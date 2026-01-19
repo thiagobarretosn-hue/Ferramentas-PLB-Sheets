@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 15px;
+      background-color: #f9f9f9;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h2 {
+      color: #1a73e8;
+      margin-top: 0;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 6px;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    input[type="text"] {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    .btn-success { background: #28a745; color: white; }
+    .btn-success:hover { background: #218838; }
+    .btn-info { background: #17a2b8; color: white; }
+    .btn-info:hover { background: #138496; }
+    .btn-primary { background: #007bff; color: white; }
+    .btn-primary:hover { background: #0056b3; }
+    .btn-warning { background: #ffc107; color: #212529; }
+    .btn-warning:hover { background: #e0a800; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-danger:hover { background: #c82333; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-secondary:hover { background: #5a6268; }
+    
+    .sheet-list {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+    }
+    .sheet-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .sheet-item:last-child {
+      border-bottom: none;
+    }
+    .sheet-item input[type="checkbox"] {
+      margin-right: 10px;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-line;
+    }
+    .result.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .mode-title {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 3px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Gerenciador de Abas</h2>
+    
+    <div class="controls">
+      <div class="input-group">
+        <label>
+          <div class="checkbox-group">
+            <input type="checkbox" id="prefixCheck"> Prefixo:
+          </div>
+        </label>
+        <input type="text" id="prefix" placeholder="Digite o prefixo" disabled>
+        <div class="mode-title">Adicionar texto antes do nome</div>
+      </div>
+      
+      <div class="input-group">
+        <label>
+          <div class="checkbox-group">
+            <input type="checkbox" id="suffixCheck"> Sufixo:
+          </div>
+        </label>
+        <input type="text" id="suffix" placeholder="Digite o sufixo" disabled>
+        <div class="mode-title">Adicionar texto depois do nome</div>
+      </div>
+      
+      <div class="input-group">
+        <label>
+          <div class="checkbox-group">
+            <input type="checkbox" id="renameCompleteCheck"> Novo Nome:
+          </div>
+        </label>
+        <input type="text" id="newBaseName" placeholder="Nome base para renomeação" disabled>
+        <div class="mode-title">Substituir nome completamente</div>
+      </div>
+      
+      <div class="input-group">
+        <label>
+          <div class="checkbox-group">
+            <input type="checkbox" id="findReplaceCheck"> Localizar e Substituir:
+          </div>
+        </label>
+        <input type="text" id="findText" placeholder="Localizar texto" disabled>
+        <input type="text" id="replaceText" placeholder="Substituir por" disabled style="margin-top: 5px;">
+        <div class="mode-title">Trocar parte específica do nome</div>
+      </div>
+    </div>
+    
+    <div class="buttons">
+      <button class="btn btn-success" onclick="selectAll()">Marcar Todos</button>
+      <button class="btn btn-info" onclick="unselectAll()">Desmarcar Todos</button>
+      <button class="btn btn-primary" onclick="renameSheets()">Renomear Selecionados</button>
+      <button class="btn btn-warning" onclick="duplicateSheets()">Duplicar Selecionados</button>
+      <button class="btn btn-danger" onclick="duplicateAndRenameSheets()">Duplicar + Renomear</button>
+    </div>
+    
+    <div class="sheet-list" id="sheetList">
+      <!-- Será preenchido dinamicamente -->
+    </div>
+    
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // Gerenciar checkboxes das opções
+    document.getElementById('prefixCheck').addEventListener('change', function() {
+      const input = document.getElementById('prefix');
+      input.disabled = !this.checked;
+      if (!this.checked) input.value = '';
+      checkRenameOptions();
+    });
+    
+    document.getElementById('suffixCheck').addEventListener('change', function() {
+      const input = document.getElementById('suffix');
+      input.disabled = !this.checked;
+      if (!this.checked) input.value = '';
+      checkRenameOptions();
+    });
+    
+    document.getElementById('renameCompleteCheck').addEventListener('change', function() {
+      const input = document.getElementById('newBaseName');
+      input.disabled = !this.checked;
+      if (!this.checked) input.value = '';
+      checkRenameOptions();
+    });
+    
+    document.getElementById('findReplaceCheck').addEventListener('change', function() {
+      const findInput = document.getElementById('findText');
+      const replaceInput = document.getElementById('replaceText');
+      findInput.disabled = !this.checked;
+      replaceInput.disabled = !this.checked;
+      if (!this.checked) {
+        findInput.value = '';
+        replaceInput.value = '';
+      }
+      checkRenameOptions();
+    });
+    
+    function checkRenameOptions() {
+      const prefixCheck = document.getElementById('prefixCheck').checked;
+      const suffixCheck = document.getElementById('suffixCheck').checked;
+      const renameCheck = document.getElementById('renameCompleteCheck').checked;
+      const findReplaceCheck = document.getElementById('findReplaceCheck').checked;
+      
+      const options = [
+        { check: 'prefixCheck', inputs: ['prefix'] },
+        { check: 'suffixCheck', inputs: ['suffix'] },
+        { check: 'renameCompleteCheck', inputs: ['newBaseName'] },
+        { check: 'findReplaceCheck', inputs: ['findText', 'replaceText'] }
+      ];
+      
+      // Encontra qual opção está ativa
+      const activeOption = options.find(opt => document.getElementById(opt.check).checked);
+      
+      // Desabilita outras opções se uma estiver ativa
+      options.forEach(opt => {
+        const isActive = opt === activeOption;
+        const checkbox = document.getElementById(opt.check);
+        
+        if (!isActive && activeOption) {
+          checkbox.disabled = true;
+          opt.inputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            input.disabled = true;
+            input.value = '';
+          });
+          if (checkbox.checked) checkbox.checked = false;
+        } else if (!activeOption) {
+          checkbox.disabled = false;
+        }
+      });
+    }
+    
+    function loadSheets() {
+      google.script.run
+        .withSuccessHandler(displaySheets)
+        .withFailureHandler(showError)
+        .getAllSheetNames();
+    }
+    
+    function displaySheets(sheets) {
+      const container = document.getElementById('sheetList');
+      container.innerHTML = '';
+      
+      sheets.forEach(name => {
+        const div = document.createElement('div');
+        div.className = 'sheet-item';
+        div.innerHTML = `
+          <input type="checkbox" value="${name}" id="sheet_${name.replace(/[^a-zA-Z0-9]/g, '_')}">
+          <label for="sheet_${name.replace(/[^a-zA-Z0-9]/g, '_')}">${name}</label>
+        `;
+        container.appendChild(div);
+      });
+    }
+    
+    function getSelectedSheets() {
+      const checkboxes = document.querySelectorAll('#sheetList input[type="checkbox"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+    
+    function selectAll() {
+      document.querySelectorAll('#sheetList input[type="checkbox"]').forEach(cb => cb.checked = true);
+    }
+    
+    function unselectAll() {
+      document.querySelectorAll('#sheetList input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+    
+    function renameSheets() {
+      const selected = getSelectedSheets();
+      if (selected.length === 0) {
+        showError('Selecione pelo menos uma aba');
+        return;
+      }
+      
+      const renameComplete = document.getElementById('renameCompleteCheck').checked;
+      const findReplace = document.getElementById('findReplaceCheck').checked;
+      const newBaseName = document.getElementById('newBaseName').value.trim();
+      const findText = document.getElementById('findText').value.trim();
+      const replaceText = document.getElementById('replaceText').value.trim();
+      const prefix = document.getElementById('prefix').value;
+      const suffix = document.getElementById('suffix').value;
+      
+      if (renameComplete) {
+        if (!newBaseName) {
+          showError('Digite o novo nome base');
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(showSuccess)
+          .withFailureHandler(showError)
+          .renameCompleteSelected(selected, newBaseName);
+          
+      } else if (findReplace) {
+        if (!findText) {
+          showError('Digite o texto a ser localizado');
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(showSuccess)
+          .withFailureHandler(showError)
+          .findAndReplaceSelected(selected, findText, replaceText);
+          
+      } else {
+        if (!prefix && !suffix) {
+          showError('Digite pelo menos um prefixo ou sufixo');
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(showSuccess)
+          .withFailureHandler(showError)
+          .renameSelected(selected, prefix, suffix);
+      }
+    }
+    
+    function duplicateSheets() {
+      const selected = getSelectedSheets();
+      if (selected.length === 0) {
+        showError('Selecione pelo menos uma aba');
+        return;
+      }
+      
+      google.script.run
+        .withSuccessHandler(showSuccess)
+        .withFailureHandler(showError)
+        .duplicateSelected(selected);
+    }
+    
+function duplicateAndRenameSheets() {
+    const selected = getSelectedSheets();
+    if (selected.length === 0) {
+      showError('Selecione pelo menos uma aba');
+      return;
+    }
+
+    const renameComplete = document.getElementById('renameCompleteCheck').checked;
+    const findReplace   = document.getElementById('findReplaceCheck').checked;
+
+    const newBaseName = (document.getElementById('newBaseName').value || '').trim();
+    const findText    = (document.getElementById('findText').value || '').trim();
+    const replaceText = (document.getElementById('replaceText').value || '').trim();
+    const prefix      = document.getElementById('prefix').value || '';
+    const suffix      = document.getElementById('suffix').value || '';
+
+    if (renameComplete) {
+      if (!newBaseName) { showError('Digite o novo nome base'); return; }
+      google.script.run
+        .withSuccessHandler(showSuccess)
+        .withFailureHandler(showError)
+        .duplicateAndRenameComplete(selected, newBaseName);
+      return;
+    }
+
+    if (findReplace) {
+      if (!findText) { showError('Digite o texto a ser localizado'); return; }
+      google.script.run
+        .withSuccessHandler(showSuccess)
+        .withFailureHandler(showError)
+        .duplicateAndFindReplace(selected, findText, replaceText);
+      return;
+    }
+
+    if (!prefix && !suffix) {
+      showError('Digite pelo menos um prefixo ou sufixo para duplicar e renomear');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(showSuccess)
+      .withFailureHandler(showError)
+      .duplicateAndRename(selected, prefix, suffix);
+  }
+    
+    function showSuccess(results) {
+      const div = document.getElementById('result');
+      div.className = 'result success';
+      div.textContent = 'Operação concluída:\n' + results.join('\n');
+      loadSheets(); // Recarrega a lista
+    }
+    
+    function showError(error) {
+      const div = document.getElementById('result');
+      div.className = 'result error';
+      div.textContent = 'Erro: ' + error;
+    }
+    
+    // Carrega as abas ao inicializar
+    loadSheets();
+  </script>
+</body>
+</html>

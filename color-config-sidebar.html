@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f5f7fa;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px;
+      text-align: center;
+      border-radius: 12px;
+      margin: -16px -16px 20px -16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .header h3 { margin: 0; font-size: 18px; font-weight: 600; }
+    .header .subtitle { font-size: 11px; opacity: 0.9; margin-top: 4px; }
+    .section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .section-title { font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 12px; display:flex; align-items:center; gap:8px; }
+    .form-group { margin-bottom: 16px; }
+    label { display:block; font-weight:600; color:#34495e; margin-bottom:6px; font-size:12px; }
+    input[type="text"], input[type="number"], input[type="range"] {
+      width:100%; padding: 8px 12px; border:2px solid #e1e8ed; border-radius:8px; background:#f8f9fa;
+      font-size:12px; transition:all .2s;
+    }
+    input[type="range"] { padding: 0; }
+    input[type="text"]:focus, input[type="number"]:focus { outline:none; border-color:#667eea; background:white; box-shadow:0 0 0 3px rgba(102,126,234,0.1); }
+    .range-group { display: flex; align-items: center; gap: 10px; }
+    .range-group span { font-weight: 500; color: #667eea; min-width: 30px; text-align: right; }
+    .checkbox-group { display:flex; align-items:center; gap:8px; padding:8px 0; }
+    .checkbox-group input[type="checkbox"] { transform:scale(1.2); accent-color:#667eea; }
+    .color-groups { max-height:250px; overflow-y:auto; border:1px solid #e1e8ed; border-radius:8px; background:#fafbfc; }
+    .color-group-item { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e1e8ed; transition:background .2s; }
+    .color-group-item:last-child { border-bottom:none; }
+    .group-name { font-weight:500; color:#2c3e50; flex:1; margin-right:12px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .color-picker-container { display:flex; align-items:center; gap:8px; }
+    input[type="color"] { width:40px; height:32px; padding:0; border:2px solid #e1e8ed; border-radius:6px; cursor:pointer; transition:all .2s; background:none; }
+    input[type="color"]:hover { border-color:#667eea; transform:scale(1.05); }
+    .actions { padding-top:16px; border-top:1px solid #e1e8ed; }
+    .btn { width:100%; padding:12px; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; margin-bottom:8px; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-primary { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; }
+    .btn-secondary { background:#f8f9fa; color:#495057; border:1px solid #e1e8ed; }
+    .status { margin-top:12px; padding:8px 12px; border-radius:6px; font-size:11px; text-align:center; display:none; }
+    .status.success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+    .status.error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+    .status.info { background:#fff3cd; color:#856404; border:1px solid #ffeeba; }
+    .info-box { background:#e3f2fd; border:1px solid #bbdefb; border-radius:6px; padding:8px 10px; font-size:11px; color:#1565c0; margin-top:8px; }
+    .empty-state { text-align:center; color:#6c757d; font-style:italic; padding:20px;}
+    .color-groups::-webkit-scrollbar { width:6px; }
+    .color-groups::-webkit-scrollbar-track { background:#f1f1f1; border-radius:3px; }
+    .color-groups::-webkit-scrollbar-thumb { background:#c1c1c1; border-radius:3px; }
+    .color-groups::-webkit-scrollbar-thumb:hover { background:#a8a8a8; }
+    .regenerate-btn { 
+      background: #28a745; 
+      color: white; 
+      border: none; 
+      padding: 4px 8px; 
+      border-radius: 4px; 
+      font-size: 10px; 
+      cursor: pointer; 
+      margin-left: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3>🎨 Configuração de Cores</h3>
+    <div class="subtitle">Configurações para a aba: <strong id="sheet-name-display">...</strong></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">⚙️ Configurações da Aba</div>
+    <div class="form-group">
+      <label for="start-row">Linha de Início</label>
+      <input type="number" id="start-row" min="1" max="10000">
+    </div>
+    <div class="form-group">
+      <label for="column-range">Intervalo de Colunas (ex: A:O)</label>
+      <input type="text" id="column-range" placeholder="A:O">
+    </div>
+    <div class="form-group">
+      <label for="group-column">Coluna de Agrupamento (ex: A)</label>
+      <input type="text" id="group-column" placeholder="A">
+    </div>
+    <div class="checkbox-group">
+      <input type="checkbox" id="automatic-coloring">
+      <label for="automatic-coloring">Colorir automaticamente ao editar</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🎨 Gerador de Cores</div>
+    <div class="form-group">
+        <label for="saturation-slider">Saturação (%)</label>
+        <div class="range-group">
+            <input type="range" id="saturation-slider" min="0" max="100">
+            <span id="saturation-value"></span>
+        </div>
+    </div>
+     <div class="form-group">
+        <label for="luminosity-slider">Luminosidade/Brilho (%)</label>
+        <div class="range-group">
+            <input type="range" id="luminosity-slider" min="0" max="100">
+            <span id="luminosity-value"></span>
+        </div>
+    </div>
+    <button class="btn btn-secondary" id="regenerate-all-colors">🔄 Regenerar Todas as Cores</button>
+    <div class="info-box">Cores aleatórias serão geradas respeitando a faixa de Saturação e Luminosidade que você definir. Use valores altos de Luminosidade para garantir a legibilidade.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🌈 Cores dos Grupos</div>
+    <div id="color-groups-container" class="color-groups"></div>
+    <div id="empty-groups" class="empty-state" style="display:none;">Nenhum grupo encontrado na coluna especificada.</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="save-btn">💾 Salvar e Aplicar Cores</button>
+    <button class="btn btn-secondary" id="apply-btn">🎨 Aplicar Apenas as Cores</button>
+    <button class="btn btn-secondary" id="reset-btn">🔄 Restaurar Padrão</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <script>
+    // --- Global State ---
+    let config = {};
+    let currentGroups = [];
+    let sheetName = '';
+    let groupColors = {};
+
+    // --- DOM Elements ---
+    const elements = {
+      startRow: document.getElementById('start-row'),
+      columnRange: document.getElementById('column-range'),
+      groupColumn: document.getElementById('group-column'),
+      automaticColoring: document.getElementById('automatic-coloring'),
+      saturationSlider: document.getElementById('saturation-slider'),
+      saturationValue: document.getElementById('saturation-value'),
+      luminositySlider: document.getElementById('luminosity-slider'),
+      luminosityValue: document.getElementById('luminosity-value'),
+      colorGroupsContainer: document.getElementById('color-groups-container'),
+      emptyGroups: document.getElementById('empty-groups'),
+      saveBtn: document.getElementById('save-btn'),
+      applyBtn: document.getElementById('apply-btn'),
+      resetBtn: document.getElementById('reset-btn'),
+      regenerateAllBtn: document.getElementById('regenerate-all-colors'),
+      status: document.getElementById('status'),
+      sheetNameDisplay: document.getElementById('sheet-name-display')
+    };
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+      showStatus('Carregando dados da aba...', 'info');
+      disableButtons(true);
+      google.script.run
+        .withSuccessHandler(data => {
+          config = data.config;
+          currentGroups = data.currentGroups;
+          sheetName = data.sheetName;
+          groupColors = config.groupColors || {};
+          
+          initializeUI();
+          renderColorGroups();
+          disableButtons(false);
+          showStatus(`Pronto para configurar a aba "${sheetName}".`, 'success');
+        })
+        .withFailureHandler(error => {
+          showStatus('❌ Erro ao carregar: ' + (error.message || String(error)), 'error');
+        })
+        .getInitialDataForSidebar();
+    });
+
+    function initializeUI() {
+        elements.sheetNameDisplay.textContent = sheetName;
+        elements.startRow.value = config.startRow;
+        elements.columnRange.value = `${config.startColLetter}:${config.endColLetter}`;
+        elements.groupColumn.value = config.groupColLetter;
+        elements.automaticColoring.checked = config.automaticColoring;
+        
+        elements.saturationSlider.value = config.saturation || 80;
+        elements.luminositySlider.value = config.luminosity || 95;
+        elements.saturationValue.textContent = `${config.saturation || 80}%`;
+        elements.luminosityValue.textContent = `${config.luminosity || 95}%`;
+
+        // Event listeners para sliders
+        elements.saturationSlider.addEventListener('input', e => {
+            elements.saturationValue.textContent = `${e.target.value}%`;
+        });
+        elements.luminositySlider.addEventListener('input', e => {
+            elements.luminosityValue.textContent = `${e.target.value}%`;
+        });
+
+        // Event listeners para atualizar grupos
+        elements.startRow.addEventListener('change', refreshGroups);
+        elements.groupColumn.addEventListener('change', refreshGroups);
+        
+        // Event listener para regenerar cores
+        elements.regenerateAllBtn.addEventListener('click', regenerateAllColors);
+    }
+    
+    // --- FUNÇÃO CORRIGIDA: Atualizar grupos dinamicamente ---
+    function refreshGroups() {
+      const startRow = parseInt(elements.startRow.value, 10);
+      const groupColLetter = elements.groupColumn.value.trim().toUpperCase();
+
+      if (!startRow || !groupColLetter) return;
+
+      showStatus('Atualizando grupos...', 'info');
+      disableButtons(true);
+
+      google.script.run
+        .withSuccessHandler(newGroups => {
+          // CORREÇÃO: Não resetar cores existentes, apenas adicionar novas
+          currentGroups = newGroups;
+          
+          // Adicionar cores para novos grupos apenas
+          currentGroups.forEach(groupName => {
+            if (!groupColors[groupName]) {
+              groupColors[groupName] = generateRandomHexColor();
+            }
+          });
+          
+          renderColorGroups();
+          disableButtons(false);
+          showStatus(`Grupos atualizados da coluna ${groupColLetter}.`, 'success');
+        })
+        .withFailureHandler(error => {
+          showStatus('❌ Erro ao atualizar grupos: ' + error.message, 'error');
+          disableButtons(false);
+        })
+        .getRefreshedGroups(sheetName, startRow, groupColLetter);
+    }
+
+    // --- FUNÇÃO CORRIGIDA: Geração de cores em HEX ---
+    function generateRandomHexColor() {
+        const h = Math.floor(Math.random() * 361); // 0-360
+        const s = parseInt(elements.saturationSlider.value, 10);
+        const l = parseInt(elements.luminositySlider.value, 10);
+        
+        // Converter HSL para HEX diretamente
+        return hslToHex(h, s, l);
+    }
+
+    // --- FUNÇÃO CORRIGIDA: Conversão HSL para HEX ---
+    function hslToHex(h, s, l) {
+        s /= 100;
+        l /= 100;
+        
+        const a = s * Math.min(l, 1 - l);
+        const f = n => {
+            const k = (n + h / 30) % 12;
+            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            return Math.round(255 * color).toString(16).padStart(2, '0');
+        };
+        
+        return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
+    // --- NOVA FUNÇÃO: Regenerar todas as cores ---
+    function regenerateAllColors() {
+        if (!confirm('🔄 Regenerar todas as cores dos grupos?')) return;
+        
+        currentGroups.forEach(groupName => {
+            groupColors[groupName] = generateRandomHexColor();
+        });
+        
+        renderColorGroups();
+        showStatus('✨ Todas as cores foram regeneradas!', 'success');
+    }
+
+    // --- FUNÇÃO CORRIGIDA: Renderizar grupos de cores ---
+    function renderColorGroups() {
+      const container = elements.colorGroupsContainer;
+      if (!Array.isArray(currentGroups) || currentGroups.length === 0) {
+        container.style.display = 'none';
+        elements.emptyGroups.style.display = 'block';
+        return;
+      }
+      container.style.display = 'block';
+      elements.emptyGroups.style.display = 'none';
+      container.innerHTML = '';
+
+      currentGroups.forEach(groupName => {
+        if (!groupColors[groupName]) {
+          groupColors[groupName] = generateRandomHexColor();
+        }
+
+        const item = document.createElement('div');
+        item.className = 'color-group-item';
+
+        item.innerHTML = `
+          <span class="group-name" title="${escapeHtml(groupName)}">${escapeHtml(groupName)}</span>
+          <div class="color-picker-container">
+            <div style="width:24px; height:24px; border-radius: 50%; background-color: ${groupColors[groupName]}; border: 1px solid #ddd;"></div>
+            <input type="color" value="${groupColors[groupName]}" data-group="${escapeAttr(groupName)}">
+            <button class="regenerate-btn" data-group="${escapeAttr(groupName)}">🎲</button>
+          </div>
+        `;
+        
+        container.appendChild(item);
+      });
+      
+      // Event listeners para color pickers
+      container.querySelectorAll('input[type="color"]').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const group = e.target.dataset.group;
+          groupColors[group] = e.target.value;
+          e.target.previousElementSibling.style.backgroundColor = e.target.value;
+        });
+      });
+      
+      // Event listeners para botões de regenerar cor individual
+      container.querySelectorAll('.regenerate-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const group = e.target.dataset.group;
+          const newColor = generateRandomHexColor();
+          groupColors[group] = newColor;
+          
+          const colorInput = e.target.previousElementSibling;
+          const colorPreview = colorInput.previousElementSibling;
+          
+          colorInput.value = newColor;
+          colorPreview.style.backgroundColor = newColor;
+        });
+      });
+    }
+
+    // --- FUNÇÃO CORRIGIDA: Salvar configuração ---
+    function saveConfiguration() {
+      disableButtons(true);
+      showStatus('Salvando configurações...', 'info');
+      
+      const columnRangeParts = (elements.columnRange.value || '').split(':');
+      const configData = {
+        startRow: parseInt(elements.startRow.value) || 2,
+        startCol: (columnRangeParts[0] || 'A').trim().toUpperCase(),
+        endCol: (columnRangeParts[1] || 'O').trim().toUpperCase(),
+        groupCol: (elements.groupColumn.value || 'A').trim().toUpperCase(),
+        groupColors: groupColors, // Já está em HEX
+        automaticColoring: elements.automaticColoring.checked,
+        saturation: parseInt(elements.saturationSlider.value, 10),
+        luminosity: parseInt(elements.luminositySlider.value, 10)
+      };
+
+      google.script.run
+        .withSuccessHandler(result => {
+          disableButtons(false);
+          if (result && result.success) {
+            showStatus('✅ ' + result.message, 'success');
+          } else {
+            showStatus('❌ ' + (result?.message || 'Erro desconhecido'), 'error');
+          }
+        })
+        .withFailureHandler(error => {
+          disableButtons(false);
+          showStatus('❌ Erro: ' + (error.message || String(error)), 'error');
+        })
+        .salvarConfiguracaoCores(configData, sheetName);
+    }
+
+    function applyColorsNow() {
+      disableButtons(true);
+      showStatus('Aplicando cores na aba...', 'info');
+      google.script.run
+        .withSuccessHandler(() => {
+          disableButtons(false);
+          showStatus('✅ Cores aplicadas com sucesso!', 'success');
+        })
+        .withFailureHandler(error => {
+          disableButtons(false);
+          showStatus('❌ Erro: ' + (error.message || String(error)), 'error');
+        })
+        .applyGroupColors(sheetName);
+    }
+
+    function resetToDefaults() {
+      if (!confirm('🔄 Restaurar configurações padrão para esta aba?')) return;
+      
+      const defaultConfig = {
+          startRow: 2, startColLetter: 'A', endColLetter: 'O', groupColLetter: 'A',
+          automaticColoring: false, saturation: 80, luminosity: 95
+      };
+
+      elements.startRow.value = defaultConfig.startRow;
+      elements.columnRange.value = `${defaultConfig.startColLetter}:${defaultConfig.endColLetter}`;
+      elements.groupColumn.value = defaultConfig.groupColLetter;
+      elements.automaticColoring.checked = defaultConfig.automaticColoring;
+      elements.saturationSlider.value = defaultConfig.saturation;
+      elements.luminositySlider.value = defaultConfig.luminosity;
+      elements.saturationValue.textContent = `${defaultConfig.saturation}%`;
+      elements.luminosityValue.textContent = `${defaultConfig.luminosity}%`;
+
+      refreshGroups();
+      showStatus('🔄 Configurações restauradas. Salve para aplicar.', 'info');
+    }
+
+    // --- Event Listeners ---
+    elements.saveBtn.addEventListener('click', saveConfiguration);
+    elements.applyBtn.addEventListener('click', applyColorsNow);
+    elements.resetBtn.addEventListener('click', resetToDefaults);
+
+    // --- UI Helpers ---
+    function showStatus(message, type='info') {
+      elements.status.textContent = message;
+      elements.status.className = `status ${type}`;
+      elements.status.style.display = 'block';
+      if (type === 'success' || type === 'info') {
+        setTimeout(()=> elements.status.style.display='none', 4000);
+      }
+    }
+
+    function disableButtons(disabled=true) {
+      elements.saveBtn.disabled = disabled;
+      elements.applyBtn.disabled = disabled;
+      elements.resetBtn.disabled = disabled;
+      elements.regenerateAllBtn.disabled = disabled;
+    }
+
+    function escapeHtml(text) {
+      if (text == null) return '';
+      return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+    function escapeAttr(text) { return escapeHtml(text); }
+  </script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --border: #dadce0;
+      --text: #202124;
+      --hover: #e8f0fe;
+    }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* Área de Busca Fixa */
+    .header {
+      padding: 12px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      z-index: 10;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+
+    /* Lista de Resultados */
+    .results-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .result-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid transparent;
+      transition: background 0.1s;
+      color: var(--text);
+    }
+
+    .result-item:hover {
+      background-color: #f1f3f4;
+    }
+
+    .result-item.selected {
+      background-color: var(--hover);
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    /* Checkbox Visual */
+    .custom-check {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #5f6368;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: white;
+    }
+
+    .result-item.selected .custom-check {
+      background-color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .result-item.selected .custom-check::after {
+      content: '✓';
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    /* Rodapé */
+    .footer {
+      padding: 12px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      opacity: 0.5;
+      pointer-events: none;
+      transition: all 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    button.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    button:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    .info-text {
+      color: #5f6368;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <input type="text" id="searchInput" placeholder="Ex: bushing 1-1/4 cpvc" autocomplete="off" autofocus>
+  </div>
+
+  <div class="results-container" id="resultsList">
+    <div style="padding:20px; text-align:center; color:#888;">Carregando catálogo...</div>
+  </div>
+
+  <div class="footer">
+    <span class="info-text" id="statusText">0 itens</span>
+    <button id="btnInsert" onclick="inserirDados()">INSERIR</button>
+  </div>
+
+  <script>
+    let rawData = [];
+    let selectedSet = new Set();
+
+    // 1. Carrega dados ao abrir
+    window.onload = () => {
+      google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(err => {
+          document.getElementById('resultsList').innerHTML = `<div style="padding:20px; color:red">Erro: ${err.message}</div>`;
+        })
+        .getDadosParaBusca();
+    };
+
+    function onDataLoaded(data) {
+      rawData = data || [];
+      const list = document.getElementById('resultsList');
+      if (rawData.length === 0) {
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Lista vazia ou não encontrada.</div>';
+      } else {
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Digite para filtrar...</div>';
+      }
+      
+      document.getElementById('searchInput').addEventListener('input', runFilter);
+      document.getElementById('searchInput').focus();
+    }
+
+    // 2. Filtro (AND Logic, preservando símbolos)
+    function runFilter() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const container = document.getElementById('resultsList');
+      
+      if (!query.trim()) {
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Digite para filtrar...</div>';
+        return;
+      }
+
+      const tokens = query.split(/\s+/).filter(t => t.length > 0);
+
+      const filtered = rawData.filter(item => {
+        const itemLower = item.toLowerCase();
+        return tokens.every(token => itemLower.includes(token));
+      });
+
+      renderList(filtered);
+    }
+
+    // 3. Renderização
+    function renderList(items) {
+      const container = document.getElementById('resultsList');
+      container.innerHTML = '';
+
+      if (items.length === 0) {
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Nenhum resultado.</div>';
+        return;
+      }
+
+      // Limite de 50 itens para performance
+      const limit = 50;
+      const viewItems = items.slice(0, limit);
+
+      viewItems.forEach(text => {
+        const div = document.createElement('div');
+        const isSelected = selectedSet.has(text);
+        
+        div.className = `result-item ${isSelected ? 'selected' : ''}`;
+        div.onclick = () => toggleItem(text, div);
+        
+        div.innerHTML = `
+          <div class="custom-check"></div>
+          <span>${text}</span>
+        `;
+        container.appendChild(div);
+      });
+
+      if (items.length > limit) {
+        const more = document.createElement('div');
+        more.style.padding = "10px";
+        more.style.textAlign = "center";
+        more.style.color = "#888";
+        more.innerText = `+ ${items.length - limit} outros resultados...`;
+        container.appendChild(more);
+      }
+    }
+
+    // 4. Seleção
+    function toggleItem(text, el) {
+      if (selectedSet.has(text)) {
+        selectedSet.delete(text);
+        el.classList.remove('selected');
+      } else {
+        selectedSet.add(text);
+        el.classList.add('selected');
+      }
+      updateFooter();
+    }
+
+    function updateFooter() {
+      const count = selectedSet.size;
+      document.getElementById('statusText').innerText = `${count} selecionado(s)`;
+      const btn = document.getElementById('btnInsert');
+      
+      if (count > 0) {
+        btn.classList.add('active');
+        btn.innerText = `INSERIR (${count})`;
+      } else {
+        btn.classList.remove('active');
+        btn.innerText = 'INSERIR';
+      }
+    }
+
+    // 5. Inserção Fluida (Mantém a busca)
+    function inserirDados() {
+      const itens = Array.from(selectedSet);
+      if (itens.length === 0) return;
+
+      const btn = document.getElementById('btnInsert');
+      const oldText = btn.innerText;
+      btn.innerText = '...';
+
+      google.script.run
+        .withSuccessHandler(() => {
+          // 1. Limpa seleção lógica
+          selectedSet.clear();
+          
+          // 2. Remove destaque visual, mas MANTÉM a lista
+          document.querySelectorAll('.result-item.selected').forEach(el => {
+            el.classList.remove('selected');
+          });
+
+          // 3. Atualiza rodapé
+          updateFooter();
+
+          // 4. Feedback no botão
+          const btn = document.getElementById('btnInsert');
+          btn.innerText = "SUCESSO!";
+          setTimeout(() => updateFooter(), 1500);
+
+          // 5. Mantém o foco para continuar
+          document.getElementById('searchInput').focus();
+        })
+        .withFailureHandler(err => {
+          alert("Erro: " + err.message);
+          btn.innerText = oldText;
+        })
+        .inserirItensSelecionados(itens);
+    }
+  </script>
+</body>
+</html>

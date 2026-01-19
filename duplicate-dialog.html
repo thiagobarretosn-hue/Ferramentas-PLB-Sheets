@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 16px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      margin: 0;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .header h3 {
+      color: #e74c3c;
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+    
+    .header p {
+      color: #666;
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    .local-name {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    
+    .comparison {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    
+    .template-panel {
+      flex: 1;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .panel-header {
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      color: white;
+    }
+    
+    .existing-header {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    }
+    
+    .new-header {
+      background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    }
+    
+    .panel-content {
+      padding: 16px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .template-item {
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    
+    .template-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .template-task {
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 4px;
+    }
+    
+    .template-desc {
+      color: #666;
+      font-size: 11px;
+    }
+    
+    .template-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 10px;
+      color: #999;
+    }
+    
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid #e1e8ed;
+    }
+    
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 100px;
+    }
+    
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    
+    .btn-cancel {
+      background: #95a5a6;
+      color: white;
+    }
+    
+    .btn-cancel:hover {
+      background: #7f8c8d;
+    }
+    
+    .btn-rename {
+      background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+      color: white;
+    }
+    
+    .btn-rename:hover {
+      box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+    }
+    
+    .btn-update {
+      background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+      color: white;
+    }
+    
+    .btn-update:hover {
+      box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    .status {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: center;
+      display: none;
+    }
+    
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    /* Scrollbar customizada */
+    .panel-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .panel-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    .panel-content::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    
+    .panel-content::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    /* Responsividade */
+    @media (max-width: 600px) {
+      .comparison {
+        flex-direction: column;
+      }
+      
+      .actions {
+        flex-direction: column;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3>⚠️ Conflito de Template Detectado</h3>
+    <p>Já existe um template para <span class="local-name"><?= localName ?></span>. Compare e escolha uma ação:</p>
+  </div>
+
+  <div class="comparison">
+    <div class="template-panel">
+      <div class="panel-header existing-header">
+        📋 Template Existente
+      </div>
+      <div class="panel-content" id="existingList"></div>
+    </div>
+    
+    <div class="template-panel">
+      <div class="panel-header new-header">
+        ✨ Nova Seleção
+      </div>
+      <div class="panel-content" id="newList"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-cancel" onclick="closeDialog()">
+      ❌ Cancelar
+    </button>
+    <button class="btn btn-rename" id="renameBtn">
+      🏷️ Salvar como Novo
+    </button>
+    <button class="btn btn-update" id="updateBtn">
+      🔄 Substituir Existente
+    </button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <script>
+    // ======== DADOS INJETADOS PELO SERVIDOR ========
+    let existingTemplates, newTemplates;
+    
+    try {
+      // Tenta fazer parse dos dados injetados
+      const existingRaw = <?= existingTemplates ?>;
+      const newRaw = <?= newTemplates ?>;
+      
+      existingTemplates = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      newTemplates = typeof newRaw === 'string' ? JSON.parse(newRaw) : newRaw;
+    } catch (error) {
+      console.error('Erro ao processar dados dos templates:', error);
+      existingTemplates = [];
+      newTemplates = [];
+    }
+
+    const localName = '<?= localName ?>';
+
+    // ======== FUNÇÕES UTILITÁRIAS ========
+    function showStatus(message, type = 'info') {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`;
+      statusEl.style.display = 'block';
+    }
+
+    function disableButtons(disabled = true) {
+      document.querySelectorAll('.btn').forEach(btn => {
+        btn.disabled = disabled;
+      });
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+
+    // ======== RENDERIZAÇÃO ========
+    function renderTemplateList(templates, containerId) {
+      const container = document.getElementById(containerId);
+      
+      if (!templates || templates.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999; font-style: italic;">Nenhum template encontrado</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      
+      templates.forEach((template, index) => {
+        const item = document.createElement('div');
+        item.className = 'template-item';
+        
+        const taskInfo = template.task && template.subTrade 
+          ? `${template.task} → ${template.subTrade}`
+          : (template.task || 'Task não especificada');
+        
+        item.innerHTML = `
+          <div class="template-task">${taskInfo}</div>
+          <div class="template-desc">${template.description || template.desc || 'Sem descrição'}</div>
+          <div class="template-meta">
+            <span>Local: ${template.local || 'N/A'}</span>
+            <span>Qty: ${template.quantity || template.qty || '0'}</span>
+          </div>
+        `;
+        
+        container.appendChild(item);
+      });
+    }
+
+    // ======== AÇÕES DO USUÁRIO ========
+    function updateExistingTemplate() {
+      showStatus('Atualizando template existente...', 'info');
+      disableButtons(true);
+
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result && result.success) {
+            showStatus('✅ Template atualizado com sucesso!', 'success');
+            setTimeout(() => {
+              google.script.run.atualizarTemplates(); // Refresh cache
+              closeDialog();
+            }, 1500);
+          } else {
+            showStatus(`❌ Erro: ${result?.message || 'Falha desconhecida'}`, 'error');
+            disableButtons(false);
+          }
+        })
+        .withFailureHandler(error => {
+          showStatus(`❌ Erro: ${error.message}`, 'error');
+          disableButtons(false);
+        })
+        .updateExistingTemplate(existingTemplates, newTemplates);
+    }
+
+    function saveAsNewTemplate() {
+      const newName = prompt(
+        '🏷️ Digite o novo nome para o LOCAL:\n\n' +
+        'O template será salvo com este novo nome, mantendo o existente inalterado.',
+        localName + '_NOVO'
+      );
+
+      if (!newName || newName.trim() === '') {
+        return;
+      }
+
+      const trimmedName = newName.trim();
+      
+      if (trimmedName === localName) {
+        alert('❌ O novo nome deve ser diferente do nome atual!');
+        return;
+      }
+
+      showStatus(`Salvando como "${trimmedName}"...`, 'info');
+      disableButtons(true);
+
+      // Cria cópia dos templates com novo nome
+      const renamedTemplates = newTemplates.map(template => ({
+        ...template,
+        local: trimmedName
+      }));
+
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result && result.success) {
+            showStatus('✅ Novo template salvo com sucesso!', 'success');
+            setTimeout(() => {
+              google.script.run.atualizarTemplates(); // Refresh cache
+              closeDialog();
+            }, 1500);
+          } else {
+            showStatus(`❌ Erro: ${result?.message || 'Falha desconhecida'}`, 'error');
+            disableButtons(false);
+          }
+        })
+        .withFailureHandler(error => {
+          showStatus(`❌ Erro: ${error.message}`, 'error');
+          disableButtons(false);
+        })
+        .saveTemplateToDatabase(renamedTemplates);
+    }
+
+    // ======== EVENT LISTENERS ========
+    document.getElementById('updateBtn').addEventListener('click', updateExistingTemplate);
+    document.getElementById('renameBtn').addEventListener('click', saveAsNewTemplate);
+
+    // ======== INICIALIZAÇÃO ========
+    document.addEventListener('DOMContentLoaded', () => {
+      renderTemplateList(existingTemplates, 'existingList');
+      renderTemplateList(newTemplates, 'newList');
+      
+      // Validação inicial
+      if (!existingTemplates || !newTemplates) {
+        showStatus('❌ Erro: Dados dos templates não foram carregados corretamente', 'error');
+        disableButtons(true);
+        document.querySelector('.btn-cancel').disabled = false;
+      }
+      
+      // Adiciona informações de estatísticas
+      const existingCount = existingTemplates ? existingTemplates.length : 0;
+      const newCount = newTemplates ? newTemplates.length : 0;
+      
+      if (existingCount > 0 && newCount > 0) {
+        showStatus(
+          `📊 Comparando: ${existingCount} item(ns) existente(s) vs ${newCount} novo(s) item(ns)`,
+          'info'
+        );
+      }
+    });
+
+    // ======== ATALHOS DE TECLADO ========
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDialog();
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        updateExistingTemplate();
+      } else if (e.key === 'Enter' && e.shiftKey) {
+        saveAsNewTemplate();
+      }
+    });
+  </script>
+</body>
+</html>

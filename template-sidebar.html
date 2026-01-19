@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>PLB Templates</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 8px;
+      background: #f8f9fa;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 8px 12px;
+      text-align: center;
+      border-radius: 6px;
+      margin: -8px -8px 8px -8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .header h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .header .subtitle {
+      font-size: 10px;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+      align-items: center;
+      background: white;
+      padding: 6px 8px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      border: 1px solid #e9ecef;
+      flex-wrap: nowrap;
+    }
+    
+    .search-box {
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    .search-box input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background: #f8f9fa;
+      font-size: 11px;
+      transition: all 0.2s ease;
+      height: 28px;
+    }
+    
+    .search-box input:focus {
+      outline: none;
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn {
+      border: none;
+      border-radius: 4px;
+      padding: 0;
+      font-size: 10px;
+      font-weight: 500;
+      color: white;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      height: 28px;
+      min-width: 60px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .btn-primary {
+      background: #28a745;
+      position: relative;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      background: #218838;
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .btn-secondary:hover:not(:disabled) {
+      background: #5a6268;
+      transform: translateY(-1px);
+    }
+    
+    .row-indicator {
+      background: #007bff;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+      font-size: 10px;
+      border: 1px solid #0056b3;
+      white-space: nowrap;
+    }
+
+    .task-card {
+      background: white;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      overflow: hidden;
+      transition: all 0.2s ease;
+      border: 1px solid #e9ecef;
+    }
+    
+    .task-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .task-card.hidden {
+      display: none;
+    }
+    
+    .task-header {
+      padding: 6px 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 11px;
+      position: relative;
+      min-height: 28px;
+    }
+    
+    .task-content {
+      display: none;
+      background: #fafbfc;
+      border-top: 1px solid #e9ecef;
+    }
+    
+    .task-content.active {
+      display: block;
+    }
+    
+    .task-title {
+      font-weight: 600;
+    }
+    
+    .task-badge {
+      background: rgba(255,255,255,0.9);
+      color: #333;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .subtrade-card {
+      margin: 4px 6px;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid #e9ecef;
+      overflow: hidden;
+    }
+    
+    .subtrade-card.hidden {
+      display: none;
+    }
+    
+    .subtrade-header {
+      padding: 5px 8px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 500;
+      font-size: 10px;
+      border-bottom: 1px solid #e9ecef;
+      transition: opacity 0.2s ease;
+      min-height: 24px;
+    }
+    
+    .subtrade-header:hover {
+      opacity: 0.8;
+    }
+    
+    .subtrade-content {
+      display: none;
+      padding: 6px;
+    }
+    
+    .subtrade-content.active {
+      display: block;
+    }
+    
+    .subtrade-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 9px;
+      color: #6c757d;
+      padding: 2px 4px;
+    }
+    
+    .subtrade-actions label {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    
+    .subtrade-actions a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .subtrade-actions a:hover {
+      text-decoration: underline;
+    }
+
+    .local-item {
+      display: flex;
+      align-items: center;
+      background: #f8f9fa;
+      padding: 4px 6px;
+      margin-bottom: 3px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      cursor: pointer;
+      font-size: 10px;
+      min-height: 24px;
+      position: relative;
+    }
+    
+    .local-item:hover {
+      background: #e3f2fd;
+      border-color: #667eea;
+    }
+    
+    .local-item.selected {
+      background: #e3f2fd;
+      border-color: #667eea;
+      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.2);
+    }
+
+    .local-item.selected::after {
+      content: attr(data-order);
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #667eea;
+      color: white;
+      font-size: 8px;
+      padding: 2px 4px;
+      border-radius: 8px;
+      min-width: 14px;
+      text-align: center;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    
+    .local-checkbox {
+      margin-right: 6px;
+      transform: scale(0.9);
+      accent-color: #667eea;
+    }
+    
+    .local-info {
+      flex: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .local-name {
+      font-weight: 500;
+      color: #2c3e50;
+    }
+    
+    .local-count {
+      background: #667eea;
+      color: white;
+      padding: 1px 5px;
+      border-radius: 8px;
+      font-size: 8px;
+      font-weight: 600;
+    }
+
+    .status {
+      margin-top: 6px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      text-align: center;
+    }
+    
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .subtrade-badge {
+      background: rgba(255,255,255,0.2);
+      color: inherit;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 8px;
+      font-weight: 600;
+    }
+
+    .selection-counter {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #28a745;
+      color: white;
+      padding: 1px 4px;
+      border-radius: 6px;
+      font-size: 8px;
+      font-weight: 600;
+      min-width: 12px;
+      height: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    
+    @media (max-width: 500px) {
+      .controls {
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      
+      .search-box {
+        min-width: 100px;
+        flex-basis: 100%;
+        margin-bottom: 4px;
+      }
+      
+      .btn {
+        font-size: 9px;
+        min-width: 50px;
+        padding: 0 6px;
+      }
+      
+      .row-indicator {
+        font-size: 9px;
+        padding: 3px 6px;
+      }
+    }
+
+    /* Compactação adicional para economizar espaço */
+    .task-card + .task-card {
+      margin-top: 4px;
+    }
+
+    .subtrade-card + .subtrade-card {
+      margin-top: 2px;
+    }
+
+    .local-item:last-child {
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+
+
+  <div class="controls">
+    <div class="search-box">
+      <input id="searchInput" type="text" placeholder="🔍 Filtrar...">
+    </div>
+    <button id="insertSelectedBtn" class="btn btn-primary">
+      Inserir selecionados
+      <span id="selectionCounter" class="selection-counter" style="display: none;">0</span>
+    </button>
+    <button id="clearBtn" class="btn btn-secondary">Limpar</button>
+    <button id="refreshBtn" class="btn btn-secondary">Atualizar</button>
+    <span id="rowIndicator" class="row-indicator">Linha: 56</span>
+  </div>
+
+  <div id="templateContainer"></div>
+  <div id="statusMessage" class="status" style="display: none;"></div>
+
+  <script>
+    const TEMPLATE_DATA = <?!= templates ?>;
+    let templatesData = TEMPLATE_DATA;
+    let selectionOrder = [];
+    let selectionCounter = 0;
+    
+    if (typeof TEMPLATE_DATA === 'string') {
+      try {
+        templatesData = JSON.parse(TEMPLATE_DATA);
+      } catch (e) {
+        console.error('Erro ao fazer parse dos templates:', e);
+        templatesData = { tasks: {}, total: 0 };
+      }
+    }
+
+    const elements = {
+      container: document.getElementById('templateContainer'),
+      searchInput: document.getElementById('searchInput'),
+      insertBtn: document.getElementById('insertSelectedBtn'),
+      clearBtn: document.getElementById('clearBtn'),
+      refreshBtn: document.getElementById('refreshBtn'),
+      rowIndicator: document.getElementById('rowIndicator'),
+      status: document.getElementById('statusMessage'),
+      selectionCounter: document.getElementById('selectionCounter')
+    };
+
+    function showStatus(message, type = 'info') {
+      elements.status.textContent = message;
+      elements.status.className = `status ${type}`;
+      elements.status.style.display = 'block';
+      
+      if (type === 'success' || type === 'error') {
+        setTimeout(() => {
+          elements.status.style.display = 'none';
+        }, 3000);
+      }
+    }
+
+    function clearStatus() {
+      elements.status.style.display = 'none';
+    }
+
+    function getTextColor(backgroundColor) {
+      const hex = backgroundColor.replace('#', '');
+      const r = parseInt(hex.substr(0, 2), 16);
+      const g = parseInt(hex.substr(2, 2), 16);
+      const b = parseInt(hex.substr(4, 2), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance > 0.6 ? '#000000' : '#ffffff';
+    }
+
+    function updateRowIndicator() {
+      google.script.run
+        .withSuccessHandler(row => {
+          elements.rowIndicator.textContent = `Linha: ${row || '—'}`;
+        })
+        .withFailureHandler(() => {
+          elements.rowIndicator.textContent = 'Linha: —';
+        })
+        .getSelectedRowForClient();
+    }
+
+    function updateSelectionCounter() {
+      const count = selectionOrder.length;
+      if (count > 0) {
+        elements.selectionCounter.textContent = count;
+        elements.selectionCounter.style.display = 'inline';
+      } else {
+        elements.selectionCounter.style.display = 'none';
+      }
+    }
+
+    function addToSelection(task, subTrade, local, element) {
+      const key = `${task}|${subTrade}|${local}`;
+      
+      // Remove se já existir
+      const existingIndex = selectionOrder.findIndex(item => item.key === key);
+      if (existingIndex !== -1) {
+        selectionOrder.splice(existingIndex, 1);
+        element.removeAttribute('data-order');
+        element.classList.remove('selected');
+      } else {
+        // Adiciona nova seleção
+        selectionCounter++;
+        const selection = {
+          key,
+          task,
+          subTrade,
+          local,
+          order: selectionCounter
+        };
+        selectionOrder.push(selection);
+        element.setAttribute('data-order', selectionCounter);
+        element.classList.add('selected');
+      }
+      
+      // Reordena os números visuais
+      selectionOrder.forEach((item, index) => {
+        const itemElement = document.querySelector(`[data-selection-key="${item.key}"]`);
+        if (itemElement) {
+          itemElement.setAttribute('data-order', index + 1);
+        }
+      });
+      
+      updateSelectionCounter();
+    }
+
+    function renderTemplates(data) {
+      const tasks = data.tasks || {};
+      elements.container.innerHTML = '';
+
+      Object.keys(tasks).sort().forEach(taskName => {
+        const task = tasks[taskName];
+        
+        const taskCard = document.createElement('div');
+        taskCard.className = 'task-card';
+        taskCard.dataset.taskName = taskName.toLowerCase();
+
+        const taskHeader = document.createElement('div');
+        taskHeader.className = 'task-header';
+        
+        const taskColor = task.colorCode || '#667eea';
+        taskHeader.style.background = taskColor;
+        taskHeader.style.color = getTextColor(taskColor);
+
+        taskHeader.innerHTML = `
+          <span class="task-title">${taskName}</span>
+          <span class="task-badge">${task.totalTemplates}</span>
+        `;
+
+        const taskContent = document.createElement('div');
+        taskContent.className = 'task-content';
+
+        const subTrades = task.subTrades || {};
+        Object.keys(subTrades).sort().forEach(subTradeName => {
+          const subTrade = subTrades[subTradeName];
+          
+          const subTradeCard = document.createElement('div');
+          subTradeCard.className = 'subtrade-card';
+          subTradeCard.dataset.subtradeName = subTradeName.toLowerCase();
+
+          const subTradeHeader = document.createElement('div');
+          subTradeHeader.className = 'subtrade-header';
+          
+          const subTradeColor = subTrade.colorCode || '#667eea';
+          subTradeHeader.style.background = subTradeColor;
+          subTradeHeader.style.color = getTextColor(subTradeColor);
+          
+          subTradeHeader.innerHTML = `
+            <span>${subTradeName}</span>
+            <span class="subtrade-badge">${subTrade.totalTemplates}</span>
+          `;
+
+          const subTradeContent = document.createElement('div');
+          subTradeContent.className = 'subtrade-content';
+
+          const actions = document.createElement('div');
+          actions.className = 'subtrade-actions';
+          actions.innerHTML = `
+            <label>
+              <input type="checkbox" class="select-all-checkbox"> Todos
+            </label>
+            <span>•</span>
+            <a href="#" class="insert-all-link">Inserir todos</a>
+          `;
+
+          subTradeContent.appendChild(actions);
+
+          const locals = subTrade.locals || {};
+          Object.keys(locals).sort().forEach(localName => {
+            const local = locals[localName];
+            
+            const localItem = document.createElement('div');
+            localItem.className = 'local-item';
+            localItem.dataset.localName = localName.toLowerCase();
+            localItem.dataset.selectionKey = `${taskName}|${subTradeName}|${localName}`;
+
+            localItem.innerHTML = `
+              <input type="checkbox" class="local-checkbox">
+              <div class="local-info">
+                <span class="local-name">${localName}</span>
+                <span class="local-count">${local.templates.length}</span>
+              </div>
+            `;
+
+            const checkbox = localItem.querySelector('.local-checkbox');
+            
+            checkbox.addEventListener('change', (e) => {
+              if (e.target.checked) {
+                addToSelection(taskName, subTradeName, localName, localItem);
+              } else {
+                removeFromSelection(taskName, subTradeName, localName, localItem);
+              }
+            });
+
+            localItem.addEventListener('click', (e) => {
+              if (e.target.classList.contains('local-checkbox')) return;
+              
+              checkbox.checked = !checkbox.checked;
+              
+              if (checkbox.checked) {
+                addToSelection(taskName, subTradeName, localName, localItem);
+              } else {
+                removeFromSelection(taskName, subTradeName, localName, localItem);
+              }
+            });
+
+            subTradeContent.appendChild(localItem);
+          });
+
+          subTradeHeader.addEventListener('click', () => {
+            subTradeContent.classList.toggle('active');
+          });
+
+          actions.querySelector('.select-all-checkbox').addEventListener('change', (e) => {
+            const checkboxes = subTradeContent.querySelectorAll('.local-checkbox');
+            checkboxes.forEach(cb => {
+              cb.checked = e.target.checked;
+              cb.dispatchEvent(new Event('change'));
+            });
+          });
+
+          actions.querySelector('.insert-all-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            const allLocals = Array.from(subTradeContent.querySelectorAll('.local-item')).map(item => ({
+              task: taskName,
+              subTrade: subTradeName,
+              local: item.querySelector('.local-name').textContent
+            }));
+            insertMultipleSelections(allLocals);
+          });
+
+          subTradeCard.appendChild(subTradeHeader);
+          subTradeCard.appendChild(subTradeContent);
+          taskContent.appendChild(subTradeCard);
+        });
+
+        taskHeader.addEventListener('click', () => {
+          taskContent.classList.toggle('active');
+        });
+
+        taskCard.appendChild(taskHeader);
+        taskCard.appendChild(taskContent);
+        elements.container.appendChild(taskCard);
+      });
+    }
+
+    function removeFromSelection(task, subTrade, local, element) {
+      const key = `${task}|${subTrade}|${local}`;
+      const index = selectionOrder.findIndex(item => item.key === key);
+      
+      if (index !== -1) {
+        selectionOrder.splice(index, 1);
+        element.removeAttribute('data-order');
+        element.classList.remove('selected');
+        
+        // Reordena os números
+        selectionOrder.forEach((item, i) => {
+          const itemElement = document.querySelector(`[data-selection-key="${item.key}"]`);
+          if (itemElement) {
+            itemElement.setAttribute('data-order', i + 1);
+          }
+        });
+        
+        updateSelectionCounter();
+      }
+    }
+
+    function insertSingleLocal(taskName, subTradeName, localName, element) {
+      showStatus(`Inserindo "${localName}"...`, 'info');
+      elements.insertBtn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(result => {
+          elements.insertBtn.disabled = false;
+          element.classList.remove('selected');
+          
+          if (result && result.success) {
+            showStatus(
+              `✅ ${result.totalInserted} linha(s) na linha ${result.startRow}`,
+              'success'
+            );
+            updateRowIndicator();
+          } else {
+            showStatus(
+              `❌ Falha: ${result?.message || 'erro desconhecido'}`,
+              'error'
+            );
+          }
+        })
+        .withFailureHandler(error => {
+          elements.insertBtn.disabled = false;
+          element.classList.remove('selected');
+          showStatus(`❌ Erro: ${error.message}`, 'error');
+        })
+        .inserirLocal(taskName, subTradeName, localName);
+    }
+
+    function insertMultipleSelections(selections) {
+      if (!selections || selections.length === 0) {
+        showStatus('❌ Selecione ao menos um local', 'error');
+        return;
+      }
+
+      showStatus(`Inserindo ${selections.length} item(s)...`, 'info');
+      elements.insertBtn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(result => {
+          elements.insertBtn.disabled = false;
+          
+          if (result && result.success) {
+            showStatus(
+              `✅ ${result.totalInserted} linhas na linha ${result.startRow}`,
+              'success'
+            );
+            updateRowIndicator();
+            clearAllSelections();
+          } else {
+            showStatus(
+              `❌ Falha: ${result?.message || 'erro desconhecido'}`,
+              'error'
+            );
+          }
+        })
+        .withFailureHandler(error => {
+          elements.insertBtn.disabled = false;
+          showStatus(`❌ Erro: ${error.message}`, 'error');
+        })
+        .inserirMultiplosLocals(selections);
+    }
+
+    function getSelectedLocals() {
+      // Retorna na ordem de seleção
+      return selectionOrder.map(item => ({
+        task: item.task,
+        subTrade: item.subTrade,
+        local: item.local
+      }));
+    }
+
+    function clearAllSelections() {
+      selectionOrder = [];
+      selectionCounter = 0;
+      
+      document.querySelectorAll('.local-checkbox, .select-all-checkbox').forEach(cb => {
+        cb.checked = false;
+      });
+      
+      document.querySelectorAll('.local-item').forEach(item => {
+        item.classList.remove('selected');
+        item.removeAttribute('data-order');
+      });
+      
+      updateSelectionCounter();
+      clearStatus();
+    }
+
+    function filterTemplates(searchTerm) {
+      const query = searchTerm.toLowerCase().trim();
+      
+      document.querySelectorAll('.task-card').forEach(taskCard => {
+        const taskName = taskCard.dataset.taskName;
+        const matchesTask = taskName.includes(query);
+        let hasVisibleSubTrades = false;
+
+        taskCard.querySelectorAll('.subtrade-card').forEach(subTradeCard => {
+          const subTradeName = subTradeCard.dataset.subtradeName;
+          const matchesSubTrade = matchesTask || subTradeName.includes(query);
+          let hasVisibleLocals = false;
+
+          subTradeCard.querySelectorAll('.local-item').forEach(localItem => {
+            const localName = localItem.dataset.localName;
+            const matchesLocal = matchesSubTrade || localName.includes(query);
+            
+            localItem.style.display = matchesLocal ? '' : 'none';
+            if (matchesLocal) hasVisibleLocals = true;
+          });
+
+          subTradeCard.style.display = hasVisibleLocals ? '' : 'none';
+          if (hasVisibleLocals) hasVisibleSubTrades = true;
+        });
+
+        taskCard.style.display = hasVisibleSubTrades || matchesTask ? '' : 'none';
+      });
+    }
+
+    elements.searchInput.addEventListener('input', (e) => {
+      filterTemplates(e.target.value);
+    });
+
+    elements.insertBtn.addEventListener('click', () => {
+      const selected = getSelectedLocals();
+      insertMultipleSelections(selected);
+    });
+
+    elements.clearBtn.addEventListener('click', () => {
+      clearAllSelections();
+      elements.searchInput.value = '';
+      filterTemplates('');
+    });
+
+    elements.refreshBtn.addEventListener('click', () => {
+      elements.refreshBtn.disabled = true;
+      showStatus('Atualizando...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(data => {
+          elements.refreshBtn.disabled = false;
+          templatesData = data;
+          renderTemplates(templatesData);
+          showStatus('✅ Atualizado', 'success');
+          updateRowIndicator();
+        })
+        .withFailureHandler(error => {
+          elements.refreshBtn.disabled = false;
+          showStatus(`❌ Erro: ${error.message}`, 'error');
+        })
+        .atualizarTemplates();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderTemplates(templatesData);
+      updateRowIndicator();
+      
+      const totalTasks = Object.keys(templatesData.tasks || {}).length;
+      showStatus(`📊 ${totalTasks} tasks • ${templatesData.total || 0} templates`, 'info');
+    });
+  </script>
+</body>
+</html>

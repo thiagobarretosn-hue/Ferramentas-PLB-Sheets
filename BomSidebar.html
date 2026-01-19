@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1a73e8; --success: #34a853; --danger: #ea4335;
+      --bg: #f8f9fa; --card: #ffffff; --border: #e0e0e0;
+      --disabled: #3a3a3a; --disabled-text: #888;
+      --text: #202124; --text-light: #5f6368;
+      --header-bg: #2c3e50; --section-bg: #3498db; --input-bg: #ecf0f1;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg);
+      color: var(--text); font-size: 13px;
+      display: flex; flex-direction: column;
+      height: 100%; overflow: hidden;
+    }
+    
+    /* Layout Principal */
+    .header {
+      background: var(--header-bg); color: white;
+      padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    .header h2 { font-size: 18px; font-weight: 600; margin: 0; }
+    
+    .content {
+      display: flex;
+      flex: 1;
+      overflow: hidden; 
+    }
+    
+    /* ✅ Coluna da Esquerda (Configuração) */
+    .config-panel {
+      width: 320px;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden; /* Scroll será interno */
+    }
+    
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .tab-button {
+      flex: 1; text-align: center;
+      padding: 12px 8px; font-size: 12px; font-weight: 600;
+      cursor: pointer; color: var(--text-light);
+      border-bottom: 3px solid transparent;
+      background: #fdfdfd;
+    }
+    .tab-button:hover { background: var(--bg); }
+    .tab-button.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: var(--card);
+    }
+    
+    /* ✅ CORREÇÃO (Bug 1): Área de scroll para as abas */
+    .config-scroll-area {
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+    .tab-content { padding: 16px; }
+    .tab-content:not(.active) { display: none; }
+    
+    .config-section h3 {
+      font-size: 14px; font-weight: 600;
+      color: var(--section-bg); margin-bottom: 12px;
+      padding-bottom: 4px; border-bottom: 1px solid var(--input-bg);
+    }
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block; font-size: 12px;
+      font-weight: 500; margin-bottom: 4px;
+    }
+    select, input[type="text"] {
+      width: 100%; padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px; font-size: 12px;
+      font-family: inherit; background: var(--input-bg);
+    }
+    
+    /* ✅ CORREÇÃO (Bug 1): Footer do painel de config */
+    .footer-config {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background: var(--card);
+      flex-shrink: 0;
+    }
+    
+    /* ✅ Coluna da Direita (Resultados) */
+    .results-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto; /* ✅ CORREÇÃO: Painel direito rola */
+      padding: 20px;
+    }
+    
+    /* Painel de Filtros */
+    .filter-panel { margin-bottom: 20px; }
+    .filter-header {
+      font-size: 16px; font-weight: 600;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    /* ✅ CORREÇÃO: Painéis de filtro em 3 colunas (grid) */
+    .filter-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding-top: 16px;
+    }
+    .group-level {
+      display: flex; flex-direction: column;
+      min-height: 250px;
+    }
+    .panel-header {
+      background: var(--section-bg); color: white;
+      padding: 8px 12px; border-radius: 4px 4px 0 0;
+      font-weight: 600; font-size: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .panel-header-title {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1;
+    }
+    .select-all-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      margin-left: 8px;
+      transition: all 0.2s;
+    }
+    .select-all-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    /* ✅ CORREÇÃO (Bug 3): Painel de filtro com scroll interno */
+    .panel-body {
+      flex-grow: 1;
+      overflow-y: auto;
+      background: var(--card); border: 1px solid var(--border);
+      border-top: none; padding: 8px;
+    }
+    .panel-item {
+      display: flex; align-items: center;
+      padding: 6px 4px; font-size: 12px;
+    }
+    .panel-item input { margin-right: 8px; }
+    .panel-item label { flex: 1; cursor: pointer; }
+    
+    /* Painel de Pré-visualização */
+    .preview-header {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 16px; font-weight: 600;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .find-replace { display: flex; gap: 6px; }
+    .find-replace input {
+      font-size: 11px; padding: 6px 8px; width: 100px;
+    }
+    .btn {
+      width: auto; padding: 10px 16px; border: none;
+      border-radius: 6px; cursor: pointer; font-weight: 600;
+      font-size: 12px; transition: all 0.2s;
+      font-family: inherit;
+    }
+    .btn-small { padding: 6px 10px; font-size: 11px; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .preview-container {
+      flex: 1; overflow-y: auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      margin-top: 16px;
+      min-height: 200px; /* Garante altura mínima */
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 10px; border-bottom: 1px solid var(--border);
+      font-size: 12px; text-align: left;
+    }
+    th {
+      background: var(--input-bg); position: sticky; top: 0;
+    }
+    td:first-child { width: 40px; text-align: center; }
+    td:last-child { width: 50%; }
+    td input[type="text"] { 
+      width: 100%;
+      padding: 6px 8px; font-size: 11px; 
+      background: #fff;
+    }
+    
+    /* Aba de Exportar PDF */
+    #pdf-list-container {
+      max-height: 300px;
+      overflow-y: auto;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+    }
+    
+    /* Status */
+    .status {
+      position: fixed; bottom: 20px; left: 20px; padding: 12px 20px;
+      border-radius: 8px; font-size: 12px; font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none; z-index: 1000;
+    }
+    .status.success { background: var(--success); color: white; }
+    .status.error { background: var(--danger); color: white; }
+    .status.info { background: var(--primary); color: white; }
+
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>Painel Gerador de BOM</h2>
+  </div>
+
+  <div class="content">
+    
+    <div class="config-panel">
+    
+      <div class="tab-buttons">
+        <div class="tab-button active" onclick="openTab('agrupamento')">1. Agrupamento</div>
+        <div class="tab-button" onclick="openTab('config-relatorio')">2. Config.</div>
+        <div class="tab-button" onclick="openTab('exportar-pdf')">3. Exportar</div>
+      </div>
+      
+      <div class="config-scroll-area">
+        <div class="tab-content active" id="tab-agrupamento">
+          <div class="config-section">
+            <h3>Configuração Principal</h3>
+            <div class="form-group">
+              <label for="sourceSheetSelect">Aba Origem</label>
+              <select id="sourceSheetSelect" onchange="onSourceSheetChange()">
+                <option value="">-- Carregando... --</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="config-section">
+            <h3>Agrupamento</h3>
+            <div class="form-group">
+              <label for="groupL1Select">Agrupar por Nível 1</label>
+              <select id="groupL1Select" onchange="onGroupChange()"><option value="">-- Nenhum --</option></select>
+            </div>
+            <div class="form-group">
+              <label for="groupL2Select">Agrupar por Nível 2</label>
+              <select id="groupL2Select" onchange="onGroupChange()"><option value="">-- Nenhum --</option></select>
+            </div>
+            <div class="form-group">
+              <label for="groupL3Select">Agrupar por Nível 3</label>
+              <select id="groupL3Select" onchange="onGroupChange()"><option value="">-- Nenhum --</option></select>
+            </div>
+          </div>
+        </div>
+        
+        <div class="tab-content" id="tab-config-relatorio">
+          <div class="config-section">
+            <h3>Dados BOMS</h3>
+            <div class="form-group">
+              <label for="col1Select">Coluna 1 (ID)</label>
+              <select id="col1Select" onchange="saveState()"></select>
+            </div>
+            <div class="form-group">
+              <label for="col2Select">Coluna 2 (Descrição)</label>
+              <select id="col2Select" onchange="saveState()"></select>
+            </div>
+            <div class="form-group">
+              <label for="col3Select">Coluna 3 (UPC)</label>
+              <select id="col3Select" onchange="saveState()"></select>
+            </div>
+            <div class="form-group">
+              <label for="col4Select">Coluna 4 (UOM)</label>
+              <select id="col4Select" onchange="saveState()"></select>
+            </div>
+            <div class="form-group">
+              <label for="col5Select">Coluna 5 (Quantidade)</label>
+              <select id="col5Select" onchange="saveState()"></select>
+            </div>
+          </div>
+          
+          <div class="config-section">
+            <h3>Cabeçalho (BOM)</h3>
+            <div class="form-group">
+              <label for="projectInput">Project</label>
+              <input type="text" id="projectInput" oninput="saveState()">
+            </div>
+            <div class="form-group">
+              <label for="bomInput">BOM</label>
+              <input type="text" id="bomInput" oninput="saveState()">
+            </div>
+            <div class="form-group">
+              <label for="kojoInput">KOJO Prefixo</label>
+              <input type="text" id="kojoInput" oninput="saveState()">
+            </div>
+            <div class="form-group">
+              <label for="engineerInput">Engenheiro</label>
+              <input type="text" id="engineerInput" oninput="saveState()">
+            </div>
+            <div class="form-group">
+              <label for="versionInput">Versão</label>
+              <input type="text" id="versionInput" oninput="saveState()">
+            </div>
+          </div>
+          
+          <div class="config-section">
+            <h3>Opções (BOM)</h3>
+            <div class="form-group">
+              <label for="sortBySelect">Classificar Por</label>
+              <select id="sortBySelect" onchange="saveState()"></select>
+            </div>
+            <div class="form-group">
+              <label for="sortOrderSelect">Ordem</label>
+              <select id="sortOrderSelect" onchange="saveState()">
+                <option value="Ascendente (A-Z, 0-9)">Ascendente (A-Z, 0-9)</option>
+                <option value="Descendente (Z-A, 9-0)">Descendente (Z-A, 9-0)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <div class="tab-content" id="tab-exportar-pdf">
+          <div class="config-section">
+            <h3>Configurar Exportação</h3>
+            <div class="form-group">
+              <label for="folderInput">Pasta Drive (ID ou Nome)</label>
+              <input type="text" id="folderInput" oninput="saveState()">
+            </div>
+            <div class="form-group">
+              <label for="prefixInput">Prefixo do PDF</label>
+              <input type="text" id="prefixInput" oninput="saveState()">
+            </div>
+          </div>
+          <div class="config-section">
+            <h3>Relatórios para Exportar</h3>
+            <div id="pdf-list-container">
+              (Carregando automaticamente...)
+            </div>
+          </div>
+          <div class="config-section">
+             <button class="btn btn-danger" id="exportPdfBtn" onclick="exportPdfs()" disabled>
+              Exportar Selecionados
+            </button>
+          </div>
+        </div>
+        
+      </div>
+      
+      <div class="footer-config">
+        <button class="btn btn-success" id="generateBtn" onclick="generateReports()" disabled>
+          Gerar Relatórios
+        </button>
+      </div>
+    </div>
+    
+    <div class="results-panel">
+    
+      <div class="filter-panel">
+        <div class="filter-header">
+          <h3>3. Painéis de Filtro</h3>
+        </div>
+        <div class="filter-container" id="groupPanelsContainer">
+          <div class="group-level" id="panel-L1">
+             <div class="panel-header" style="background: var(--disabled-text);">NÍVEL 1</div>
+             <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Configure o Nível 1)</div></div>
+          </div>
+          <div class="group-level" id="panel-L2">
+             <div class="panel-header" style="background: var(--disabled-text);">NÍVEL 2</div>
+             <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Configure o Nível 2)</div></div>
+          </div>
+          <div class="group-level" id="panel-L3">
+             <div class="panel-header" style="background: var(--disabled-text);">NÍVEL 3</div>
+             <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Configure o Nível 3)</div></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="preview-panel">
+        <div class="preview-header">
+          <h3>4. Pré-visualização</h3>
+          <div class="find-replace">
+            <input type="text" id="findInput" placeholder="Localizar">
+            <input type="text" id="replaceInput" placeholder="Substituir">
+            <button class="btn btn-small btn-primary" onclick="findAndReplaceKojo()">Subst. Todos</button>
+          </div>
+        </div>
+        <div class="preview-container">
+          <table id="previewTable">
+            <thead>
+              <tr>
+                <th><input type="checkbox" onchange="toggleAllPreview(this.checked)"></th>
+                <th>Combinação</th>
+                <th>Sufixo Kojo</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody">
+              <tr><td colspan="3" style="text-align: center; padding: 20px;">Aguardando filtros...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+    
+  </div>
+  
+  <div id="status" class="status"></div>
+
+  <script>
+    let allColumns = [];
+    let currentConfig = {};
+    let generatedCombinations = [];
+    // ✅ NOVO (V2.13): Flag para evitar recargas múltiplas de PDF
+    let isPdfListLoading = false; 
+    const STATE_KEY = 'BOM_SIDEBAR_STATE_V2_12'; // Mantém a mesma chave de estado
+
+    // --- CHAVES DE CONFIGURAÇÃO (Cliente) ---
+    const CONFIG_KEYS = {
+      SOURCE_SHEET: 'Aba Origem',
+      GROUP_L1: 'Agrupar por Nível 1', GROUP_L2: 'Agrupar por Nível 2', GROUP_L3: 'Agrupar por Nível 3',
+      COL_1: 'Coluna 1', COL_2: 'Coluna 2', COL_3: 'Coluna 3', COL_4: 'Coluna 4', COL_5: 'Coluna 5',
+      PROJECT: 'Project', BOM: 'BOM', KOJO_PREFIX: 'KOJO Prefixo', ENGINEER: 'Engenheiro', VERSION: 'Versão',
+      SORT_BY: 'CLASSIFICAR POR', SORT_ORDER: 'ORDEM',
+      DRIVE_FOLDER_ID: 'Pasta Drive ID', PDF_PREFIX: 'PDF Prefixo'
+    };
+    
+    const formFields = {
+      'sourceSheetSelect': CONFIG_KEYS.SOURCE_SHEET,
+      'groupL1Select': CONFIG_KEYS.GROUP_L1, 'groupL2Select': CONFIG_KEYS.GROUP_L2, 'groupL3Select': CONFIG_KEYS.GROUP_L3,
+      'col1Select': CONFIG_KEYS.COL_1, 'col2Select': CONFIG_KEYS.COL_2, 'col3Select': CONFIG_KEYS.COL_3, 'col4Select': CONFIG_KEYS.COL_4, 'col5Select': CONFIG_KEYS.COL_5,
+      'projectInput': CONFIG_KEYS.PROJECT, 'bomInput': CONFIG_KEYS.BOM, 'kojoInput': CONFIG_KEYS.KOJO_PREFIX, 'engineerInput': CONFIG_KEYS.ENGINEER, 'versionInput': CONFIG_KEYS.VERSION,
+      'sortBySelect': CONFIG_KEYS.SORT_BY, 'sortOrderSelect': CONFIG_KEYS.SORT_ORDER,
+      'folderInput': CONFIG_KEYS.DRIVE_FOLDER_ID,
+      'prefixInput': CONFIG_KEYS.PDF_PREFIX
+    };
+
+    // 1. INICIALIZAÇÃO
+    window.addEventListener('load', () => {
+      google.script.run
+        .withSuccessHandler(onInitDataLoaded)
+        .withFailureHandler(onError)
+        .getBomHtmlInitData();
+    });
+
+    async function onInitDataLoaded(data) {
+      allColumns = data.allColumns || [];
+      currentConfig = data.currentConfig || {}; 
+      
+      const savedState = await loadState(); // Carrega o estado salvo
+      
+      if (savedState && savedState.settings) {
+        currentConfig = { ...currentConfig, ...savedState.settings };
+      }
+
+      // Popular Aba Origem
+      const ssSelect = document.getElementById('sourceSheetSelect');
+      ssSelect.options.length = 1; 
+      data.allSheets.forEach(sheetName => {
+        const option = new Option(sheetName, sheetName);
+        option.selected = (sheetName === currentConfig[CONFIG_KEYS.SOURCE_SHEET]);
+        ssSelect.add(option);
+      });
+      
+      populateGroupDropdowns();
+      populateReportConfig();
+      
+      // Carrega painéis e aplica estado salvo (se houver)
+      await loadPanels(savedState);
+    }
+    
+    function onSourceSheetChange() {
+      showStatus('Para mudar a "Aba Origem", por favor, use a aba "Config" e recarregue este painel (F5).', 'info');
+      document.getElementById('sourceSheetSelect').value = currentConfig[CONFIG_KEYS.SOURCE_SHEET];
+    }
+
+    // Popula "1. Agrupamento"
+    function populateGroupDropdowns() {
+      const selects = [
+        { el: document.getElementById('groupL1Select'), key: CONFIG_KEYS.GROUP_L1 },
+        { el: document.getElementById('groupL2Select'), key: CONFIG_KEYS.GROUP_L2 },
+        { el: document.getElementById('groupL3Select'), key: CONFIG_KEYS.GROUP_L3 }
+      ];
+      
+      selects.forEach(s => {
+        s.el.options.length = 1;
+        allColumns.forEach(colName => {
+          const option = new Option(colName, colName);
+          option.selected = (colName === currentConfig[s.key]);
+          s.el.add(option);
+        });
+      });
+    }
+    
+    // Popula "2. Config. Relatório" e "3. Exportar PDF"
+    function populateReportConfig() {
+      for (const [elementId, configKey] of Object.entries(formFields)) {
+        if (configKey.startsWith('Agrupar') || configKey === 'Aba Origem') continue; 
+        
+        const el = document.getElementById(elementId);
+        if (!el) continue;
+        
+        if (el.tagName === 'SELECT') {
+          if (elementId.startsWith('col') || elementId === 'sortBySelect') {
+            el.options.length = 0; 
+            el.add(new Option('-- Selecione a Coluna --', '')); 
+            allColumns.forEach(colName => {
+              const option = new Option(colName, colName);
+              option.selected = (colName === currentConfig[configKey]);
+              el.add(option);
+            });
+          } else if (elementId === 'sortOrderSelect') {
+            el.value = currentConfig[configKey];
+          }
+        } else {
+          el.value = currentConfig[configKey] || '';
+        }
+      }
+    }
+
+    // 2. CARREGAR PAINÉIS DE FILTRO (Automático)
+    function onGroupChange() {
+      saveState(); // Salva a mudança no dropdown
+      loadPanels(); // Carrega os painéis
+    }
+
+    // ✅ CORREÇÃO (V2.13): Função 'async' para esperar os painéis
+    async function loadPanels(savedState = null) {
+      const levels = [
+        { id: 'panel-L1', colName: document.getElementById('groupL1Select').value },
+        { id: 'panel-L2', colName: document.getElementById('groupL2Select').value },
+        { id: 'panel-L3', colName: document.getElementById('groupL3Select').value }
+      ];
+      
+      showStatus('Carregando valores únicos...', 'info');
+      document.getElementById('previewBody').innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Carregando filtros...</td></tr>';
+      
+      const panelPromises = levels.map(level => {
+        const container = document.getElementById(level.id);
+        container.innerHTML = '';
+        
+        if (level.colName) {
+          container.innerHTML = `<div class="panel-header">${level.id.replace('panel-', 'NÍVEL ')}: ...</div>
+                                 <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Carregando...)</div></div>`;
+          
+          // Retorna uma promessa que resolve quando o painel está pronto
+          return new Promise((resolve, reject) => {
+            google.script.run
+              .withSuccessHandler(values => {
+                buildPanel(level.id, level.colName, values);
+                resolve();
+              })
+              .withFailureHandler(err => {
+                onError(err);
+                reject(err);
+              })
+              .getUniqueValuesForColumn(level.colName);
+          });
+        } else {
+          container.innerHTML = `<div class="panel-header" style="background: var(--disabled-text);">${level.id.replace('panel-', 'NÍVEL ')}</div>
+                                 <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Não configurado)</div></div>`;
+          return Promise.resolve(); // Resolve imediatamente
+        }
+      });
+      
+      // Espera todos os painéis carregarem
+      await Promise.all(panelPromises);
+      
+      if (savedState && savedState.filterState) {
+        applyFilterState(savedState.filterState);
+        updatePreview(savedState); // Passa o estado salvo para a pré-visualização
+      } else {
+        updatePreview(); // Atualiza a pré-visualização normal
+      }
+      
+      showStatus('Painéis carregados!', 'success');
+    }
+    
+    function buildPanel(panelId, colName, values) {
+      const container = document.getElementById(panelId);
+      container.innerHTML = '';
+
+      const header = document.createElement('div');
+      header.className = 'panel-header';
+      header.title = colName;
+
+      const headerTitle = document.createElement('span');
+      headerTitle.className = 'panel-header-title';
+      headerTitle.textContent = `${panelId.replace('panel-', 'NÍVEL ')}: ${colName.split(' - ')[1] || ''}`;
+
+      const selectAllBtn = document.createElement('button');
+      selectAllBtn.className = 'select-all-btn';
+      selectAllBtn.textContent = 'Todos';
+      selectAllBtn.onclick = () => togglePanelSelection(panelId);
+
+      header.appendChild(headerTitle);
+      header.appendChild(selectAllBtn);
+
+      const body = document.createElement('div');
+      body.className = 'panel-body';
+
+      if (values.length > 0) {
+        values.forEach(val => {
+          const item = document.createElement('div');
+          item.className = 'panel-item';
+          item.innerHTML = `
+            <input type="checkbox" id="cb-${panelId}-${val}" value="${val}" onchange="onFilterChange()">
+            <label for="cb-${panelId}-${val}">${val}</label>
+          `;
+          body.appendChild(item);
+        });
+      } else {
+        body.innerHTML = '<div class="panel-item">Nenhum valor encontrado.</div>';
+      }
+
+      container.appendChild(header);
+      container.appendChild(body);
+    }
+    
+    function togglePanelSelection(panelId) {
+      const panel = document.getElementById(panelId);
+      const checkboxes = panel.querySelectorAll('input[type="checkbox"]');
+
+      // Verifica se todos estão marcados
+      const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+      // Se todos estão marcados, desmarca todos; senão, marca todos
+      checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+      });
+
+      onFilterChange();
+    }
+
+    function onFilterChange() {
+      saveState();
+      updatePreview();
+    }
+
+    // 3. ATUALIZAR PRÉ-VISUALIZAÇÃO
+    function updatePreview(savedState = null) {
+      const selectedGroups = {};
+      const groupConfigs = [];
+      
+      const levels = [
+        { id: 'panel-L1', key: 'NÍVEL 1', colName: document.getElementById('groupL1Select').value },
+        { id: 'panel-L2', key: 'NÍVEL 2', colName: document.getElementById('groupL2Select').value },
+        { id: 'panel-L3', key: 'NÍVEL 3', colName: document.getElementById('groupL3Select').value }
+      ];
+      
+      levels.forEach(level => {
+        if (level.colName) {
+          groupConfigs.push(level.colName);
+          const checked = [];
+          document.querySelectorAll(`#${level.id} input[type="checkbox"]:checked`).forEach(cb => {
+            checked.push(cb.value);
+          });
+          if (checked.length > 0) {
+            selectedGroups[level.key] = checked;
+          }
+        }
+      });
+
+      if (Object.keys(selectedGroups).length === 0) {
+        buildPreviewTable([]); 
+        return;
+      }
+
+      showStatus('Atualizando pré-visualização...', 'info');
+      document.getElementById('generateBtn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(combinations => {
+          buildPreviewTable(combinations);
+          if (savedState) {
+            applyPreviewState(savedState.kojoState, savedState.previewState);
+          }
+          saveState(); // Salva o estado da pré-visualização
+          showStatus('Pré-visualização atualizada!', 'success');
+        })
+        .withFailureHandler(onError)
+        .getCombinationsForPreview(selectedGroups, groupConfigs);
+    }
+    
+    function buildPreviewTable(combinations) {
+      generatedCombinations = []; 
+      const tbody = document.getElementById('previewBody');
+      tbody.innerHTML = '';
+      
+      if (combinations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Nenhuma combinação encontrada.</td></tr>';
+        document.getElementById('generateBtn').disabled = true;
+        return;
+      }
+      
+      combinations.forEach((combo, index) => {
+        const displayCombo = combo.replace(/\|\|\|/g, '.');
+        generatedCombinations.push({
+          index: index,
+          combination: combo,
+          displayCombination: displayCombo
+        });
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="preview-check" data-combination="${combo}" onchange="saveState()" checked></td>
+          <td>${displayCombo}</td>
+          <td><input type="text" class="kojo-suffix" data-combination="${combo}" oninput="saveState()" value="${displayCombo}"></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      
+      document.getElementById('generateBtn').disabled = false;
+    }
+    
+    function toggleAllPreview(checked) {
+      document.querySelectorAll('.preview-check').forEach(cb => cb.checked = checked);
+      saveState();
+    }
+    
+    function findAndReplaceKojo() {
+      const findText = document.getElementById('findInput').value;
+      const replaceText = document.getElementById('replaceInput').value;
+      
+      if (!findText) {
+        showStatus("Por favor, insira um texto para 'Localizar'.", "error");
+        return;
+      }
+      
+      let count = 0;
+      document.querySelectorAll('.kojo-suffix').forEach(input => {
+        const originalValue = input.value;
+        const newValue = originalValue.replace(new RegExp(findText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), replaceText);
+        if (originalValue !== newValue) {
+          input.value = newValue;
+          count++;
+        }
+      });
+      
+      showStatus(`${count} sufixo(s) atualizado(s)!`, 'success');
+      saveState(); 
+    }
+
+    // 4. GERAR RELATÓRIOS
+    function generateReports() {
+      const selections = [];
+      document.querySelectorAll('.preview-check:checked').forEach(cb => {
+        const combination = cb.dataset.combination;
+        const kojoSuffix = document.querySelector(`.kojo-suffix[data-combination="${combination}"]`).value;
+        
+        selections.push({
+          combination: combination,
+          kojoSuffix: kojoSuffix || combination.replace(/\|\|\|/g, '.')
+        });
+      });
+      
+      if (selections.length === 0) {
+        showStatus('Nenhum relatório selecionado para gerar.', 'error');
+        return;
+      }
+      
+      const reportSettings = getState().settings;
+      
+      if (!reportSettings[CONFIG_KEYS.SOURCE_SHEET] || !reportSettings[CONFIG_KEYS.GROUP_L1] ||
+          !reportSettings[CONFIG_KEYS.COL_1] || !reportSettings[CONFIG_KEYS.COL_2] || 
+          !reportSettings[CONFIG_KEYS.COL_5] || !reportSettings[CONFIG_KEYS.SORT_BY]) {
+        showStatus('Erro: Verifique as configurações. Aba Origem, Nível 1, Colunas 1, 2, 5 e Classificar Por são obrigatórios.', 'error');
+        openTab('config-relatorio');
+        return;
+      }
+      
+      showStatus(`Gerando ${selections.length} relatório(s)...`, 'info');
+      document.getElementById('generateBtn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result.success) {
+            showStatus(`✅ ${result.created} relatórios criados!`, 'success');
+          } else {
+            onError(new Error(result.message));
+          }
+          document.getElementById('generateBtn').disabled = false;
+        })
+        .withFailureHandler(onError)
+        .runProcessingFromHtml(selections, reportSettings);
+    }
+    
+    // 5. EXPORTAR PDF
+    // ✅ CORREÇÃO (V2.13): Esta função agora é chamada pela openTab
+    function loadPdfSheets() {
+      if (isPdfListLoading) return; // Evita múltiplas chamadas
+      isPdfListLoading = true;
+      
+      showStatus('Carregando relatórios...', 'info');
+      document.getElementById('exportPdfBtn').disabled = true;
+      document.getElementById('pdf-list-container').innerHTML = '(Carregando...)';
+      
+      google.script.run
+        .withSuccessHandler(sheetNames => {
+          const container = document.getElementById('pdf-list-container');
+          container.innerHTML = '';
+          if (!sheetNames || sheetNames.length === 0) {
+            container.innerHTML = 'Nenhum relatório encontrado para exportar.';
+            document.getElementById('exportPdfBtn').disabled = true;
+            isPdfListLoading = false;
+            return;
+          }
+          
+          sheetNames.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'panel-item';
+            item.innerHTML = `
+              <input type="checkbox" class="pdf-check" id="pdf-${name}" value="${name}" checked>
+              <label for="pdf-${name}">${name}</label>
+            `;
+            container.appendChild(item);
+          });
+          document.getElementById('exportPdfBtn').disabled = false;
+          showStatus(`${sheetNames.length} relatórios carregados.`, 'success');
+          isPdfListLoading = false;
+        })
+        .withFailureHandler(err => {
+          onError(err);
+          isPdfListLoading = false;
+        })
+        .getReportSheetNamesForHtml();
+    }
+    
+    function exportPdfs() {
+      const sheetNames = [];
+      document.querySelectorAll('.pdf-check:checked').forEach(cb => {
+        sheetNames.push(cb.value);
+      });
+      
+      if (sheetNames.length === 0) {
+        showStatus('Nenhum relatório selecionado para exportar.', 'error');
+        return;
+      }
+      
+      const folderInput = document.getElementById('folderInput').value;
+      const prefix = document.getElementById('prefixInput').value;
+      
+      showStatus(`Exportando ${sheetNames.length} PDF(s)...`, 'info');
+      document.getElementById('exportPdfBtn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result.success) {
+            showStatus(`✅ ${result.exported} PDFs exportados para a pasta "${result.folder}".`, 'success');
+          } else {
+            onError(new Error(result.message));
+          }
+          document.getElementById('exportPdfBtn').disabled = false;
+        })
+        .withFailureHandler(onError)
+        .runPdfExportFromHtml(sheetNames, folderInput, prefix);
+    }
+    
+    // 6. SALVAR/CARREGAR ESTADO
+    function saveState() {
+      try {
+        const state = getState();
+        localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        google.script.run.saveUserSidebarState(JSON.stringify(state));
+      } catch (e) {
+        console.warn('Não foi possível salvar o estado:', e.message);
+      }
+    }
+    
+    function getState() {
+      const settings = {};
+      for (const [elementId, configKey] of Object.entries(formFields)) {
+        const el = document.getElementById(elementId);
+        if (el) settings[configKey] = el.value;
+      }
+      
+      const filterState = {};
+      document.querySelectorAll('.group-level').forEach(panel => {
+        const panelId = panel.id;
+        const checked = [];
+        panel.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+          checked.push(cb.value);
+        });
+        if (checked.length > 0) filterState[panelId] = checked;
+      });
+      
+      const kojoState = {};
+      const previewState = [];
+      document.querySelectorAll('.preview-check').forEach(cb => {
+        const combo = cb.dataset.combination;
+        if (cb.checked) previewState.push(combo);
+        const kojoInput = document.querySelector(`.kojo-suffix[data-combination="${combo}"]`);
+        if (kojoInput) kojoState[combo] = kojoInput.value;
+      });
+      
+      return { settings, filterState, kojoState, previewState };
+    }
+    
+    async function loadState() {
+      try {
+        // Tenta carregar do servidor primeiro
+        const serverState = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getUserSidebarState();
+        });
+        
+        if (serverState) {
+          localStorage.setItem(STATE_KEY, JSON.stringify(serverState)); // Sincroniza local
+          return serverState;
+        }
+        
+        // Se não houver no servidor, tenta no local
+        const localStateJson = localStorage.getItem(STATE_KEY);
+        if (localStateJson) {
+          return JSON.parse(localStateJson);
+        }
+      } catch (e) {
+        console.warn('Não foi possível carregar o estado.', e);
+      }
+      return null;
+    }
+    
+    function applyFilterState(filterState) {
+      if (!filterState) return;
+      for (const [panelId, checkedValues] of Object.entries(filterState)) {
+        const panel = document.getElementById(panelId);
+        if (panel) {
+          checkedValues.forEach(value => {
+            const cb = panel.querySelector(`input[value="${CSS.escape(value)}"]`);
+            if (cb) cb.checked = true;
+          });
+        }
+      }
+    }
+    
+    function applyPreviewState(kojoState, previewState) {
+      if (kojoState) {
+        document.querySelectorAll('.kojo-suffix').forEach(input => {
+          const combo = input.dataset.combination;
+          if (kojoState[combo]) {
+            input.value = kojoState[combo];
+          }
+        });
+      }
+      if (previewState) {
+        document.querySelectorAll('.preview-check').forEach(cb => {
+          const combo = cb.dataset.combination;
+          cb.checked = previewState.includes(combo);
+        });
+      }
+    }
+    
+    // --- UTILITÁRIOS DO HTML ---
+    
+    // ✅ CORREÇÃO (V2.13): Carrega PDFs automaticamente
+    function openTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
+      
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add('active');
+      
+      if (tabName === 'exportar-pdf') {
+        loadPdfSheets();
+      }
+    }
+    
+    function onError(error) {
+      console.error(error);
+      showStatus(`Erro: ${error.message}`, 'error');
+      document.getElementById('generateBtn').disabled = false;
+      document.getElementById('exportPdfBtn').disabled = false;
+    }
+    
+    function showStatus(msg, type) {
+      const status = document.getElementById('status');
+      status.textContent = msg;
+      status.className = `status ${type}`;
+      status.style.display = 'block';
+      
+      const duration = (type === 'info') ? 2000 : 4000;
+      setTimeout(() => status.style.display = 'none', duration);
+    }
+  </script>
+</body>
+</html>
