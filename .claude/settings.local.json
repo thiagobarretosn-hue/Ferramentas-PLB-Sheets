@@ -1,0 +1,54 @@
+{
+  "description": "Local settings for Claude Code - Google Apps Script workspace",
+  "permissions": {
+    "allow": [
+      {
+        "tool": "Bash",
+        "command": "git status"
+      },
+      {
+        "tool": "Bash",
+        "command": "git diff"
+      },
+      {
+        "tool": "Bash",
+        "command": "git add"
+      },
+      {
+        "tool": "Bash",
+        "command": "git commit"
+      },
+      {
+        "tool": "Bash",
+        "command": "git log"
+      },
+      {
+        "tool": "Bash",
+        "command": "git branch"
+      },
+      {
+        "tool": "Bash",
+        "command": "clasp"
+      },
+      {
+        "tool": "Bash",
+        "command": "npm"
+      },
+      {
+        "tool": "Bash",
+        "command": "dir"
+      },
+      {
+        "tool": "Bash",
+        "command": "ls"
+      }
+    ]
+  },
+  "contextFiles": [
+    "CLAUDE.md",
+    "docs/context/DIRETRIZES.md",
+    "docs/context/PROJECT_CONTEXT.md"
+  ],
+  "projectType": "google-apps-script",
+  "language": "pt-BR"
+}

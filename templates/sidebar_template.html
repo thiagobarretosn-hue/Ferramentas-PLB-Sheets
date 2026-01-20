@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <!-- Google Add-ons CSS -->
+  <link rel="stylesheet"
+    href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+
+  <style>
+    /* ==========================================
+       ESTILOS CUSTOMIZADOS
+       ========================================== */
+
+    body {
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      padding: 16px;
+      margin: 0;
+    }
+
+    /* Seções */
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #202124;
+      margin-bottom: 8px;
+    }
+
+    /* Labels */
+    .label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #5f6368;
+      margin-bottom: 4px;
+    }
+
+    /* Inputs */
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #1a73e8;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+
+    /* Botões */
+    .btn-container {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .btn-primary {
+      background-color: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #1557b0;
+    }
+
+    .btn-secondary {
+      background-color: #f1f3f4;
+      color: #202124;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e8eaed;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Status/Feedback */
+    .status {
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .status.success {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+
+    .status.error {
+      background-color: #fce8e6;
+      color: #c5221f;
+    }
+
+    .status.info {
+      background-color: #e8f0fe;
+      color: #1967d2;
+    }
+
+    .status.warning {
+      background-color: #fef7e0;
+      color: #ea8600;
+    }
+
+    /* Loading */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.active {
+      display: block;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 8px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Checkbox/Radio */
+    .checkbox-group,
+    .radio-group {
+      margin-bottom: 12px;
+    }
+
+    .checkbox-item,
+    .radio-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .checkbox-item input,
+    .radio-item input {
+      margin-right: 8px;
+      width: auto;
+    }
+
+    /* Lista */
+    .list {
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .list-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid #f1f3f4;
+      cursor: pointer;
+    }
+
+    .list-item:last-child {
+      border-bottom: none;
+    }
+
+    .list-item:hover {
+      background-color: #f8f9fa;
+    }
+
+    .list-item.selected {
+      background-color: #e8f0fe;
+    }
+
+    /* Helpers */
+    .hidden {
+      display: none !important;
+    }
+
+    .text-muted {
+      color: #5f6368;
+      font-size: 12px;
+    }
+
+    .mt-8 { margin-top: 8px; }
+    .mt-16 { margin-top: 16px; }
+    .mb-8 { margin-bottom: 8px; }
+    .mb-16 { margin-bottom: 16px; }
+  </style>
+</head>
+
+<body>
+  <!-- ==========================================
+       CONTEÚDO DA SIDEBAR
+       ========================================== -->
+
+  <div class="section">
+    <div class="section-title">Configurações</div>
+
+    <label class="label">Selecione a aba:</label>
+    <select id="sheetSelect">
+      <option value="">Carregando...</option>
+    </select>
+
+    <label class="label">Nome do campo:</label>
+    <input type="text" id="fieldName" placeholder="Digite aqui...">
+  </div>
+
+  <div class="section">
+    <div class="section-title">Opções</div>
+
+    <div class="checkbox-group">
+      <div class="checkbox-item">
+        <input type="checkbox" id="option1" checked>
+        <label for="option1">Opção 1</label>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="option2">
+        <label for="option2">Opção 2</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botões -->
+  <div class="btn-container">
+    <button class="btn btn-secondary" onclick="onCancel()">Cancelar</button>
+    <button class="btn btn-primary" id="btnExecute" onclick="onExecute()">
+      Executar
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <span>Processando...</span>
+  </div>
+
+  <!-- Status -->
+  <div id="status" class="status hidden"></div>
+
+  <!-- ==========================================
+       SCRIPTS
+       ========================================== -->
+  <script>
+    // ==========================================
+    // INICIALIZAÇÃO
+    // ==========================================
+
+    /**
+     * Inicializa a sidebar ao carregar
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      loadSheetList();
+    });
+
+    /**
+     * Carrega lista de abas
+     */
+    function loadSheetList() {
+      google.script.run
+        .withSuccessHandler(populateSheetSelect)
+        .withFailureHandler(onError)
+        .getSheetNames(); // Implementar no backend
+    }
+
+    /**
+     * Popula select com nomes das abas
+     */
+    function populateSheetSelect(sheets) {
+      const select = document.getElementById('sheetSelect');
+      select.innerHTML = '<option value="">Selecione...</option>';
+
+      sheets.forEach(function(name) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      });
+    }
+
+    // ==========================================
+    // HANDLERS DE EVENTOS
+    // ==========================================
+
+    /**
+     * Handler do botão Executar
+     */
+    function onExecute() {
+      // Validar inputs
+      const sheetName = document.getElementById('sheetSelect').value;
+      const fieldName = document.getElementById('fieldName').value;
+
+      if (!sheetName) {
+        showStatus('Selecione uma aba', 'warning');
+        return;
+      }
+
+      // Coletar opções
+      const options = {
+        sheetName: sheetName,
+        fieldName: fieldName,
+        option1: document.getElementById('option1').checked,
+        option2: document.getElementById('option2').checked
+      };
+
+      // Mostrar loading
+      showLoading(true);
+
+      // Chamar backend
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onError)
+        .minhaFuncaoPrincipal(options); // Implementar no backend
+    }
+
+    /**
+     * Handler do botão Cancelar
+     */
+    function onCancel() {
+      google.script.host.close();
+    }
+
+    // ==========================================
+    // CALLBACKS
+    // ==========================================
+
+    /**
+     * Callback de sucesso
+     */
+    function onSuccess(result) {
+      showLoading(false);
+
+      if (result.success) {
+        showStatus('Operação concluída com sucesso!', 'success');
+      } else {
+        showStatus('Erro: ' + result.error, 'error');
+      }
+    }
+
+    /**
+     * Callback de erro
+     */
+    function onError(error) {
+      showLoading(false);
+      showStatus('Erro: ' + error.message, 'error');
+      console.error(error);
+    }
+
+    // ==========================================
+    // UTILITÁRIOS DE UI
+    // ==========================================
+
+    /**
+     * Mostra/esconde loading
+     */
+    function showLoading(show) {
+      const loading = document.getElementById('loading');
+      const btn = document.getElementById('btnExecute');
+
+      if (show) {
+        loading.classList.add('active');
+        btn.disabled = true;
+      } else {
+        loading.classList.remove('active');
+        btn.disabled = false;
+      }
+    }
+
+    /**
+     * Mostra mensagem de status
+     * @param {string} message - Mensagem
+     * @param {string} type - success|error|info|warning
+     */
+    function showStatus(message, type) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = 'status ' + type;
+      status.classList.remove('hidden');
+
+      // Auto-hide após 5 segundos
+      setTimeout(function() {
+        status.classList.add('hidden');
+      }, 5000);
+    }
+
+    /**
+     * Esconde status
+     */
+    function hideStatus() {
+      document.getElementById('status').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
