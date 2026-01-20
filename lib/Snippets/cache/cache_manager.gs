@@ -1,16 +1,24 @@
 /**
  * @fileoverview Gerenciador de Cache para Google Apps Script
- * @version 1.0.0
+ * @version 1.1.0
  *
  * Fornece uma interface simplificada para CacheService com suporte
  * a objetos JSON e chunking para dados maiores que 100KB.
+ *
+ * NOTA: Renomeado para SharedCache para evitar conflito com
+ * CacheManager do BOM.gs que tem logica especifica
+ *
+ * USO:
+ *   SharedCache.set('key', { dados: 'valor' }, 300);
+ *   const data = SharedCache.get('key');
+ *   const data = SharedCache.getOrFetch('key', () => fetchData(), 300);
  */
 
 /**
- * Gerenciador de cache com interface simplificada
+ * Gerenciador de cache compartilhado
  * @namespace
  */
-const CacheManager = {
+const SharedCache = {
   /** @private */
   _cache: CacheService.getScriptCache(),
 
@@ -164,5 +172,5 @@ const CacheManager = {
 
 // Exportar para uso global
 if (typeof module !== 'undefined') {
-  module.exports = CacheManager;
+  module.exports = SharedCache;
 }

@@ -13,9 +13,10 @@
 
 // ============================================================================
 // CONFIGURAÇÃO GLOBAL - BOM
+// Namespace prefixado para evitar conflitos com outros módulos
 // ============================================================================
 
-const CONFIG = {
+const BOM_CONFIG = {
   SHEETS: {
     CONFIG: 'Config'
   },
@@ -96,45 +97,44 @@ const CONFIG = {
 
 // ============================================================================
 // UTILITÁRIOS - BOM
+// Usa funções centralizadas de lib/Shared/Utils.gs
 // ============================================================================
 
 const Utils = {
+  /**
+   * Extrai índice de coluna de config "A - Nome" ou "AA - Nome"
+   * Usa SharedUtils para suporte a colunas AA, AB, etc.
+   */
   getColumnIndex: (colConfig) => {
-    if (!colConfig || typeof colConfig !== 'string') return -1;
-    return colConfig.charAt(0).toUpperCase().charCodeAt(0) - 64;
+    return SharedUtils_getColumnIndexFromConfig(colConfig);
   },
+
+  /**
+   * Extrai nome do cabeçalho de config "A - Nome"
+   */
   getColumnHeader: (colConfig) => {
-    if (!colConfig || typeof colConfig !== 'string') return '';
-    const parts = colConfig.split(' - ');
-    return parts.length > 1 ? parts[1].trim() : '';
+    return SharedUtils_getColumnHeaderFromConfig(colConfig);
   },
+
+  /**
+   * Formata versão com zeros à esquerda: "1" → "01"
+   */
   formatVersion: (input) => {
-    if (!input) return '';
-    const str = String(input).trim();
-    if (!str) return '';
-    const num = parseInt(str, 10);
-    return (isNaN(num) || num < 1) ? str : (num < 10 ? `0${num}` : `${num}`);
+    return SharedUtils_formatVersion(input);
   },
+
+  /**
+   * Remove caracteres inválidos de nome de aba
+   */
   sanitizeSheetName: (name) => {
-    return String(name).replace(/[\/\\\?\*\[\]:]/g, '_').substring(0, 100);
+    return SharedUtils_sanitizeSheetName(name);
   },
+
+  /**
+   * Extrai diâmetro de descrição de tubo (PIPE X IN)
+   */
   extractDiameter: (desc) => {
-    const patterns = [
-      /PIPE\s+(\d+\/\d+)\s+IN/i, /PIPE\s+(\d+)\s+IN/i, /PIPE\s+(\d+-\d+\/\d+)\s+IN/i
-    ];
-    for (const pattern of patterns) {
-      const match = desc.match(pattern);
-      if (match) {
-        const diam = match[1].replace(/\s+/g, '');
-        const mapping = {
-          '1/2': '1/2', '3/4': '3/4', '1': '1', '1-1/4': '1-1/4',
-          '1-1/2': '1-1/2', '2': '2', '2-1/2': '2-1/2', '3': '3',
-          '4': '4', '6': '6', '8': '8', '10': '10', '12': '12'
-        };
-        return mapping[diam] || diam;
-      }
-    }
-    return null;
+    return SharedUtils_extractPipeDiameter(desc);
   }
 };
 
@@ -148,17 +148,17 @@ const CacheManager = {
     const cached = CacheManager._cache.get(key);
     return cached ? JSON.parse(cached) : null;
   },
-  put: (key, value, ttl = CONFIG.CACHE_TTL) => {
+  put: (key, value, ttl = BOM_CONFIG.CACHE_TTL) => {
     CacheManager._cache.put(key, JSON.stringify(value), ttl);
   },
   invalidateAll: () => {
     CacheManager._cache.removeAll([ 'all_config_values', 'unique_values' ]);
     const config = ConfigService.getAll();
-    const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+    const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
     if (sourceSheet) {
         const sourceSheetId = sourceSheet.getSheetId();
         const groupConfigs = [
-            config[CONFIG.KEYS.GROUP_L1], config[CONFIG.KEYS.GROUP_L2], config[CONFIG.KEYS.GROUP_L3]
+            config[BOM_CONFIG.KEYS.GROUP_L1], config[BOM_CONFIG.KEYS.GROUP_L2], config[BOM_CONFIG.KEYS.GROUP_L3]
         ].filter(Boolean);
         const cacheKeysToRemove = groupConfigs.map(conf => {
             const colIndex = Utils.getColumnIndex(conf);
@@ -180,7 +180,7 @@ const ConfigService = {
   getAll: () => {
     const cached = CacheManager.get('all_config_values');
     if (cached) return cached;
-    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.CONFIG);
+    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
     if (!configSheet) return {};
     const values = configSheet.getRange("A1:B" + configSheet.getLastRow()).getDisplayValues();
     const config = {};
@@ -200,21 +200,43 @@ const ConfigService = {
 // CRIAÇÃO E ATUALIZAÇÃO DA ABA CONFIG (V2.7)
 // ============================================================================
 
+/**
+ * Garante que a aba 'Config' existe na planilha
+ * Chamada automaticamente pelo onOpen() para inicializar o sistema
+ *
+ * @private
+ * @returns {void}
+ */
 function ensureConfigExists() {
-  if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.CONFIG)) {
+  if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BOM_CONFIG.SHEETS.CONFIG)) {
     forceCreateConfig();
   }
 }
 
+/**
+ * Cria ou recria a aba 'Config' com estrutura completa
+ * Remove a aba existente e cria uma nova com todos os campos de configuração
+ *
+ * Estrutura criada:
+ * - Seção de Agrupamento (colunas para agrupar relatórios)
+ * - Seção de Dados BOM (mapeamento de colunas)
+ * - Seção de Opções (ordenação, versão)
+ * - Seção de Salvamento (pasta Drive, prefixo)
+ * - Seção de Fixadores (configuração de inserção)
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '🔧 Recriar Config'
+ * @returns {void}
+ */
 function forceCreateConfig() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let configSheet = ss.getSheetByName(CONFIG.SHEETS.CONFIG);
+  let configSheet = ss.getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
   if (configSheet) ss.deleteSheet(configSheet);
 
-  configSheet = ss.insertSheet(CONFIG.SHEETS.CONFIG, 0);
+  configSheet = ss.insertSheet(BOM_CONFIG.SHEETS.CONFIG, 0);
   configSheet.clear();
 
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
   const configData = [
     ['CONFIGURAÇÃO', 'VALOR', 'DESCRIÇÃO'],
     ['', '', ''],
@@ -258,7 +280,7 @@ function forceCreateConfig() {
   configSheet.getRange(1, 1, configData.length, 3).setValues(configData);
 
   // Formatação
-  const s = CONFIG.COLORS;
+  const s = BOM_CONFIG.COLORS;
   configSheet.getRange("A1:C" + configData.length)
     .setFontFamily(s.FONT_FAMILY)
     .setVerticalAlignment('middle')
@@ -283,7 +305,7 @@ function forceCreateConfig() {
   };
 
   for (const startRow in sections) {
-    const start = parseInt(startRow);
+    const start = SharedUtils_toInteger(startRow);
     const endRow = sections[startRow].endRow;
     configSheet.getRange(start, 1, 1, 3).merge()
       .setBackground(s.SECTION_BG)
@@ -328,20 +350,20 @@ function forceCreateConfig() {
 
 function updateConfigDropdowns() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheet = ss.getSheetByName(CONFIG.SHEETS.CONFIG);
+  const configSheet = ss.getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
   if (!configSheet) return;
   const config = ConfigService.getAll();
 
   const sourceSheets = ss.getSheets()
     .map(s => s.getName())
-    .filter(n => n !== CONFIG.SHEETS.CONFIG);
+    .filter(n => n !== BOM_CONFIG.SHEETS.CONFIG);
   if (sourceSheets.length > 0) {
     configSheet.getRange('B4').setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(sourceSheets, true).setAllowInvalid(false).build()
     );
   }
 
-  const sourceSheet = ss.getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+  const sourceSheet = ss.getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
   if (!sourceSheet || sourceSheet.getLastColumn() === 0) return;
 
   const headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues()[0];
@@ -374,14 +396,14 @@ function updateConfigDropdowns() {
 function updateGroupingPanel() {
   const config = ConfigService.getAll();
   const sourceSheet = SpreadsheetApp.getActiveSpreadsheet()
-    .getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+    .getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
   for (let level = 1; level <= 3; level++) {
     updateSingleLevelPanel(level, config, sourceSheet);
   }
 }
 
 function updateSingleLevelPanel(level, config, sourceSheet) {
-  const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.CONFIG);
+  const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
   const startCol = 5 + (level - 1) * 2;
   const levelId = `NÍVEL ${level}`;
   const groupConfig = config[`Agrupar por Nível ${level}`];
@@ -393,11 +415,11 @@ function updateSingleLevelPanel(level, config, sourceSheet) {
   if (sourceSheet && groupConfig && groupConfig.trim() !== '') {
     const colIndex = Utils.getColumnIndex(groupConfig);
     if (colIndex === -1) {
-      headerRange.setValue(`${levelId}: ERRO`).setBackground(CONFIG.COLORS.PANEL_ERROR_BG).setFontColor(CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold').setHorizontalAlignment('center');
-      configSheet.getRange(4, startCol).setValue('Config. inválida.').setFontColor(CONFIG.COLORS.FONT_SUBTLE).setFontStyle('italic');
+      headerRange.setValue(`${levelId}: ERRO`).setBackground(BOM_CONFIG.COLORS.PANEL_ERROR_BG).setFontColor(BOM_CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold').setHorizontalAlignment('center');
+      configSheet.getRange(4, startCol).setValue('Config. inválida.').setFontColor(BOM_CONFIG.COLORS.FONT_SUBTLE).setFontStyle('italic');
     } else {
       const colHeader = Utils.getColumnHeader(groupConfig);
-      headerRange.setValue(`${levelId}: ${colHeader.toUpperCase()}`).setBackground(CONFIG.COLORS.SECTION_BG).setFontColor(CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold').setHorizontalAlignment('center');
+      headerRange.setValue(`${levelId}: ${colHeader.toUpperCase()}`).setBackground(BOM_CONFIG.COLORS.SECTION_BG).setFontColor(BOM_CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold').setHorizontalAlignment('center');
       const uniqueValues = getUniqueColumnValues(sourceSheet, colIndex);
       if (uniqueValues.length > 0) {
         const valuesFormatted = uniqueValues.map(v => [v ?? '']);
@@ -406,14 +428,14 @@ function updateSingleLevelPanel(level, config, sourceSheet) {
       }
     }
   } else {
-    headerRange.setValue(levelId).setBackground(CONFIG.COLORS.PANEL_EMPTY_BG).setFontColor(CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold').setHorizontalAlignment('center');
+    headerRange.setValue(levelId).setBackground(BOM_CONFIG.COLORS.PANEL_EMPTY_BG).setFontColor(BOM_CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold').setHorizontalAlignment('center');
     const message = sourceSheet ? '(Não configurado)' : '(Selecione Aba Origem)';
-    configSheet.getRange(4, startCol).setValue(message).setFontColor(CONFIG.COLORS.FONT_SUBTLE).setFontStyle('italic');
+    configSheet.getRange(4, startCol).setValue(message).setFontColor(BOM_CONFIG.COLORS.FONT_SUBTLE).setFontStyle('italic');
   }
 
   const lastRowInPanel = configSheet.getRange(configSheet.getMaxRows(), startCol).getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
   const effectiveLastRow = Math.max(3, lastRowInPanel);
-  configSheet.getRange(3, startCol, effectiveLastRow - 2, 2).setBorder(true, true, true, true, true, true, CONFIG.COLORS.BORDER, SpreadsheetApp.BorderStyle.SOLID);
+  configSheet.getRange(3, startCol, effectiveLastRow - 2, 2).setBorder(true, true, true, true, true, true, BOM_CONFIG.COLORS.BORDER, SpreadsheetApp.BorderStyle.SOLID);
 }
 
 function getUniqueColumnValues(sheet, columnIndex) {
@@ -462,7 +484,7 @@ function getPanelSelections(sheet) {
 
 function updatePreviewPanel(previewStartCol) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheet = ss.getSheetByName(CONFIG.SHEETS.CONFIG);
+  const configSheet = ss.getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
 
   const combinations = getSelectedCombinations();
   const existingSuffixes = new Map();
@@ -478,7 +500,7 @@ function updatePreviewPanel(previewStartCol) {
   configSheet.getRange(3, previewStartCol, configSheet.getMaxRows() - 2, 4).clear();
   configSheet.getRange(3, previewStartCol, 1, 3)
     .setValues([['COMBINAÇÃO GERADA', 'CRIAR?', 'SUFIXO KOJO FINAL']])
-    .setBackground(CONFIG.COLORS.HEADER_BG).setFontColor(CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold');
+    .setBackground(BOM_CONFIG.COLORS.HEADER_BG).setFontColor(BOM_CONFIG.COLORS.FONT_LIGHT).setFontWeight('bold');
 
   if (combinations.length > 0) {
     const tableData = combinations.map(combo => {
@@ -488,7 +510,7 @@ function updatePreviewPanel(previewStartCol) {
     });
     configSheet.getRange(4, previewStartCol, tableData.length, 4).setValues(tableData);
     configSheet.getRange(4, previewStartCol + 1, tableData.length, 1).insertCheckboxes();
-    configSheet.getRange(4, previewStartCol + 2, tableData.length, 1).setBackground(CONFIG.COLORS.INPUT_BG);
+    configSheet.getRange(4, previewStartCol + 2, tableData.length, 1).setBackground(BOM_CONFIG.COLORS.INPUT_BG);
   }
 
   configSheet.setColumnWidth(previewStartCol, 250).setColumnWidth(previewStartCol + 1, 80).setColumnWidth(previewStartCol + 2, 250);
@@ -496,19 +518,19 @@ function updatePreviewPanel(previewStartCol) {
 
   const lastCombinationRow = configSheet.getRange(configSheet.getMaxRows(), previewStartCol).getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
   const effectiveLastRow = Math.max(3, lastCombinationRow);
-  configSheet.getRange(3, previewStartCol, effectiveLastRow - 2, 3).setBorder(true, true, true, true, true, true, CONFIG.COLORS.BORDER, SpreadsheetApp.BorderStyle.SOLID);
+  configSheet.getRange(3, previewStartCol, effectiveLastRow - 2, 3).setBorder(true, true, true, true, true, true, BOM_CONFIG.COLORS.BORDER, SpreadsheetApp.BorderStyle.SOLID);
   ss.toast('Pré-visualização atualizada!', 'Sucesso', 3);
 }
 
 function getSelectedCombinations() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheet = ss.getSheetByName(CONFIG.SHEETS.CONFIG);
+  const configSheet = ss.getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
   const config = ConfigService.getAll();
-  const sourceSheet = ss.getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+  const sourceSheet = ss.getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
   if (!sourceSheet) return [];
 
   const groupConfigs = [
-    config[CONFIG.KEYS.GROUP_L1], config[CONFIG.KEYS.GROUP_L2], config[CONFIG.KEYS.GROUP_L3]
+    config[BOM_CONFIG.KEYS.GROUP_L1], config[BOM_CONFIG.KEYS.GROUP_L2], config[BOM_CONFIG.KEYS.GROUP_L3]
   ].filter(Boolean);
   if (groupConfigs.length === 0) return [];
 
@@ -523,12 +545,12 @@ function getSelectedCombinations() {
   allData.forEach(row => {
     const combinationParts = groupIndices.map(index => row[index - 1] ?? '');
     if (combinationParts.every(part => String(part).trim() !== '')) {
-      existingCombinations.add(combinationParts.join(CONFIG.DELIMITER));
+      existingCombinations.add(combinationParts.join(BOM_CONFIG.DELIMITER));
     }
   });
 
   const finalCombinations = [...existingCombinations].filter(combo => {
-    const parts = combo.split(CONFIG.DELIMITER);
+    const parts = combo.split(BOM_CONFIG.DELIMITER);
     return parts.every((part, i) => {
       const levelId = `NÍVEL ${i + 1}`;
       if (!panelSelections[levelId]) return false;
@@ -537,15 +559,17 @@ function getSelectedCombinations() {
   });
 
   return finalCombinations.sort((a, b) => {
-    const aParts = a.split(CONFIG.DELIMITER);
-    const bParts = b.split(CONFIG.DELIMITER);
+    const aParts = a.split(BOM_CONFIG.DELIMITER);
+    const bParts = b.split(BOM_CONFIG.DELIMITER);
     for (let i = 0; i < Math.min(aParts.length, bParts.length); i++) {
-      const aNum = parseFloat(aParts[i]);
-      const bNum = parseFloat(bParts[i]);
-      if (!isNaN(aNum) && !isNaN(bNum)) {
+      const aIsNum = SharedUtils_isValidNumber(aParts[i]);
+      const bIsNum = SharedUtils_isValidNumber(bParts[i]);
+      if (aIsNum && bIsNum) {
+        const aNum = SharedUtils_toNumber(aParts[i]);
+        const bNum = SharedUtils_toNumber(bParts[i]);
         if (aNum !== bNum) return aNum - bNum;
       } else {
-         const comparison = aParts[i].localeCompare(bParts[i], undefined, { numeric: true });
+        const comparison = aParts[i].localeCompare(bParts[i], undefined, { numeric: true });
         if (comparison !== 0) return comparison;
       }
     }
@@ -564,7 +588,7 @@ function runProcessing() {
   CacheManager.invalidateAll();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const config = ConfigService.getAll(); // Lê da aba 'Config'
-  const configSheet = ss.getSheetByName(CONFIG.SHEETS.CONFIG);
+  const configSheet = ss.getSheetByName(BOM_CONFIG.SHEETS.CONFIG);
 
   const previewStartCol = 11;
   const lastPreviewRow = configSheet.getRange(configSheet.getMaxRows(), previewStartCol).getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
@@ -605,11 +629,29 @@ function runProcessingFromHtml(selections, reportSettings) {
 
 
 /**
- * ✅ ATUALIZADO (V2.12): Nomeia a aba pelo kojoSuffix
+ * Processa e gera relatórios BOM (Bill of Materials)
+ * Função principal do sistema de relatórios
+ *
+ * Para cada combinação selecionada:
+ * 1. Filtra dados da aba fonte pelo grupo
+ * 2. Agrupa e soma quantidades por item
+ * 3. Cria/limpa aba de destino
+ * 4. Formata relatório com cabeçalhos e totais
+ *
+ * @public
+ * @param {Array<{combination: string, kojoSuffix: string}>} combinationsToProcess - Combinações a processar
+ * @param {Object} settings - Configurações da aba Config
+ * @param {string} settings.Aba_Fonte - Nome da aba com dados brutos
+ * @param {string} settings.Grupo_Nivel_1 - Configuração do primeiro nível de grupo
+ * @param {string} [settings.Grupo_Nivel_2] - Segundo nível de grupo (opcional)
+ * @param {string} [settings.Grupo_Nivel_3] - Terceiro nível de grupo (opcional)
+ * @param {string} settings.Ordenar_Por - Coluna para ordenação
+ * @param {string} settings.Ordem_Classificacao - 'asc' ou 'desc'
+ * @returns {{success: boolean, message: string}} Resultado da operação
  */
 function processBomCore(combinationsToProcess, settings) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
 
   const sourceSheet = ss.getSheetByName(settings[K.SOURCE_SHEET]);
   if (!sourceSheet) {
@@ -644,12 +686,12 @@ function processBomCore(combinationsToProcess, settings) {
   for (const row of allData) {
     const rowCombination = groupIndices
       .map(index => String(row[index - 1] ?? '').trim())
-      .join(CONFIG.DELIMITER);
+      .join(BOM_CONFIG.DELIMITER);
 
     if (dataMap.has(rowCombination)) {
       dataMap.get(rowCombination).push([
         row[bomCols.c1 - 1], row[bomCols.c2 - 1], row[bomCols.c3 - 1],
-        row[bomCols.c4 - 1], parseFloat(row[bomCols.c5 - 1]) || 0,
+        row[bomCols.c4 - 1], SharedUtils_toNumber(row[bomCols.c5 - 1]),
         row[sortColumnIndex] // Valor para classificação
       ]);
     }
@@ -699,12 +741,12 @@ function groupAndSumData(data, sortOrder) {
   groupedData.sort((a, b) => {
     const valA = a[5]; // O valor de ordenação está sempre no índice 5
     const valB = b[5];
-    if (valA === null || valA === undefined || valA === '') return 1;
-    if (valB === null || valB === undefined || valB === '') return -1;
-    const aIsNum = !isNaN(parseFloat(valA)) && isFinite(valA);
-    const bIsNum = !isNaN(parseFloat(valB)) && isFinite(valB);
+    if (SharedUtils_isEmpty(valA)) return 1;
+    if (SharedUtils_isEmpty(valB)) return -1;
+    const aIsNum = SharedUtils_isValidNumber(valA);
+    const bIsNum = SharedUtils_isValidNumber(valB);
     if (aIsNum && bIsNum) {
-      return (parseFloat(valA) - parseFloat(valB)) * direction;
+      return (SharedUtils_toNumber(valA) - SharedUtils_toNumber(valB)) * direction;
     }
     return String(valA).localeCompare(String(valB), undefined, { numeric: true }) * direction;
   });
@@ -714,7 +756,7 @@ function groupAndSumData(data, sortOrder) {
 
 
 function createAndFormatReport(sheet, kojoSuffix, data, settings) {
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
   const reportConfig = {
     project: settings[K.PROJECT],
     bom: settings[K.BOM],
@@ -761,13 +803,22 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
   }
 }
 
+/**
+ * Remove todas as abas de relatório geradas
+ * Mantém apenas a aba Config e a aba de origem configurada
+ * Solicita confirmação do usuário antes de executar
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '🗑️ Limpar Relatórios'
+ * @returns {void}
+ */
 function clearOldReports() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert('Confirmação', 'Apagar TODAS as abas de relatório?', ui.ButtonSet.YES_NO);
   if (response !== ui.Button.YES) return;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const config = ConfigService.getAll();
-  const protectedSheets = [CONFIG.SHEETS.CONFIG, config[CONFIG.KEYS.SOURCE_SHEET]].filter(Boolean);
+  const protectedSheets = [BOM_CONFIG.SHEETS.CONFIG, config[BOM_CONFIG.KEYS.SOURCE_SHEET]].filter(Boolean);
   let deletedCount = 0;
   ss.getSheets().forEach(sheet => {
     if (!protectedSheets.includes(sheet.getName())) {
@@ -782,6 +833,14 @@ function clearOldReports() {
 // FIXADORES (SEÇÃO V2.7 - CÓPIA INTELIGENTE)
 // ============================================================================
 
+/**
+ * Abre a sidebar para seleção de fixadores
+ * Permite adicionar automaticamente fixadores (clamps, hangers) para tubulações
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '🔧 Fixadores → Fonte'
+ * @returns {void}
+ */
 function abrirSeletorFixadores() {
   const html = HtmlService.createHtmlOutputFromFile('FixadoresSidebar.html')
     .setTitle('Seletor de Fixadores')
@@ -791,7 +850,7 @@ function abrirSeletorFixadores() {
 
 function getPipesElegiveis() {
   const config = ConfigService.getAll();
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
   const fixIdx = {
     section: Utils.getColumnIndex(config[K.FIX_SECTION]) - 1,
     desc: Utils.getColumnIndex(config[K.FIX_DESC]) - 1,
@@ -815,13 +874,13 @@ function getPipesElegiveis() {
   data.forEach((row, idx) => {
     const section = String(row[fixIdx.section] || '');
     const desc = String(row[fixIdx.desc] || '');
-    const qty = parseFloat(row[fixIdx.qty]) || 0;
+    const qty = SharedUtils_toNumber(row[fixIdx.qty]);
     const uom = String(row[fixIdx.uom] || '');
 
     if (validarTipoFixacao(section) && desc.toUpperCase().includes('PIPE') && qty > 0) {
       const diameter = Utils.extractDiameter(desc);
       const isRiser = section.toUpperCase().includes('RISER');
-      const fixConfig = isRiser ? CONFIG.FIXADORES.RISER : CONFIG.FIXADORES.LOOP;
+      const fixConfig = isRiser ? BOM_CONFIG.FIXADORES.RISER : BOM_CONFIG.FIXADORES.LOOP;
       const itemMap = isRiser ? fixConfig.clamps : fixConfig.hangs;
 
       if (diameter && itemMap[diameter]) {
@@ -855,7 +914,7 @@ function validarTipoFixacao(section) {
 
 function processarFixadoresSelecionados(selectedPipes) {
   const config = ConfigService.getAll();
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
   const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[K.SOURCE_SHEET]);
   if (!sourceSheet || !selectedPipes || selectedPipes.length === 0) {
     return { success: false, message: 'Dados inválidos' };
@@ -876,7 +935,7 @@ function processarFixadoresSelecionados(selectedPipes) {
   const maxCol = sourceSheet.getLastColumn();
 
   selectedPipes.forEach(pipe => {
-    const fixConfig = pipe.isRiser ? CONFIG.FIXADORES.RISER : CONFIG.FIXADORES.LOOP;
+    const fixConfig = pipe.isRiser ? BOM_CONFIG.FIXADORES.RISER : BOM_CONFIG.FIXADORES.LOOP;
     const itemMap = pipe.isRiser ? fixConfig.clamps : fixConfig.hangs;
     const fixadorItem = itemMap[pipe.diameter];
     if (!fixadorItem) return;
@@ -926,7 +985,7 @@ function processarFixadoresSelecionados(selectedPipes) {
 
 function removerFixadoresSelecionados(selectedPipes) {
   const config = ConfigService.getAll();
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
   const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[K.SOURCE_SHEET]);
   if (!sourceSheet || !selectedPipes || selectedPipes.length === 0) {
     return { success: false, message: 'Dados inválidos' };
@@ -968,6 +1027,16 @@ function removerFixadoresSelecionados(selectedPipes) {
 // EXPORTAÇÃO PDF (V2.12)
 // ============================================================================
 
+/**
+ * Exporta abas selecionadas para PDF via sidebar HTML
+ * Chamada pela sidebar BomSidebar.html
+ *
+ * @public
+ * @param {string[]} sheetNames - Nomes das abas a exportar
+ * @param {string} folderInput - ID da pasta Drive ou nome para criar
+ * @param {string} prefix - Prefixo para nome dos arquivos (não usado atualmente)
+ * @returns {{success: boolean, message?: string, exported?: number, folder?: string}}
+ */
 function runPdfExportFromHtml(sheetNames, folderInput, prefix) {
   if (!sheetNames || sheetNames.length === 0) {
     return { success: false, message: 'Nenhuma aba selecionada' };
@@ -987,10 +1056,19 @@ function runPdfExportFromHtml(sheetNames, folderInput, prefix) {
   return { success: true, exported: sheetNames.length, folder: folder.getName() };
 }
 
+/**
+ * Exporta todos os relatórios gerados para PDF
+ * Usa configurações da aba Config (pasta Drive, prefixo)
+ * Mostra feedback via toast durante a operação
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '📄 Exportar PDFs (da Aba Config)'
+ * @returns {void}
+ */
 function exportPDFsWithFeedback() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Exportando PDFs...', 'Aguarde', -1);
   const config = ConfigService.getAll();
-  const K = CONFIG.KEYS;
+  const K = BOM_CONFIG.KEYS;
 
   const sheetNames = getReportSheetNames();
   if (!sheetNames || sheetNames.length === 0) {
@@ -1113,10 +1191,10 @@ function getBomHtmlInitData() {
 
   const allSheets = ss.getSheets()
     .map(s => s.getName())
-    .filter(n => n !== CONFIG.SHEETS.CONFIG);
+    .filter(n => n !== BOM_CONFIG.SHEETS.CONFIG);
 
   let allColumns = [];
-  const sourceSheet = ss.getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+  const sourceSheet = ss.getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
   if (sourceSheet && sourceSheet.getLastColumn() > 0) {
     const headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues()[0];
     allColumns = headers.map((h, i) =>
@@ -1138,7 +1216,7 @@ function getBomHtmlInitData() {
 function getUniqueValuesForColumn(colName) {
   if (!colName) return [];
   const config = ConfigService.getAll();
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
   if (!sourceSheet) return [];
   const colIndex = Utils.getColumnIndex(colName);
   if (colIndex === -1) return [];
@@ -1148,7 +1226,7 @@ function getUniqueValuesForColumn(colName) {
 function getCombinationsForPreview(selectedGroups, groupConfigs) {
   const config = ConfigService.getAll();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sourceSheet = ss.getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+  const sourceSheet = ss.getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
   if (!sourceSheet) return [];
 
   const activeGroupConfigs = groupConfigs.filter(Boolean);
@@ -1170,12 +1248,12 @@ function getCombinationsForPreview(selectedGroups, groupConfigs) {
   allData.forEach(row => {
     const combinationParts = groupIndices.map(index => row[index - 1] ?? '');
     if (combinationParts.every(part => String(part).trim() !== '')) {
-      existingCombinations.add(combinationParts.join(CONFIG.DELIMITER));
+      existingCombinations.add(combinationParts.join(BOM_CONFIG.DELIMITER));
     }
   });
 
   const finalCombinations = [...existingCombinations].filter(combo => {
-    const parts = combo.split(CONFIG.DELIMITER);
+    const parts = combo.split(BOM_CONFIG.DELIMITER);
     return parts.every((part, i) => {
       const levelId = `NÍVEL ${i + 1}`;
       if (!panelSelections[levelId]) return false;
@@ -1184,15 +1262,17 @@ function getCombinationsForPreview(selectedGroups, groupConfigs) {
   });
 
   return finalCombinations.sort((a, b) => {
-    const aParts = a.split(CONFIG.DELIMITER);
-    const bParts = b.split(CONFIG.DELIMITER);
+    const aParts = a.split(BOM_CONFIG.DELIMITER);
+    const bParts = b.split(BOM_CONFIG.DELIMITER);
     for (let i = 0; i < Math.min(aParts.length, bParts.length); i++) {
-      const aNum = parseFloat(aParts[i]);
-      const bNum = parseFloat(bParts[i]);
-      if (!isNaN(aNum) && !isNaN(bNum)) {
+      const aIsNum = SharedUtils_isValidNumber(aParts[i]);
+      const bIsNum = SharedUtils_isValidNumber(bParts[i]);
+      if (aIsNum && bIsNum) {
+        const aNum = SharedUtils_toNumber(aParts[i]);
+        const bNum = SharedUtils_toNumber(bParts[i]);
         if (aNum !== bNum) return aNum - bNum;
       } else {
-         const comparison = aParts[i].localeCompare(bParts[i], undefined, { numeric: true });
+        const comparison = aParts[i].localeCompare(bParts[i], undefined, { numeric: true });
         if (comparison !== 0) return comparison;
       }
     }
@@ -1226,16 +1306,29 @@ function getUserSidebarState() {
 // ============================================================================
 
 /**
- * ✅ CORRIGIDO (V2.11): Adicionado setWidth e setHeight
+ * Abre o painel modal do Gerador de BOM
+ * Dialog maior (1100x750) com interface completa de geração de relatórios
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '📊 Gerador de BOM (Painel)'
+ * @returns {void}
  */
 function openBomSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('BomSidebar.html')
     .setTitle('Painel Gerador de BOM')
-    .setWidth(1100) // ✅ Tamanho grande
+    .setWidth(1100)
     .setHeight(750);
   SpreadsheetApp.getUi().showModelessDialog(html, 'Painel Gerador de BOM');
 }
 
+/**
+ * Abre a sidebar de controle de configurações
+ * Permite visualizar e editar configurações da aba Config
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '⚙️ Painel de Controle (Sidebar)'
+ * @returns {void}
+ */
 function openConfigSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('ConfigSidebar.html')
     .setTitle('Painel de Controle')
@@ -1255,16 +1348,24 @@ function runProcessingWithFeedback() {
   return result;
 }
 
+/**
+ * Executa diagnóstico do sistema BOM
+ * Mostra informações sobre configuração, aba de origem e relatórios gerados
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '🧪 Diagnóstico'
+ * @returns {void}
+ */
 function testSystem() {
   try {
     const config = ConfigService.getAll();
-    const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+    const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
     const msg = [
       `Versão do Script: 2.13 (Correção Exportar PDF)`, // Atualizado
-      `Aba de Origem: ${config[CONFIG.KEYS.SOURCE_SHEET] || 'Não configurada'}`,
+      `Aba de Origem: ${config[BOM_CONFIG.KEYS.SOURCE_SHEET] || 'Não configurada'}`,
       `Linhas na Origem: ${sourceSheet ? sourceSheet.getLastRow() - 1 : 0}`,
       `Relatórios Gerados: ${getReportSheetNames().length}`,
-      `Fixador Trade: ${config[CONFIG.KEYS.FIX_TRADE] || 'Não configurado'}`
+      `Fixador Trade: ${config[BOM_CONFIG.KEYS.FIX_TRADE] || 'Não configurado'}`
     ].join('\n');
     SpreadsheetApp.getUi().alert('🧪 Diagnóstico do Sistema', msg, SpreadsheetApp.getUi().ButtonSet.OK);
     return {
@@ -1283,7 +1384,7 @@ function getReportSheetNames() {
   const config = ConfigService.getAll();
   return SpreadsheetApp.getActiveSpreadsheet().getSheets()
     .map(s => s.getName())
-    .filter(name => name !== CONFIG.SHEETS.CONFIG && name !== config[CONFIG.KEYS.SOURCE_SHEET]);
+    .filter(name => name !== BOM_CONFIG.SHEETS.CONFIG && name !== config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
 }
 
 /**
@@ -1293,18 +1394,39 @@ function getReportSheetNamesForHtml() {
   return getReportSheetNames();
 }
 
+/**
+ * Força limpeza completa do cache do sistema BOM
+ * Útil quando os dados parecem desatualizados
+ *
+ * @public
+ * @menuitem '🔧 Relatórios Dinâmicos' > '🔄 Limpar Cache'
+ * @returns {void}
+ */
 function forceRefreshCache() {
   CacheManager.invalidateAll();
   SpreadsheetApp.getActiveSpreadsheet().toast('Cache limpo!', 'Sucesso', 3);
 }
 
-// Trigger onEdit para BOM
+/**
+ * Handler de edição para a aba Config
+ * Chamado pelo onEdit() centralizado em Menu.gs
+ *
+ * Funcionalidades:
+ * - Invalida cache quando qualquer célula é editada
+ * - Formata versão (linha 21) automaticamente
+ * - Atualiza dropdowns quando aba de origem muda
+ * - Atualiza painéis de agrupamento
+ *
+ * @private
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e - Evento de edição
+ * @returns {void}
+ */
 function onEditBom(e) {
   if (!e || !e.source) return;
   const sheet = e.source.getActiveSheet();
   const sheetName = sheet.getName();
 
-  if (sheetName === CONFIG.SHEETS.CONFIG) {
+  if (sheetName === BOM_CONFIG.SHEETS.CONFIG) {
     CacheManager.invalidateAll();
     const range = e.range;
     const col = range.getColumn();
@@ -1318,7 +1440,7 @@ function onEditBom(e) {
     if (col === 2 && row >= 4 && row <= 7) { // Painéis de Agrupamento
       Utilities.sleep(200);
       const config = ConfigService.getAll();
-      const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[CONFIG.KEYS.SOURCE_SHEET]);
+      const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[BOM_CONFIG.KEYS.SOURCE_SHEET]);
       if (row === 4) {
         updateConfigDropdowns();
         updateGroupingPanel();
@@ -1334,7 +1456,7 @@ function onEditBom(e) {
   } else {
     try {
       const config = ConfigService.getAll();
-      if (sheetName === config[CONFIG.KEYS.SOURCE_SHEET]) {
+      if (sheetName === config[BOM_CONFIG.KEYS.SOURCE_SHEET]) {
         CacheManager.invalidateAll();
       }
     } catch (error) {}

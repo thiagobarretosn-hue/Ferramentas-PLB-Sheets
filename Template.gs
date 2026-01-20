@@ -1,21 +1,51 @@
 /**
- * SISTEMA DE TEMPLATES PLB
- * Ferramentas PLB Sheets
+ * @fileoverview Sistema de Templates PLB - Ferramentas PLB Sheets
+ * @version 1.1.0
  *
  * Este arquivo contém todas as funções relacionadas ao sistema de Templates:
- * - Gerenciamento de templates de tarefas
- * - Inserção de templates em planilhas
- * - Configuração de cores automáticas
- * - Gerenciamento de abas (renomear, duplicar, etc.)
- * - Criação e atualização de templates
+ *
+ * FUNCIONALIDADES:
+ * - Gerenciamento de templates de tarefas (carregar, inserir, criar)
+ * - Inserção de templates na planilha ativa
+ * - Configuração de cores automáticas por grupo/tarefa
+ * - Gerenciamento de abas (renomear, duplicar, buscar/substituir)
+ * - Criação e atualização de templates na base central
+ *
+ * DEPENDÊNCIAS:
+ * - lib/Shared/Config.gs (AppConfig) - Configurações centralizadas
+ * - lib/Shared/Utils.gs (SharedUtils) - Funções utilitárias
+ *
+ * MENUS:
+ * - '🏗️ PLB Templates' - Menu principal de templates
+ * - '📑 Gerenciar Abas' - Menu de gerenciamento de abas
  */
 
 // ============================================================================
-// CONFIGURAÇÃO GLOBAL - TEMPLATE
+// CONFIGURACAO GLOBAL - TEMPLATE
+// Valores agora sao obtidos de lib/Shared/Config.gs (AppConfig)
+// Use showConfigDialog() para alterar via interface
 // ============================================================================
 
-const CENTRAL_SPREADSHEET_ID = "1KD_NXdtEjORJJFYwiFc9uzrZeO57TPPSXWh7bokZMdU";
-const CENTRAL_SHEET_NAME = "DATA BASE";
+/**
+ * Obtem ID da planilha central (usa AppConfig)
+ * @returns {string} ID da planilha
+ */
+function getCentralSpreadsheetId() {
+  return AppConfig.get('CENTRAL_SPREADSHEET_ID');
+}
+
+/**
+ * Obtem nome da aba central (usa AppConfig)
+ * @returns {string} Nome da aba
+ */
+function getCentralSheetName() {
+  return AppConfig.get('CENTRAL_SHEET_NAME');
+}
+
+// Constantes mantidas para retrocompatibilidade (leitura apenas)
+// IMPORTANTE: Nao use diretamente - use as funcoes acima
+const CENTRAL_SPREADSHEET_ID = AppConfig.get('CENTRAL_SPREADSHEET_ID');
+const CENTRAL_SHEET_NAME = AppConfig.get('CENTRAL_SHEET_NAME');
 
 const COLUMN_MAPPING = {
   DESTINATION: { TASK: 4, 'SUB-TASK': 5, 'SUB-TRADE': 6, LOCAL: 9, DESC: 11, QTY: 12 },
@@ -107,6 +137,16 @@ function saveAllColorConfigs(configs) {
   properties.setProperty('SHEET_COLOR_CONFIGS', JSON.stringify(configs));
 }
 
+/**
+ * Aplica cores de fundo baseadas nos valores da coluna de grupo
+ * Usa a paleta de cores configurada para cada valor de grupo
+ *
+ * @public
+ * @menuitem '📑 Gerenciar Abas' > '✨ Aplicar Cores'
+ * @param {string} [sheetName=null] - Nome da aba (usa aba ativa se omitido)
+ * @param {Object} [configToApply=null] - Configuração de cores (usa salva se omitido)
+ * @returns {void}
+ */
 function applyGroupColors(sheetName = null, configToApply = null) {
   const sheet = sheetName ? SpreadsheetApp.getActive().getSheetByName(sheetName) : SpreadsheetApp.getActive().getActiveSheet();
   if (!sheet) return;
@@ -221,6 +261,14 @@ function onEditColorTrigger(e) {
 // UI E SIDEBARS - TEMPLATE
 // ============================================================================
 
+/**
+ * Abre a sidebar principal de templates
+ * Carrega templates da base central e exibe interface de seleção
+ *
+ * @public
+ * @menuitem '🏗️ PLB Templates' > '📋 Abrir Sidebar'
+ * @returns {void}
+ */
 function openTemplateSidebar() {
   const html = HtmlService.createTemplateFromFile('template-sidebar.html');
   html.templates = JSON.stringify(loadTemplatesWithCache());
@@ -232,6 +280,14 @@ function openTemplateSidebar() {
   SpreadsheetApp.getUi().showSidebar(sidebar);
 }
 
+/**
+ * Abre diálogo de configuração do sistema de templates
+ * Permite configurar a linha padrão de inserção
+ *
+ * @public
+ * @menuitem '🏗️ PLB Templates' > '⚙️ Configurar Sistema'
+ * @returns {void}
+ */
 function openSystemConfig() {
   const config = getSystemConfiguration();
   const ui = SpreadsheetApp.getUi();
@@ -241,8 +297,8 @@ function openSystemConfig() {
     ui.ButtonSet.OK_CANCEL
   );
   if (response.getSelectedButton() === ui.Button.OK) {
-    const newRow = parseInt(response.getResponseText(), 10);
-    if (!isNaN(newRow) && newRow > 0) {
+    const newRow = SharedUtils_toPositiveInteger(response.getResponseText(), 0);
+    if (newRow > 0) {
       config.defaultInsertRow = newRow;
       saveSystemConfiguration(config);
       ui.alert('✅ Configuração salva com sucesso!');
@@ -293,43 +349,56 @@ function salvarConfiguracaoCores(data, sheetName) {
 
 // ============================================================================
 // UTILITÁRIOS - TEMPLATE
+// Wrappers para funções centralizadas em lib/Shared/Utils.gs
+// Mantidos para retrocompatibilidade com código existente
 // ============================================================================
 
+/**
+ * Converte número de coluna para letra(s)
+ * @param {number} columnNumber - Número da coluna (1-indexed)
+ * @returns {string} Letra(s) da coluna
+ */
 function numberToColumnLetter(columnNumber) {
-  let result = '';
-  while (columnNumber > 0) {
-    columnNumber--;
-    result = String.fromCharCode(65 + (columnNumber % 26)) + result;
-    columnNumber = Math.floor(columnNumber / 26);
-  }
-  return result;
+  return SharedUtils_numberToColumnLetter(columnNumber);
 }
 
+/**
+ * Converte letra(s) de coluna para número
+ * @param {string} columnLetter - Letra(s) da coluna
+ * @returns {number} Número da coluna (1-indexed)
+ */
 function columnLetterToIndex(columnLetter) {
-  let index = 0;
-  const letters = String(columnLetter || '');
-  for (let i = 0; i < letters.length; i++) {
-    index = index * 26 + (letters.charCodeAt(i) - 64);
-  }
-  return index;
+  return SharedUtils_columnLetterToIndex(columnLetter);
 }
 
+/**
+ * Valida e converte para inteiro dentro de um range
+ * @param {*} value - Valor a validar
+ * @param {number} [min=1] - Valor mínimo
+ * @param {number} [max=10000] - Valor máximo
+ * @returns {number} Valor validado
+ */
 function validateInteger(value, min = 1, max = 10000) {
-  if (value == null || value === '') return min;
-  const number = parseInt(value, 10);
-  if (isNaN(number) || number < min || number > max) {
-    throw new Error(`Valor inválido: ${value}. Deve estar entre ${min} e ${max}`);
-  }
-  return number;
+  return SharedUtils_validateInteger(value, min, max);
 }
 
+/**
+ * Cria ID seguro para uso em HTML/CSS
+ * @param {string} text - Texto original
+ * @returns {string} ID seguro
+ */
 function createSafeId(text) {
-  return String(text || '')
-    .replace(/[^A-Za-z0-9]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
+  return SharedUtils_createSafeId(text);
 }
 
+/**
+ * Substitui TASK/SUB-TRADE em linhas com FIRESTOP na descrição
+ * Define TASK como 'SHELL' e SUB-TRADE como 'C.A.'
+ *
+ * @public
+ * @menuitem '🏗️ PLB Templates' > 'Substituir SHELL em FIRESTOP'
+ * @returns {void}
+ */
 function substituirShellFirestop() {
   const planilha = SpreadsheetApp.getActiveSheet();
   const dados = planilha.getDataRange().getValues();
@@ -349,6 +418,14 @@ function substituirShellFirestop() {
 // SHEET MANAGER - TEMPLATE
 // ============================================================================
 
+/**
+ * Abre o gerenciador de abas da planilha
+ * Permite renomear, duplicar e buscar/substituir em múltiplas abas
+ *
+ * @public
+ * @menuitem '📑 Gerenciar Abas' > 'Gerenciador de Abas'
+ * @returns {void}
+ */
 function showSheetManager() {
   SpreadsheetApp.getUi()
     .showModalDialog(
@@ -660,7 +737,7 @@ function adjustFormula(formula, originalRow, targetRow) {
   try {
     const rowDifference = (targetRow || 0) - (originalRow || targetRow || 0);
     return String(formula).replace(/([A-Z]+)(\d+)/g, (match, column, row) => {
-      const currentRowNum = parseInt(row, 10);
+      const currentRowNum = SharedUtils_toInteger(row);
       const newRowNum = currentRowNum + rowDifference;
 
       if (column === 'T') {
@@ -1039,7 +1116,7 @@ function adjustFormulaForDatabase(formula, originalRow, targetRow) {
   try {
     const rowDifference = targetRow - originalRow;
     return formula.replace(/([A-Z]+)(\d+)/g, (match, column, row) => {
-      const newRowNumber = parseInt(row, 10) + rowDifference;
+      const newRowNumber = SharedUtils_toInteger(row) + rowDifference;
       if (column === numberToColumnLetter(COLUMN_MAPPING.DESTINATION.QTY)) {
         return `T${newRowNumber}`;
       }

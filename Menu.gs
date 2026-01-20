@@ -1,21 +1,36 @@
 /**
- * MENU PRINCIPAL - FERRAMENTAS PLB SHEETS
+ * @fileoverview Menu Principal - Ferramentas PLB Sheets
+ * @version 1.1.0
  *
  * Este arquivo centraliza todos os menus e funções onOpen do sistema.
  * Facilita a adição ou remoção de funcionalidades do menu principal.
  *
- * Estrutura:
- * - onOpen(): Função principal que cria todos os menus
- * - onEdit(): Gerencia todos os triggers de edição
+ * IMPORTANTE: Este é o único arquivo que deve conter funções onOpen e onEdit.
+ * Todas as outras funcionalidades devem ser chamadas a partir daqui.
+ *
+ * Menus Disponíveis:
+ * - 🔧 Relatórios Dinâmicos (BOM) - Geração e exportação de relatórios
+ * - 🏗️ PLB Templates - Sistema de templates
+ * - 📑 Gerenciar Abas - Organização e cores de abas
+ * - 🔍 Super Busca - Busca rápida de materiais
+ * - ⚙️ Configurações - Configurações gerais do sistema
  */
 
 // ============================================================================
-// FUNÇÃO PRINCIPAL - onOpen
+// FUNÇÃO PRINCIPAL - onOpen (TRIGGER SIMPLES)
 // ============================================================================
 
 /**
- * Cria todos os menus quando a planilha é aberta.
- * Esta é a única função onOpen que deve existir no projeto.
+ * Cria todos os menus quando a planilha é aberta
+ * Esta é a ÚNICA função onOpen que deve existir no projeto
+ *
+ * IMPORTANTE: Simple triggers têm limitações:
+ * - Não podem acessar serviços que requerem autorização (não se aplica a createMenu)
+ * - Tempo máximo de execução de 30 segundos
+ * - Não podem fazer alterações que afetem outros usuários
+ *
+ * @trigger onOpen - Executada automaticamente ao abrir a planilha
+ * @returns {void}
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
@@ -69,6 +84,13 @@ function onOpen() {
     .addToUi();
 
   // ========================================
+  // MENU: CONFIGURACOES DO SISTEMA
+  // ========================================
+  ui.createMenu('⚙️ Configuracoes')
+    .addItem('🔧 Configuracoes Gerais', 'showConfigDialog')
+    .addToUi();
+
+  // ========================================
   // INICIALIZAÇÃO
   // ========================================
   // Garante que a aba Config existe (BOM)
@@ -76,28 +98,65 @@ function onOpen() {
 }
 
 // ============================================================================
-// FUNÇÃO onEdit - GERENCIADOR DE TRIGGERS
+// FUNCAO onEdit - TRIGGER DE EDIÇÃO
 // ============================================================================
 
 /**
- * Gerencia todos os triggers de edição do sistema.
- * Chama as funções apropriadas dependendo da aba editada.
+ * Gerencia todos os triggers de edição do sistema
+ * Redireciona para os handlers apropriados baseado na aba editada
+ *
+ * IMPORTANTE: Simple trigger - limite de 30 segundos
+ * - Não pode acessar PropertiesService
+ * - Não pode enviar emails
+ * - Não pode criar arquivos no Drive
+ *
+ * Handlers registrados:
+ * - Aba 'Config': onEditBom() - Atualiza interface de configuração do BOM
+ * - Outras abas: onEditColorTrigger() - Coloração automática por grupo
+ *
+ * @trigger onEdit - Executada automaticamente ao editar uma célula
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e - Evento de edição
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} e.source - Planilha
+ * @param {GoogleAppsScript.Spreadsheet.Range} e.range - Range editado
+ * @param {*} e.value - Novo valor da célula
+ * @param {*} e.oldValue - Valor anterior da célula
+ * @returns {void}
  */
 function onEdit(e) {
-  // Chama o onEdit do BOM (para aba Config)
-  if (typeof onEditBom === 'function') {
-    onEditBom(e);
-  }
+  // Validacao rapida do evento
+  if (!e || !e.source || !e.range) return;
 
-  // Chama o onEdit de cores (para coloração automática)
-  if (typeof onEditColorTrigger === 'function') {
+  try {
     const sheet = e.source.getActiveSheet();
     const sheetName = sheet.getName();
-    const allConfigs = getAllColorConfigs();
-    const config = allConfigs[sheetName];
 
-    if (config && config.automaticColoring && e.range.getColumn() === config.groupCol) {
-      onEditColorTrigger(e);
+    // ========================================
+    // TRIGGER: BOM Config
+    // ========================================
+    if (sheetName === 'Config' && typeof onEditBom === 'function') {
+      onEditBom(e);
+      return; // Sai cedo - aba Config e exclusiva do BOM
     }
+
+    // ========================================
+    // TRIGGER: Coloracao automatica
+    // ========================================
+    if (typeof onEditColorTrigger === 'function') {
+      // Verifica se ha configuracao de cores para esta aba
+      const allConfigs = getAllColorConfigs();
+      const config = allConfigs[sheetName];
+
+      if (config && config.automaticColoring) {
+        const editedCol = e.range.getColumn();
+        // So processa se editou a coluna de grupo
+        if (editedCol === config.groupCol) {
+          onEditColorTrigger(e);
+        }
+      }
+    }
+
+  } catch (error) {
+    // Log silencioso - nao interrompe o usuario
+    console.error(`[onEdit] Erro: ${error.message}`);
   }
 }
