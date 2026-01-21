@@ -2,602 +2,662 @@
 <html>
 <head>
   <base target="_top">
-  <meta charset="utf-8">
-  <title>PLB Templates</title>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --primary: #667eea; --primary-dark: #764ba2;
+      --success: #28a745; --danger: #ea4335;
+      --bg: #f8f9fa; --card: #ffffff; --border: #e0e0e0;
+      --text: #202124; --text-light: #5f6368;
+      --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --section-bg: #667eea; --input-bg: #f8f9fa;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 8px;
-      background: #f8f9fa;
-      font-size: 11px;
-      line-height: 1.3;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg); color: var(--text); font-size: 12px;
+      display: flex; flex-direction: column;
     }
-    
+
+    /* Header */
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 8px 12px;
-      text-align: center;
-      border-radius: 6px;
-      margin: -8px -8px 8px -8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background: var(--header-bg); color: white;
+      padding: 12px 16px; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
-    
-    .header h2 {
-      margin: 0;
-      font-size: 14px;
-      font-weight: 600;
+    .header h2 { font-size: 16px; font-weight: 600; margin: 0; }
+    .header .subtitle { font-size: 10px; opacity: 0.9; margin-top: 2px; }
+
+    /* Tabs */
+    .tab-buttons {
+      display: flex; border-bottom: 1px solid var(--border);
+      background: var(--card); flex-shrink: 0;
     }
-    
-    .header .subtitle {
-      font-size: 10px;
-      opacity: 0.9;
-      margin-top: 2px;
+    .tab-button {
+      flex: 1; text-align: center; padding: 10px 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      color: var(--text-light); border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-button:hover { background: var(--bg); }
+    .tab-button.active {
+      color: var(--primary); border-bottom-color: var(--primary);
+      background: var(--card);
     }
 
-    .controls {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 8px;
-      align-items: center;
-      background: white;
-      padding: 6px 8px;
-      border-radius: 6px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-      border: 1px solid #e9ecef;
-      flex-wrap: nowrap;
+    /* Content Area */
+    .content-area {
+      flex: 1; overflow-y: auto; padding: 12px;
     }
-    
-    .search-box {
-      flex: 1;
-      min-width: 120px;
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Config Sections */
+    .config-section {
+      background: var(--card); border-radius: 8px;
+      padding: 12px; margin-bottom: 12px;
+      border: 1px solid var(--border);
     }
-    
-    .search-box input {
-      width: 100%;
-      padding: 6px 10px;
-      border: 1px solid #dee2e6;
-      border-radius: 4px;
-      background: #f8f9fa;
-      font-size: 11px;
-      transition: all 0.2s ease;
-      height: 28px;
+    .config-section h3 {
+      font-size: 12px; font-weight: 600; color: var(--primary);
+      margin-bottom: 10px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--input-bg);
+      display: flex; align-items: center; gap: 6px;
     }
-    
-    .search-box input:focus {
-      outline: none;
-      border-color: #667eea;
-      background: white;
-      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+    .form-group { margin-bottom: 10px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-group label {
+      display: block; font-size: 11px; font-weight: 500;
+      margin-bottom: 4px; color: var(--text-light);
     }
-    
+    select, input[type="text"] {
+      width: 100%; padding: 8px 10px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 11px; font-family: inherit;
+      background: var(--input-bg); transition: all 0.2s;
+    }
+    select:focus, input:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(102,126,234,0.1);
+    }
+    input[type="color"] {
+      width: 40px; height: 28px; padding: 2px;
+      border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Buttons */
     .btn {
-      border: none;
-      border-radius: 4px;
-      padding: 0;
-      font-size: 10px;
-      font-weight: 500;
-      color: white;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-      height: 28px;
-      min-width: 60px;
-      padding: 0 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      padding: 8px 14px; border: none; border-radius: 6px;
+      cursor: pointer; font-weight: 600; font-size: 11px;
+      font-family: inherit; transition: all 0.2s;
     }
-    
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover:not(:disabled) { filter: brightness(1.1); }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+    .btn-small { padding: 6px 10px; font-size: 10px; }
+    .btn-block { width: 100%; }
+
+    /* Color Items */
+    .color-list { max-height: 300px; overflow-y: auto; }
+    .color-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; margin-bottom: 4px;
+      background: var(--input-bg); border-radius: 4px;
     }
-    
-    .btn-primary {
-      background: #28a745;
-      position: relative;
+    .color-item label { flex: 1; font-size: 11px; }
+    .color-preview {
+      width: 60px; height: 24px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600;
     }
-    
-    .btn-primary:hover:not(:disabled) {
-      background: #218838;
-      transform: translateY(-1px);
+
+    /* Templates Section */
+    .controls {
+      display: flex; gap: 6px; margin-bottom: 10px;
+      flex-wrap: wrap; align-items: center;
     }
-    
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
-    }
-    
-    .btn-secondary:hover:not(:disabled) {
-      background: #5a6268;
-      transform: translateY(-1px);
-    }
-    
+    .search-box { flex: 1; min-width: 140px; }
+    .search-box input { width: 100%; height: 32px; }
     .row-indicator {
-      background: #007bff;
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: 500;
-      font-size: 10px;
-      border: 1px solid #0056b3;
-      white-space: nowrap;
+      background: #007bff; color: white;
+      padding: 6px 10px; border-radius: 4px;
+      font-weight: 500; font-size: 10px;
     }
 
+    /* Task Cards */
     .task-card {
-      background: white;
-      border-radius: 6px;
-      margin-bottom: 6px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-      overflow: hidden;
-      transition: all 0.2s ease;
-      border: 1px solid #e9ecef;
+      background: var(--card); border-radius: 6px;
+      margin-bottom: 6px; overflow: hidden;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.2s;
     }
-    
-    .task-card:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    .task-card.hidden {
-      display: none;
-    }
-    
+    .task-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     .task-header {
-      padding: 6px 10px;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 600;
-      font-size: 11px;
-      position: relative;
-      min-height: 28px;
+      padding: 8px 10px; cursor: pointer;
+      display: flex; justify-content: space-between;
+      align-items: center; font-weight: 600; font-size: 11px;
     }
-    
-    .task-content {
-      display: none;
-      background: #fafbfc;
-      border-top: 1px solid #e9ecef;
-    }
-    
-    .task-content.active {
-      display: block;
-    }
-    
-    .task-title {
-      font-weight: 600;
-    }
-    
     .task-badge {
-      background: rgba(255,255,255,0.9);
-      color: #333;
-      padding: 2px 6px;
-      border-radius: 8px;
-      font-size: 9px;
-      font-weight: 600;
+      background: rgba(255,255,255,0.9); color: #333;
+      padding: 2px 6px; border-radius: 8px; font-size: 9px;
     }
+    .task-content { display: none; background: #fafbfc; border-top: 1px solid var(--border); }
+    .task-content.active { display: block; }
 
+    /* SubTrade Cards */
     .subtrade-card {
-      margin: 4px 6px;
-      background: white;
-      border-radius: 4px;
-      border: 1px solid #e9ecef;
-      overflow: hidden;
+      margin: 4px 6px; background: var(--card);
+      border-radius: 4px; border: 1px solid var(--border);
     }
-    
-    .subtrade-card.hidden {
-      display: none;
-    }
-    
     .subtrade-header {
-      padding: 5px 8px;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 500;
-      font-size: 10px;
-      border-bottom: 1px solid #e9ecef;
-      transition: opacity 0.2s ease;
-      min-height: 24px;
+      padding: 6px 8px; cursor: pointer;
+      display: flex; justify-content: space-between;
+      align-items: center; font-weight: 500; font-size: 10px;
     }
-    
-    .subtrade-header:hover {
-      opacity: 0.8;
-    }
-    
-    .subtrade-content {
-      display: none;
-      padding: 6px;
-    }
-    
-    .subtrade-content.active {
-      display: block;
-    }
-    
-    .subtrade-actions {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      margin-bottom: 6px;
-      font-size: 9px;
-      color: #6c757d;
-      padding: 2px 4px;
-    }
-    
-    .subtrade-actions label {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    
-    .subtrade-actions a {
-      color: #667eea;
-      text-decoration: none;
-      font-weight: 500;
-    }
-    
-    .subtrade-actions a:hover {
-      text-decoration: underline;
-    }
-
-    .local-item {
-      display: flex;
-      align-items: center;
-      background: #f8f9fa;
-      padding: 4px 6px;
-      margin-bottom: 3px;
-      border-radius: 4px;
-      border: 1px solid transparent;
-      transition: all 0.15s ease;
-      cursor: pointer;
-      font-size: 10px;
-      min-height: 24px;
-      position: relative;
-    }
-    
-    .local-item:hover {
-      background: #e3f2fd;
-      border-color: #667eea;
-    }
-    
-    .local-item.selected {
-      background: #e3f2fd;
-      border-color: #667eea;
-      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.2);
-    }
-
-    .local-item.selected::after {
-      content: attr(data-order);
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      background: #667eea;
-      color: white;
-      font-size: 8px;
-      padding: 2px 4px;
-      border-radius: 8px;
-      min-width: 14px;
-      text-align: center;
-      font-weight: 600;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-    
-    .local-checkbox {
-      margin-right: 6px;
-      transform: scale(0.9);
-      accent-color: #667eea;
-    }
-    
-    .local-info {
-      flex: 1;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .local-name {
-      font-weight: 500;
-      color: #2c3e50;
-    }
-    
-    .local-count {
-      background: #667eea;
-      color: white;
-      padding: 1px 5px;
-      border-radius: 8px;
-      font-size: 8px;
-      font-weight: 600;
-    }
-
-    .status {
-      margin-top: 6px;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 500;
-      text-align: center;
-    }
-    
-    .status.success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-    
-    .status.error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-    
-    .status.info {
-      background: #d1ecf1;
-      color: #0c5460;
-      border: 1px solid #bee5eb;
-    }
-
     .subtrade-badge {
       background: rgba(255,255,255,0.2);
-      color: inherit;
-      padding: 2px 6px;
-      border-radius: 8px;
-      font-size: 8px;
-      font-weight: 600;
+      padding: 2px 6px; border-radius: 8px; font-size: 8px;
+    }
+    .subtrade-content { display: none; padding: 6px; }
+    .subtrade-content.active { display: block; }
+    .subtrade-actions {
+      display: flex; gap: 8px; align-items: center;
+      margin-bottom: 6px; font-size: 9px; color: var(--text-light);
+    }
+    .subtrade-actions label { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+    .subtrade-actions a { color: var(--primary); text-decoration: none; font-weight: 500; }
+
+    /* Local Items */
+    .local-item {
+      display: flex; align-items: center;
+      background: var(--input-bg); padding: 5px 8px;
+      margin-bottom: 3px; border-radius: 4px;
+      border: 1px solid transparent; cursor: pointer;
+      font-size: 10px; transition: all 0.15s;
+      position: relative;
+    }
+    .local-item:hover { background: #e3f2fd; border-color: var(--primary); }
+    .local-item.selected {
+      background: #e3f2fd; border-color: var(--primary);
+      box-shadow: 0 1px 4px rgba(102,126,234,0.2);
+    }
+    .local-item.selected::after {
+      content: attr(data-order);
+      position: absolute; top: -6px; right: -6px;
+      background: var(--primary); color: white;
+      font-size: 8px; padding: 2px 5px;
+      border-radius: 8px; font-weight: 600;
+    }
+    .local-checkbox { margin-right: 6px; accent-color: var(--primary); }
+    .local-info { flex: 1; display: flex; justify-content: space-between; }
+    .local-name { font-weight: 500; color: #2c3e50; }
+    .local-count {
+      background: var(--primary); color: white;
+      padding: 1px 5px; border-radius: 8px; font-size: 8px;
     }
 
+    /* Selection Counter */
     .selection-counter {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: #28a745;
-      color: white;
-      padding: 1px 4px;
-      border-radius: 6px;
-      font-size: 8px;
-      font-weight: 600;
-      min-width: 12px;
-      height: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-    
-    @media (max-width: 500px) {
-      .controls {
-        flex-wrap: wrap;
-        gap: 4px;
-      }
-      
-      .search-box {
-        min-width: 100px;
-        flex-basis: 100%;
-        margin-bottom: 4px;
-      }
-      
-      .btn {
-        font-size: 9px;
-        min-width: 50px;
-        padding: 0 6px;
-      }
-      
-      .row-indicator {
-        font-size: 9px;
-        padding: 3px 6px;
-      }
+      position: absolute; top: -4px; right: -4px;
+      background: var(--success); color: white;
+      padding: 1px 5px; border-radius: 8px;
+      font-size: 8px; font-weight: 600;
     }
 
-    /* Compactação adicional para economizar espaço */
-    .task-card + .task-card {
-      margin-top: 4px;
+    /* Status */
+    .status {
+      position: fixed; bottom: 16px; left: 16px; right: 16px;
+      padding: 10px 14px; border-radius: 6px;
+      font-size: 11px; font-weight: 500; text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none; z-index: 1000;
+    }
+    .status.success { background: var(--success); color: white; }
+    .status.error { background: var(--danger); color: white; }
+    .status.info { background: var(--primary); color: white; }
+
+    /* Footer */
+    .footer {
+      padding: 12px; background: var(--card);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .footer-stats {
+      font-size: 10px; color: var(--text-light);
+      text-align: center; margin-top: 6px;
     }
 
-    .subtrade-card + .subtrade-card {
-      margin-top: 2px;
-    }
-
-    .local-item:last-child {
-      margin-bottom: 0;
-    }
+    /* Helpers */
+    .flex-row { display: flex; gap: 8px; align-items: center; }
+    .flex-1 { flex: 1; }
+    .text-muted { color: var(--text-light); }
+    .mt-2 { margin-top: 8px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-
-  <div class="controls">
-    <div class="search-box">
-      <input id="searchInput" type="text" placeholder="🔍 Filtrar...">
-    </div>
-    <button id="insertSelectedBtn" class="btn btn-primary">
-      Inserir selecionados
-      <span id="selectionCounter" class="selection-counter" style="display: none;">0</span>
-    </button>
-    <button id="clearBtn" class="btn btn-secondary">Limpar</button>
-    <button id="refreshBtn" class="btn btn-secondary">Atualizar</button>
-    <span id="rowIndicator" class="row-indicator">Linha: 56</span>
+  <div class="header">
+    <h2>PLB Templates</h2>
+    <div class="subtitle" id="headerSubtitle">Carregando...</div>
   </div>
 
-  <div id="templateContainer"></div>
-  <div id="statusMessage" class="status" style="display: none;"></div>
+  <div class="tab-buttons">
+    <div class="tab-button" onclick="openTab('config')">1. Config</div>
+    <div class="tab-button" onclick="openTab('cores')">2. Cores</div>
+    <div class="tab-button active" onclick="openTab('templates')">3. Templates</div>
+  </div>
+
+  <div class="content-area">
+
+    <!-- TAB 1: CONFIGURACAO -->
+    <div class="tab-content" id="tab-config">
+      <div class="config-section">
+        <h3>Origem dos Templates</h3>
+        <div class="form-group">
+          <label>ID da Planilha Central</label>
+          <div class="flex-row">
+            <input type="text" id="centralIdInput" placeholder="Cole o ID da planilha aqui..." oninput="onCentralIdChange()">
+            <button class="btn btn-small btn-secondary" onclick="loadExternalSheets()" title="Carregar abas">Carregar</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Aba de Templates</label>
+          <select id="centralSheetSelect" onchange="saveConfig()">
+            <option value="">-- Selecione --</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3>Mapeamento de Colunas (Destino)</h3>
+        <p class="text-muted" style="margin-bottom:10px;font-size:10px;">Define em quais colunas os templates serao inseridos na planilha atual.</p>
+        <div class="form-group">
+          <label>Coluna TASK</label>
+          <select id="destTaskSelect" onchange="saveConfig()"></select>
+        </div>
+        <div class="form-group">
+          <label>Coluna SUB-TASK</label>
+          <select id="destSubTaskSelect" onchange="saveConfig()"></select>
+        </div>
+        <div class="form-group">
+          <label>Coluna SUB-TRADE</label>
+          <select id="destSubTradeSelect" onchange="saveConfig()"></select>
+        </div>
+        <div class="form-group">
+          <label>Coluna LOCAL</label>
+          <select id="destLocalSelect" onchange="saveConfig()"></select>
+        </div>
+        <div class="form-group">
+          <label>Coluna DESC</label>
+          <select id="destDescSelect" onchange="saveConfig()"></select>
+        </div>
+        <div class="form-group">
+          <label>Coluna QTY</label>
+          <select id="destQtySelect" onchange="saveConfig()"></select>
+        </div>
+      </div>
+
+      <button class="btn btn-success btn-block" onclick="saveAndReload()">Salvar e Recarregar Templates</button>
+    </div>
+
+    <!-- TAB 2: CORES -->
+    <div class="tab-content" id="tab-cores">
+      <div class="config-section">
+        <h3>Cores por TASK</h3>
+        <p class="text-muted" style="margin-bottom:10px;font-size:10px;">Personalize as cores de cada Task para facilitar a visualizacao.</p>
+        <div class="color-list" id="taskColorList">
+          <!-- Preenchido via JS -->
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3>Cores por SUB-TRADE</h3>
+        <div class="color-list" id="subTradeColorList">
+          <!-- Preenchido via JS -->
+        </div>
+      </div>
+
+      <button class="btn btn-success btn-block mt-2" onclick="saveColors()">Salvar Cores</button>
+    </div>
+
+    <!-- TAB 3: TEMPLATES -->
+    <div class="tab-content active" id="tab-templates">
+      <div class="controls">
+        <div class="search-box">
+          <input id="searchInput" type="text" placeholder="Filtrar templates...">
+        </div>
+        <button id="insertBtn" class="btn btn-success" style="position:relative;">
+          Inserir
+          <span id="selectionCounter" class="selection-counter hidden">0</span>
+        </button>
+        <button class="btn btn-secondary" onclick="clearSelections()">Limpar</button>
+        <button class="btn btn-secondary" onclick="refreshTemplates()">Atualizar</button>
+        <span id="rowIndicator" class="row-indicator">Linha: --</span>
+      </div>
+
+      <div id="templateContainer">
+        <!-- Templates renderizados aqui -->
+      </div>
+
+      <div id="noConfigMessage" class="config-section hidden" style="text-align:center;padding:20px;">
+        <p style="margin-bottom:10px;">Configure a origem dos templates na aba <strong>Config</strong>.</p>
+        <button class="btn btn-primary" onclick="openTab('config')">Ir para Config</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button id="mainInsertBtn" class="btn btn-success btn-block" onclick="insertSelected()">
+      Inserir Selecionados
+    </button>
+    <div class="footer-stats" id="footerStats">--</div>
+  </div>
+
+  <div id="status" class="status"></div>
 
   <script>
+    // Dados injetados pelo servidor
+    const INIT_DATA = <?!= initData ?>;
     const TEMPLATE_DATA = <?!= templates ?>;
-    let templatesData = TEMPLATE_DATA;
+
+    // Parse dados
+    let initData = typeof INIT_DATA === 'string' ? JSON.parse(INIT_DATA) : INIT_DATA;
+    let templatesData = typeof TEMPLATE_DATA === 'string' ? JSON.parse(TEMPLATE_DATA) : TEMPLATE_DATA;
+
+    // Estado
+    const STATE_KEY = 'TEMPLATE_SIDEBAR_STATE_V2';
     let selectionOrder = [];
     let selectionCounter = 0;
-    
-    if (typeof TEMPLATE_DATA === 'string') {
-      try {
-        templatesData = JSON.parse(TEMPLATE_DATA);
-      } catch (e) {
-        console.error('Erro ao fazer parse dos templates:', e);
-        templatesData = { tasks: {}, total: 0 };
-      }
-    }
+    let taskColors = initData.taskColors || {};
+    let subTradeColors = initData.subTradeColors || {};
 
+    // Elementos
     const elements = {
-      container: document.getElementById('templateContainer'),
+      centralIdInput: document.getElementById('centralIdInput'),
+      centralSheetSelect: document.getElementById('centralSheetSelect'),
+      destTaskSelect: document.getElementById('destTaskSelect'),
+      destSubTaskSelect: document.getElementById('destSubTaskSelect'),
+      destSubTradeSelect: document.getElementById('destSubTradeSelect'),
+      destLocalSelect: document.getElementById('destLocalSelect'),
+      destDescSelect: document.getElementById('destDescSelect'),
+      destQtySelect: document.getElementById('destQtySelect'),
       searchInput: document.getElementById('searchInput'),
-      insertBtn: document.getElementById('insertSelectedBtn'),
-      clearBtn: document.getElementById('clearBtn'),
-      refreshBtn: document.getElementById('refreshBtn'),
+      templateContainer: document.getElementById('templateContainer'),
       rowIndicator: document.getElementById('rowIndicator'),
-      status: document.getElementById('statusMessage'),
-      selectionCounter: document.getElementById('selectionCounter')
+      selectionCounter: document.getElementById('selectionCounter'),
+      status: document.getElementById('status'),
+      headerSubtitle: document.getElementById('headerSubtitle'),
+      footerStats: document.getElementById('footerStats'),
+      noConfigMessage: document.getElementById('noConfigMessage')
     };
 
-    function showStatus(message, type = 'info') {
-      elements.status.textContent = message;
-      elements.status.className = `status ${type}`;
-      elements.status.style.display = 'block';
-      
-      if (type === 'success' || type === 'error') {
-        setTimeout(() => {
-          elements.status.style.display = 'none';
-        }, 3000);
+    // Inicializacao
+    window.addEventListener('load', () => {
+      initializeConfig();
+      initializeColorLists();
+      renderTemplates(templatesData);
+      updateRowIndicator();
+      updateStats();
+
+      // Restaurar estado salvo
+      if (initData.savedState) {
+        applyState(initData.savedState);
       }
-    }
+    });
 
-    function clearStatus() {
-      elements.status.style.display = 'none';
-    }
+    function initializeConfig() {
+      const config = initData.config || {};
+      const keys = initData.configKeys || {};
 
-    function getTextColor(backgroundColor) {
-      const hex = backgroundColor.replace('#', '');
-      const r = parseInt(hex.substr(0, 2), 16);
-      const g = parseInt(hex.substr(2, 2), 16);
-      const b = parseInt(hex.substr(4, 2), 16);
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      return luminance > 0.6 ? '#000000' : '#ffffff';
-    }
+      // ID Central
+      elements.centralIdInput.value = config[keys.CENTRAL_ID] || '';
 
-    function updateRowIndicator() {
-      google.script.run
-        .withSuccessHandler(row => {
-          elements.rowIndicator.textContent = `Linha: ${row || '—'}`;
-        })
-        .withFailureHandler(() => {
-          elements.rowIndicator.textContent = 'Linha: —';
-        })
-        .getSelectedRowForClient();
-    }
+      // Aba Central
+      populateSelect(elements.centralSheetSelect, initData.externalSheets, config[keys.CENTRAL_SHEET]);
 
-    function updateSelectionCounter() {
-      const count = selectionOrder.length;
-      if (count > 0) {
-        elements.selectionCounter.textContent = count;
-        elements.selectionCounter.style.display = 'inline';
-      } else {
-        elements.selectionCounter.style.display = 'none';
-      }
-    }
+      // Colunas de destino
+      const destCols = initData.destColumns || [];
+      const colSelects = [
+        { el: elements.destTaskSelect, key: keys.DEST_TASK, default: 'D' },
+        { el: elements.destSubTaskSelect, key: keys.DEST_SUBTASK, default: 'E' },
+        { el: elements.destSubTradeSelect, key: keys.DEST_SUBTRADE, default: 'F' },
+        { el: elements.destLocalSelect, key: keys.DEST_LOCAL, default: 'I' },
+        { el: elements.destDescSelect, key: keys.DEST_DESC, default: 'K' },
+        { el: elements.destQtySelect, key: keys.DEST_QTY, default: 'L' }
+      ];
 
-    function addToSelection(task, subTrade, local, element) {
-      const key = `${task}|${subTrade}|${local}`;
-      
-      // Remove se já existir
-      const existingIndex = selectionOrder.findIndex(item => item.key === key);
-      if (existingIndex !== -1) {
-        selectionOrder.splice(existingIndex, 1);
-        element.removeAttribute('data-order');
-        element.classList.remove('selected');
-      } else {
-        // Adiciona nova seleção
-        selectionCounter++;
-        const selection = {
-          key,
-          task,
-          subTrade,
-          local,
-          order: selectionCounter
-        };
-        selectionOrder.push(selection);
-        element.setAttribute('data-order', selectionCounter);
-        element.classList.add('selected');
-      }
-      
-      // Reordena os números visuais
-      selectionOrder.forEach((item, index) => {
-        const itemElement = document.querySelector(`[data-selection-key="${item.key}"]`);
-        if (itemElement) {
-          itemElement.setAttribute('data-order', index + 1);
-        }
+      colSelects.forEach(({ el, key, default: def }) => {
+        el.innerHTML = '<option value="">-- Selecione --</option>';
+        destCols.forEach(col => {
+          const opt = new Option(col, col);
+          if (config[key] && col.startsWith(config[key].split(' - ')[0])) {
+            opt.selected = true;
+          } else if (!config[key] && col.startsWith(def)) {
+            opt.selected = true;
+          }
+          el.add(opt);
+        });
       });
-      
-      updateSelectionCounter();
+
+      // Se nao tem ID central, mostra mensagem
+      if (!config[keys.CENTRAL_ID]) {
+        elements.noConfigMessage.classList.remove('hidden');
+        elements.templateContainer.classList.add('hidden');
+      }
     }
 
+    function populateSelect(select, options, selectedValue) {
+      const firstOpt = select.options[0];
+      select.innerHTML = '';
+      select.add(firstOpt || new Option('-- Selecione --', ''));
+
+      (options || []).forEach(opt => {
+        const option = new Option(opt, opt);
+        option.selected = (opt === selectedValue);
+        select.add(option);
+      });
+    }
+
+    function initializeColorLists() {
+      const taskList = document.getElementById('taskColorList');
+      const subTradeList = document.getElementById('subTradeColorList');
+
+      // Tasks
+      taskList.innerHTML = '';
+      Object.entries(taskColors).forEach(([name, color]) => {
+        taskList.appendChild(createColorItem('task', name, color));
+      });
+
+      // SubTrades
+      subTradeList.innerHTML = '';
+      Object.entries(subTradeColors).forEach(([name, color]) => {
+        subTradeList.appendChild(createColorItem('subtrade', name, color));
+      });
+    }
+
+    function createColorItem(type, name, color) {
+      const item = document.createElement('div');
+      item.className = 'color-item';
+      item.innerHTML = `
+        <input type="color" id="color-${type}-${name}" value="${color}" onchange="onColorChange('${type}', '${name}', this.value)">
+        <label for="color-${type}-${name}">${name}</label>
+        <div class="color-preview" style="background:${color};color:${getTextColor(color)}">${color}</div>
+      `;
+      return item;
+    }
+
+    function onColorChange(type, name, color) {
+      if (type === 'task') {
+        taskColors[name] = color;
+      } else {
+        subTradeColors[name] = color;
+      }
+      // Atualiza preview
+      const preview = document.querySelector(`#color-${type}-${name}`).parentElement.querySelector('.color-preview');
+      preview.style.background = color;
+      preview.style.color = getTextColor(color);
+      preview.textContent = color;
+    }
+
+    function saveColors() {
+      showStatus('Salvando cores...', 'info');
+      google.script.run
+        .withSuccessHandler(() => {
+          showStatus('Cores salvas! Recarregue para aplicar.', 'success');
+        })
+        .withFailureHandler(onError)
+        .saveTaskColors(taskColors);
+    }
+
+    // Tab Navigation
+    function openTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
+
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add('active');
+    }
+
+    // Config Functions
+    function onCentralIdChange() {
+      saveState();
+    }
+
+    function loadExternalSheets() {
+      const id = elements.centralIdInput.value.trim();
+      if (!id) {
+        showStatus('Digite o ID da planilha', 'error');
+        return;
+      }
+
+      showStatus('Carregando abas...', 'info');
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result.success) {
+            populateSelect(elements.centralSheetSelect, result.sheets, '');
+            showStatus(`Planilha "${result.name}" carregada com ${result.sheets.length} abas`, 'success');
+          } else {
+            showStatus(`Erro: ${result.message}`, 'error');
+          }
+        })
+        .withFailureHandler(onError)
+        .getExternalSpreadsheetSheets(id);
+    }
+
+    function saveConfig() {
+      saveState();
+    }
+
+    function saveAndReload() {
+      const keys = initData.configKeys;
+      const settings = {
+        [keys.CENTRAL_ID]: elements.centralIdInput.value.trim(),
+        [keys.CENTRAL_SHEET]: elements.centralSheetSelect.value,
+        [keys.DEST_TASK]: elements.destTaskSelect.value,
+        [keys.DEST_SUBTASK]: elements.destSubTaskSelect.value,
+        [keys.DEST_SUBTRADE]: elements.destSubTradeSelect.value,
+        [keys.DEST_LOCAL]: elements.destLocalSelect.value,
+        [keys.DEST_DESC]: elements.destDescSelect.value,
+        [keys.DEST_QTY]: elements.destQtySelect.value
+      };
+
+      showStatus('Salvando configuracoes...', 'info');
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result.success) {
+            showStatus('Configuracoes salvas! Recarregando...', 'success');
+            refreshTemplates();
+            elements.noConfigMessage.classList.add('hidden');
+            elements.templateContainer.classList.remove('hidden');
+            openTab('templates');
+          } else {
+            showStatus(`Erro: ${result.message}`, 'error');
+          }
+        })
+        .withFailureHandler(onError)
+        .saveTemplateConfig(settings);
+    }
+
+    // Template Rendering
     function renderTemplates(data) {
       const tasks = data.tasks || {};
-      elements.container.innerHTML = '';
+      elements.templateContainer.innerHTML = '';
+
+      if (data.error) {
+        elements.templateContainer.innerHTML = `
+          <div class="config-section" style="text-align:center;color:var(--danger);">
+            <p>${data.error}</p>
+          </div>`;
+        return;
+      }
+
+      if (Object.keys(tasks).length === 0) {
+        elements.templateContainer.innerHTML = `
+          <div class="config-section" style="text-align:center;">
+            <p>Nenhum template encontrado.</p>
+          </div>`;
+        return;
+      }
 
       Object.keys(tasks).sort().forEach(taskName => {
         const task = tasks[taskName];
-        
         const taskCard = document.createElement('div');
         taskCard.className = 'task-card';
         taskCard.dataset.taskName = taskName.toLowerCase();
 
-        const taskHeader = document.createElement('div');
-        taskHeader.className = 'task-header';
-        
         const taskColor = task.colorCode || '#667eea';
-        taskHeader.style.background = taskColor;
-        taskHeader.style.color = getTextColor(taskColor);
+        const textColor = getTextColor(taskColor);
 
-        taskHeader.innerHTML = `
-          <span class="task-title">${taskName}</span>
-          <span class="task-badge">${task.totalTemplates}</span>
+        taskCard.innerHTML = `
+          <div class="task-header" style="background:${taskColor};color:${textColor}">
+            <span>${taskName}</span>
+            <span class="task-badge">${task.totalTemplates}</span>
+          </div>
+          <div class="task-content"></div>
         `;
 
-        const taskContent = document.createElement('div');
-        taskContent.className = 'task-content';
+        const taskContent = taskCard.querySelector('.task-content');
+        const taskHeader = taskCard.querySelector('.task-header');
 
         const subTrades = task.subTrades || {};
         Object.keys(subTrades).sort().forEach(subTradeName => {
           const subTrade = subTrades[subTradeName];
-          
           const subTradeCard = document.createElement('div');
           subTradeCard.className = 'subtrade-card';
           subTradeCard.dataset.subtradeName = subTradeName.toLowerCase();
 
-          const subTradeHeader = document.createElement('div');
-          subTradeHeader.className = 'subtrade-header';
-          
-          const subTradeColor = subTrade.colorCode || '#667eea';
-          subTradeHeader.style.background = subTradeColor;
-          subTradeHeader.style.color = getTextColor(subTradeColor);
-          
-          subTradeHeader.innerHTML = `
-            <span>${subTradeName}</span>
-            <span class="subtrade-badge">${subTrade.totalTemplates}</span>
+          const stColor = subTrade.colorCode || taskColor;
+          const stTextColor = getTextColor(stColor);
+
+          subTradeCard.innerHTML = `
+            <div class="subtrade-header" style="background:${stColor};color:${stTextColor}">
+              <span>${subTradeName}</span>
+              <span class="subtrade-badge">${subTrade.totalTemplates}</span>
+            </div>
+            <div class="subtrade-content">
+              <div class="subtrade-actions">
+                <label><input type="checkbox" class="select-all-cb"> Todos</label>
+                <span>|</span>
+                <a href="#" class="insert-all-link">Inserir todos</a>
+              </div>
+            </div>
           `;
 
-          const subTradeContent = document.createElement('div');
-          subTradeContent.className = 'subtrade-content';
-
-          const actions = document.createElement('div');
-          actions.className = 'subtrade-actions';
-          actions.innerHTML = `
-            <label>
-              <input type="checkbox" class="select-all-checkbox"> Todos
-            </label>
-            <span>•</span>
-            <a href="#" class="insert-all-link">Inserir todos</a>
-          `;
-
-          subTradeContent.appendChild(actions);
+          const subContent = subTradeCard.querySelector('.subtrade-content');
+          const subHeader = subTradeCard.querySelector('.subtrade-header');
 
           const locals = subTrade.locals || {};
           Object.keys(locals).sort().forEach(localName => {
             const local = locals[localName];
-            
             const localItem = document.createElement('div');
             localItem.className = 'local-item';
             localItem.dataset.localName = localName.toLowerCase();
@@ -612,248 +672,269 @@
             `;
 
             const checkbox = localItem.querySelector('.local-checkbox');
-            
-            checkbox.addEventListener('change', (e) => {
-              if (e.target.checked) {
-                addToSelection(taskName, subTradeName, localName, localItem);
-              } else {
-                removeFromSelection(taskName, subTradeName, localName, localItem);
-              }
-            });
 
             localItem.addEventListener('click', (e) => {
               if (e.target.classList.contains('local-checkbox')) return;
-              
               checkbox.checked = !checkbox.checked;
-              
-              if (checkbox.checked) {
-                addToSelection(taskName, subTradeName, localName, localItem);
-              } else {
-                removeFromSelection(taskName, subTradeName, localName, localItem);
-              }
+              toggleSelection(taskName, subTradeName, localName, localItem, checkbox.checked);
             });
 
-            subTradeContent.appendChild(localItem);
+            checkbox.addEventListener('change', () => {
+              toggleSelection(taskName, subTradeName, localName, localItem, checkbox.checked);
+            });
+
+            subContent.appendChild(localItem);
           });
 
-          subTradeHeader.addEventListener('click', () => {
-            subTradeContent.classList.toggle('active');
-          });
+          // Event listeners
+          subHeader.addEventListener('click', () => subContent.classList.toggle('active'));
 
-          actions.querySelector('.select-all-checkbox').addEventListener('change', (e) => {
-            const checkboxes = subTradeContent.querySelectorAll('.local-checkbox');
-            checkboxes.forEach(cb => {
+          subTradeCard.querySelector('.select-all-cb').addEventListener('change', (e) => {
+            subContent.querySelectorAll('.local-checkbox').forEach(cb => {
               cb.checked = e.target.checked;
-              cb.dispatchEvent(new Event('change'));
+              const item = cb.closest('.local-item');
+              const [t, st, l] = item.dataset.selectionKey.split('|');
+              toggleSelection(t, st, l, item, cb.checked);
             });
           });
 
-          actions.querySelector('.insert-all-link').addEventListener('click', (e) => {
+          subTradeCard.querySelector('.insert-all-link').addEventListener('click', (e) => {
             e.preventDefault();
-            const allLocals = Array.from(subTradeContent.querySelectorAll('.local-item')).map(item => ({
-              task: taskName,
-              subTrade: subTradeName,
-              local: item.querySelector('.local-name').textContent
-            }));
-            insertMultipleSelections(allLocals);
+            const allLocals = Array.from(subContent.querySelectorAll('.local-item')).map(item => {
+              const [task, subTrade, local] = item.dataset.selectionKey.split('|');
+              return { task, subTrade, local };
+            });
+            insertMultiple(allLocals);
           });
 
-          subTradeCard.appendChild(subTradeHeader);
-          subTradeCard.appendChild(subTradeContent);
           taskContent.appendChild(subTradeCard);
         });
 
-        taskHeader.addEventListener('click', () => {
-          taskContent.classList.toggle('active');
-        });
-
-        taskCard.appendChild(taskHeader);
-        taskCard.appendChild(taskContent);
-        elements.container.appendChild(taskCard);
+        taskHeader.addEventListener('click', () => taskContent.classList.toggle('active'));
+        elements.templateContainer.appendChild(taskCard);
       });
     }
 
-    function removeFromSelection(task, subTrade, local, element) {
+    // Selection Management
+    function toggleSelection(task, subTrade, local, element, isSelected) {
       const key = `${task}|${subTrade}|${local}`;
-      const index = selectionOrder.findIndex(item => item.key === key);
-      
-      if (index !== -1) {
-        selectionOrder.splice(index, 1);
-        element.removeAttribute('data-order');
-        element.classList.remove('selected');
-        
-        // Reordena os números
-        selectionOrder.forEach((item, i) => {
-          const itemElement = document.querySelector(`[data-selection-key="${item.key}"]`);
-          if (itemElement) {
-            itemElement.setAttribute('data-order', i + 1);
-          }
-        });
-        
-        updateSelectionCounter();
-      }
-    }
 
-    function insertSingleLocal(taskName, subTradeName, localName, element) {
-      showStatus(`Inserindo "${localName}"...`, 'info');
-      elements.insertBtn.disabled = true;
-
-      google.script.run
-        .withSuccessHandler(result => {
-          elements.insertBtn.disabled = false;
+      if (isSelected) {
+        if (!selectionOrder.find(s => s.key === key)) {
+          selectionCounter++;
+          selectionOrder.push({ key, task, subTrade, local, order: selectionCounter });
+          element.classList.add('selected');
+          element.setAttribute('data-order', selectionCounter);
+        }
+      } else {
+        const idx = selectionOrder.findIndex(s => s.key === key);
+        if (idx !== -1) {
+          selectionOrder.splice(idx, 1);
           element.classList.remove('selected');
-          
-          if (result && result.success) {
-            showStatus(
-              `✅ ${result.totalInserted} linha(s) na linha ${result.startRow}`,
-              'success'
-            );
-            updateRowIndicator();
-          } else {
-            showStatus(
-              `❌ Falha: ${result?.message || 'erro desconhecido'}`,
-              'error'
-            );
-          }
-        })
-        .withFailureHandler(error => {
-          elements.insertBtn.disabled = false;
-          element.classList.remove('selected');
-          showStatus(`❌ Erro: ${error.message}`, 'error');
-        })
-        .inserirLocal(taskName, subTradeName, localName);
-    }
-
-    function insertMultipleSelections(selections) {
-      if (!selections || selections.length === 0) {
-        showStatus('❌ Selecione ao menos um local', 'error');
-        return;
+          element.removeAttribute('data-order');
+          // Reordenar
+          selectionOrder.forEach((item, i) => {
+            const el = document.querySelector(`[data-selection-key="${item.key}"]`);
+            if (el) el.setAttribute('data-order', i + 1);
+          });
+        }
       }
 
-      showStatus(`Inserindo ${selections.length} item(s)...`, 'info');
-      elements.insertBtn.disabled = true;
-
-      google.script.run
-        .withSuccessHandler(result => {
-          elements.insertBtn.disabled = false;
-          
-          if (result && result.success) {
-            showStatus(
-              `✅ ${result.totalInserted} linhas na linha ${result.startRow}`,
-              'success'
-            );
-            updateRowIndicator();
-            clearAllSelections();
-          } else {
-            showStatus(
-              `❌ Falha: ${result?.message || 'erro desconhecido'}`,
-              'error'
-            );
-          }
-        })
-        .withFailureHandler(error => {
-          elements.insertBtn.disabled = false;
-          showStatus(`❌ Erro: ${error.message}`, 'error');
-        })
-        .inserirMultiplosLocals(selections);
+      updateSelectionCounter();
+      saveState();
     }
 
-    function getSelectedLocals() {
-      // Retorna na ordem de seleção
-      return selectionOrder.map(item => ({
-        task: item.task,
-        subTrade: item.subTrade,
-        local: item.local
-      }));
-    }
-
-    function clearAllSelections() {
+    function clearSelections() {
       selectionOrder = [];
       selectionCounter = 0;
-      
-      document.querySelectorAll('.local-checkbox, .select-all-checkbox').forEach(cb => {
-        cb.checked = false;
-      });
-      
+      document.querySelectorAll('.local-checkbox, .select-all-cb').forEach(cb => cb.checked = false);
       document.querySelectorAll('.local-item').forEach(item => {
         item.classList.remove('selected');
         item.removeAttribute('data-order');
       });
-      
       updateSelectionCounter();
-      clearStatus();
+      elements.searchInput.value = '';
+      filterTemplates('');
     }
 
-    function filterTemplates(searchTerm) {
-      const query = searchTerm.toLowerCase().trim();
-      
-      document.querySelectorAll('.task-card').forEach(taskCard => {
-        const taskName = taskCard.dataset.taskName;
-        const matchesTask = taskName.includes(query);
-        let hasVisibleSubTrades = false;
+    function updateSelectionCounter() {
+      const count = selectionOrder.length;
+      elements.selectionCounter.textContent = count;
+      elements.selectionCounter.classList.toggle('hidden', count === 0);
+    }
 
-        taskCard.querySelectorAll('.subtrade-card').forEach(subTradeCard => {
-          const subTradeName = subTradeCard.dataset.subtradeName;
-          const matchesSubTrade = matchesTask || subTradeName.includes(query);
+    // Insertion
+    function insertSelected() {
+      if (selectionOrder.length === 0) {
+        showStatus('Selecione ao menos um local', 'error');
+        return;
+      }
+      const selections = selectionOrder.map(s => ({ task: s.task, subTrade: s.subTrade, local: s.local }));
+      insertMultiple(selections);
+    }
+
+    function insertMultiple(selections) {
+      if (!selections || selections.length === 0) return;
+
+      showStatus(`Inserindo ${selections.length} item(s)...`, 'info');
+      document.getElementById('mainInsertBtn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(result => {
+          document.getElementById('mainInsertBtn').disabled = false;
+          if (result.success) {
+            showStatus(`${result.totalInserted} linhas inseridas na linha ${result.startRow}`, 'success');
+            clearSelections();
+            updateRowIndicator();
+          } else {
+            showStatus(`Erro: ${result.message}`, 'error');
+          }
+        })
+        .withFailureHandler(err => {
+          document.getElementById('mainInsertBtn').disabled = false;
+          onError(err);
+        })
+        .inserirMultiplosLocals(selections);
+    }
+
+    // Filtering
+    elements.searchInput.addEventListener('input', (e) => filterTemplates(e.target.value));
+
+    function filterTemplates(query) {
+      query = query.toLowerCase().trim();
+
+      document.querySelectorAll('.task-card').forEach(taskCard => {
+        const taskMatch = taskCard.dataset.taskName.includes(query);
+        let hasVisible = false;
+
+        taskCard.querySelectorAll('.subtrade-card').forEach(stCard => {
+          const stMatch = taskMatch || stCard.dataset.subtradeName.includes(query);
           let hasVisibleLocals = false;
 
-          subTradeCard.querySelectorAll('.local-item').forEach(localItem => {
-            const localName = localItem.dataset.localName;
-            const matchesLocal = matchesSubTrade || localName.includes(query);
-            
-            localItem.style.display = matchesLocal ? '' : 'none';
-            if (matchesLocal) hasVisibleLocals = true;
+          stCard.querySelectorAll('.local-item').forEach(item => {
+            const localMatch = stMatch || item.dataset.localName.includes(query);
+            item.style.display = localMatch ? '' : 'none';
+            if (localMatch) hasVisibleLocals = true;
           });
 
-          subTradeCard.style.display = hasVisibleLocals ? '' : 'none';
-          if (hasVisibleLocals) hasVisibleSubTrades = true;
+          stCard.style.display = hasVisibleLocals ? '' : 'none';
+          if (hasVisibleLocals) hasVisible = true;
         });
 
-        taskCard.style.display = hasVisibleSubTrades || matchesTask ? '' : 'none';
+        taskCard.style.display = hasVisible || taskMatch ? '' : 'none';
       });
     }
 
-    elements.searchInput.addEventListener('input', (e) => {
-      filterTemplates(e.target.value);
-    });
-
-    elements.insertBtn.addEventListener('click', () => {
-      const selected = getSelectedLocals();
-      insertMultipleSelections(selected);
-    });
-
-    elements.clearBtn.addEventListener('click', () => {
-      clearAllSelections();
-      elements.searchInput.value = '';
-      filterTemplates('');
-    });
-
-    elements.refreshBtn.addEventListener('click', () => {
-      elements.refreshBtn.disabled = true;
-      showStatus('Atualizando...', 'info');
-      
+    // Refresh Templates
+    function refreshTemplates() {
+      showStatus('Atualizando templates...', 'info');
       google.script.run
         .withSuccessHandler(data => {
-          elements.refreshBtn.disabled = false;
           templatesData = data;
-          renderTemplates(templatesData);
-          showStatus('✅ Atualizado', 'success');
-          updateRowIndicator();
+          renderTemplates(data);
+          updateStats();
+          showStatus('Templates atualizados!', 'success');
         })
-        .withFailureHandler(error => {
-          elements.refreshBtn.disabled = false;
-          showStatus(`❌ Erro: ${error.message}`, 'error');
-        })
-        .atualizarTemplates();
-    });
+        .withFailureHandler(onError)
+        .loadTemplatesWithDynamicConfig();
+    }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      renderTemplates(templatesData);
-      updateRowIndicator();
-      
+    // Row Indicator
+    function updateRowIndicator() {
+      google.script.run
+        .withSuccessHandler(row => {
+          elements.rowIndicator.textContent = `Linha: ${row || '--'}`;
+        })
+        .withFailureHandler(() => {
+          elements.rowIndicator.textContent = 'Linha: --';
+        })
+        .getSelectedRowForClient();
+    }
+
+    // Stats
+    function updateStats() {
       const totalTasks = Object.keys(templatesData.tasks || {}).length;
-      showStatus(`📊 ${totalTasks} tasks • ${templatesData.total || 0} templates`, 'info');
-    });
+      const totalTemplates = templatesData.total || 0;
+      elements.headerSubtitle.textContent = `${totalTasks} tasks | ${totalTemplates} templates`;
+      elements.footerStats.textContent = `${totalTasks} tasks | ${totalTemplates} templates carregados`;
+    }
+
+    // State Management
+    function saveState() {
+      try {
+        const state = getState();
+        localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        google.script.run.saveUserTemplateSidebarState(JSON.stringify(state));
+      } catch (e) {
+        console.warn('Erro ao salvar estado:', e);
+      }
+    }
+
+    function getState() {
+      return {
+        config: {
+          centralId: elements.centralIdInput.value,
+          centralSheet: elements.centralSheetSelect.value,
+          destTask: elements.destTaskSelect.value,
+          destSubTask: elements.destSubTaskSelect.value,
+          destSubTrade: elements.destSubTradeSelect.value,
+          destLocal: elements.destLocalSelect.value,
+          destDesc: elements.destDescSelect.value,
+          destQty: elements.destQtySelect.value
+        },
+        selections: selectionOrder,
+        search: elements.searchInput.value
+      };
+    }
+
+    function applyState(state) {
+      if (!state) return;
+
+      if (state.selections && state.selections.length > 0) {
+        state.selections.forEach(s => {
+          const el = document.querySelector(`[data-selection-key="${s.key}"]`);
+          if (el) {
+            const cb = el.querySelector('.local-checkbox');
+            if (cb) cb.checked = true;
+            el.classList.add('selected');
+            el.setAttribute('data-order', s.order);
+          }
+        });
+        selectionOrder = state.selections;
+        selectionCounter = Math.max(...state.selections.map(s => s.order), 0);
+        updateSelectionCounter();
+      }
+
+      if (state.search) {
+        elements.searchInput.value = state.search;
+        filterTemplates(state.search);
+      }
+    }
+
+    // Utilities
+    function getTextColor(bgColor) {
+      const hex = bgColor.replace('#', '');
+      const r = parseInt(hex.substr(0, 2), 16);
+      const g = parseInt(hex.substr(2, 2), 16);
+      const b = parseInt(hex.substr(4, 2), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance > 0.6 ? '#000000' : '#ffffff';
+    }
+
+    function showStatus(message, type) {
+      elements.status.textContent = message;
+      elements.status.className = `status ${type}`;
+      elements.status.style.display = 'block';
+      setTimeout(() => elements.status.style.display = 'none', type === 'info' ? 2000 : 4000);
+    }
+
+    function onError(error) {
+      console.error(error);
+      showStatus(`Erro: ${error.message || error}`, 'error');
+    }
+
+    // Insert button event
+    document.getElementById('insertBtn').addEventListener('click', insertSelected);
   </script>
 </body>
 </html>

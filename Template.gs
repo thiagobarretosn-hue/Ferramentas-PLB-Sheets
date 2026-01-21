@@ -271,11 +271,18 @@ function onEditColorTrigger(e) {
  */
 function openTemplateSidebar() {
   const html = HtmlService.createTemplateFromFile('template-sidebar.html');
-  html.templates = JSON.stringify(loadTemplatesWithCache());
+
+  // Carrega dados iniciais para a sidebar
+  const initData = getTemplateInitData();
+  html.initData = JSON.stringify(initData);
+
+  // Carrega templates usando configuração dinâmica
+  const templates = loadTemplatesWithDynamicConfig();
+  html.templates = JSON.stringify(templates);
 
   const sidebar = html.evaluate()
     .setTitle('🏗️ PLB Templates')
-    .setWidth(450);
+    .setWidth(500);
 
   SpreadsheetApp.getUi().showSidebar(sidebar);
 }
@@ -852,7 +859,8 @@ function insertMultipleLocals(selections) {
 function pasteTemplateData(templates, startRow) {
   const spreadsheet = SpreadsheetApp.getActive();
   const sheet = spreadsheet.getActiveSheet();
-  const destCol = COLUMN_MAPPING.DESTINATION;
+  // Usa mapeamento dinâmico em vez do fixo
+  const destCol = getDynamicColumnMapping().DESTINATION;
 
   const endRow = startRow + templates.length - 1;
   const lastSheetRow = sheet.getLastRow();
@@ -1246,4 +1254,361 @@ function openCentralDatabase() {
   ).setWidth(180).setHeight(50);
 
   SpreadsheetApp.getUi().showModelessDialog(html, "📂 Abrindo Base... ");
+}
+
+// ============================================================================
+// CONFIGURAÇÃO DINÂMICA DA SIDEBAR - TEMPLATE
+// ============================================================================
+
+/**
+ * Chaves de configuração do Template
+ * Armazenadas em DocumentProperties para persistir por documento
+ */
+const TEMPLATE_CONFIG_KEYS = {
+  CENTRAL_ID: 'TEMPLATE_CENTRAL_SPREADSHEET_ID',
+  CENTRAL_SHEET: 'TEMPLATE_CENTRAL_SHEET_NAME',
+  DEST_TASK: 'TEMPLATE_DEST_COL_TASK',
+  DEST_SUBTASK: 'TEMPLATE_DEST_COL_SUBTASK',
+  DEST_SUBTRADE: 'TEMPLATE_DEST_COL_SUBTRADE',
+  DEST_LOCAL: 'TEMPLATE_DEST_COL_LOCAL',
+  DEST_DESC: 'TEMPLATE_DEST_COL_DESC',
+  DEST_QTY: 'TEMPLATE_DEST_COL_QTY',
+  DEFAULT_INSERT_ROW: 'TEMPLATE_DEFAULT_INSERT_ROW',
+  TASK_COLORS: 'TEMPLATE_TASK_COLORS'
+};
+
+/**
+ * Valores padrão de configuração
+ */
+const TEMPLATE_CONFIG_DEFAULTS = {
+  [TEMPLATE_CONFIG_KEYS.CENTRAL_ID]: '',
+  [TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]: 'DATA BASE',
+  [TEMPLATE_CONFIG_KEYS.DEST_TASK]: 'D',
+  [TEMPLATE_CONFIG_KEYS.DEST_SUBTASK]: 'E',
+  [TEMPLATE_CONFIG_KEYS.DEST_SUBTRADE]: 'F',
+  [TEMPLATE_CONFIG_KEYS.DEST_LOCAL]: 'I',
+  [TEMPLATE_CONFIG_KEYS.DEST_DESC]: 'K',
+  [TEMPLATE_CONFIG_KEYS.DEST_QTY]: 'L',
+  [TEMPLATE_CONFIG_KEYS.DEFAULT_INSERT_ROW]: 57
+};
+
+/**
+ * Serviço de configuração do Template
+ * Usa DocumentProperties para persistir configurações por documento
+ */
+const TemplateConfigService = {
+  _cache: null,
+  _cacheTime: null,
+  _cacheTTL: 180000, // 3 minutos
+
+  /**
+   * Obtém todas as configurações
+   * @returns {Object} Configurações do template
+   */
+  getAll: function() {
+    const now = Date.now();
+    if (this._cache && this._cacheTime && (now - this._cacheTime < this._cacheTTL)) {
+      return this._cache;
+    }
+
+    const props = PropertiesService.getDocumentProperties();
+    const config = {};
+
+    Object.entries(TEMPLATE_CONFIG_KEYS).forEach(([key, propKey]) => {
+      const value = props.getProperty(propKey);
+      config[propKey] = value !== null ? value : (TEMPLATE_CONFIG_DEFAULTS[propKey] || '');
+    });
+
+    // Se não tem ID central configurado, tenta usar o AppConfig
+    if (!config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]) {
+      config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID] = AppConfig.get('CENTRAL_SPREADSHEET_ID');
+    }
+    if (!config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]) {
+      config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] = AppConfig.get('CENTRAL_SHEET_NAME') || 'DATA BASE';
+    }
+
+    this._cache = config;
+    this._cacheTime = now;
+    return config;
+  },
+
+  /**
+   * Obtém uma configuração específica
+   * @param {string} key - Chave da configuração
+   * @param {*} defaultValue - Valor padrão
+   * @returns {*} Valor da configuração
+   */
+  get: function(key, defaultValue = '') {
+    const all = this.getAll();
+    return all[key] !== undefined && all[key] !== '' ? all[key] : defaultValue;
+  },
+
+  /**
+   * Define uma configuração
+   * @param {string} key - Chave
+   * @param {*} value - Valor
+   */
+  set: function(key, value) {
+    const props = PropertiesService.getDocumentProperties();
+    props.setProperty(key, String(value));
+    this._cache = null; // Invalida cache
+  },
+
+  /**
+   * Define múltiplas configurações
+   * @param {Object} settings - Objeto com chave/valor
+   */
+  setAll: function(settings) {
+    const props = PropertiesService.getDocumentProperties();
+    Object.entries(settings).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        props.setProperty(key, String(value));
+      }
+    });
+    this._cache = null;
+  },
+
+  /**
+   * Limpa o cache
+   */
+  clearCache: function() {
+    this._cache = null;
+    this._cacheTime = null;
+  }
+};
+
+/**
+ * Obtém dados iniciais para a sidebar do Template
+ * @returns {Object} Dados para inicialização
+ */
+function getTemplateInitData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const activeSheet = ss.getActiveSheet();
+
+  // Configurações atuais
+  const config = TemplateConfigService.getAll();
+
+  // Lista de abas do documento atual
+  const localSheets = ss.getSheets()
+    .map(s => s.getName())
+    .filter(n => !['Config', 'Template Config'].includes(n));
+
+  // Colunas da aba ativa (para mapeamento de destino)
+  let destColumns = [];
+  if (activeSheet) {
+    const lastCol = activeSheet.getLastColumn();
+    if (lastCol > 0) {
+      const headers = activeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      destColumns = headers.map((h, i) => {
+        const letter = numberToColumnLetter(i + 1);
+        return `${letter} - ${h || 'Coluna ' + letter}`;
+      });
+    }
+  }
+
+  // Lista de planilhas externas recentes (se houver)
+  let externalSheets = [];
+  const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+  if (centralId) {
+    try {
+      const centralSS = SpreadsheetApp.openById(centralId);
+      externalSheets = centralSS.getSheets().map(s => s.getName());
+    } catch (e) {
+      console.warn('Não foi possível acessar planilha central:', e.message);
+    }
+  }
+
+  // Cores das tasks (salvas ou paleta padrão)
+  const savedColors = config[TEMPLATE_CONFIG_KEYS.TASK_COLORS];
+  let taskColors = TASK_COLOR_PALETTE;
+  if (savedColors) {
+    try {
+      taskColors = JSON.parse(savedColors);
+    } catch (e) {
+      taskColors = TASK_COLOR_PALETTE;
+    }
+  }
+
+  // Estado salvo do usuário
+  const savedState = getUserTemplateSidebarState();
+
+  return {
+    config: config,
+    configKeys: TEMPLATE_CONFIG_KEYS,
+    localSheets: localSheets,
+    externalSheets: externalSheets,
+    destColumns: destColumns,
+    taskColors: taskColors,
+    defaultColors: TASK_COLOR_PALETTE,
+    subTradeColors: SUBTRADE_COLOR_PALETTE,
+    savedState: savedState,
+    activeSheetName: activeSheet ? activeSheet.getName() : ''
+  };
+}
+
+/**
+ * Salva configurações do Template
+ * @param {Object} settings - Configurações a salvar
+ * @returns {Object} Resultado da operação
+ */
+function saveTemplateConfig(settings) {
+  try {
+    TemplateConfigService.setAll(settings);
+
+    // Atualiza COLUMN_MAPPING dinâmicamente para a sessão
+    if (settings[TEMPLATE_CONFIG_KEYS.DEST_TASK]) {
+      COLUMN_MAPPING.DESTINATION.TASK = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_TASK].split(' - ')[0]);
+    }
+    if (settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTASK]) {
+      COLUMN_MAPPING.DESTINATION['SUB-TASK'] = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTASK].split(' - ')[0]);
+    }
+    if (settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTRADE]) {
+      COLUMN_MAPPING.DESTINATION['SUB-TRADE'] = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTRADE].split(' - ')[0]);
+    }
+    if (settings[TEMPLATE_CONFIG_KEYS.DEST_LOCAL]) {
+      COLUMN_MAPPING.DESTINATION.LOCAL = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_LOCAL].split(' - ')[0]);
+    }
+    if (settings[TEMPLATE_CONFIG_KEYS.DEST_DESC]) {
+      COLUMN_MAPPING.DESTINATION.DESC = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_DESC].split(' - ')[0]);
+    }
+    if (settings[TEMPLATE_CONFIG_KEYS.DEST_QTY]) {
+      COLUMN_MAPPING.DESTINATION.QTY = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_QTY].split(' - ')[0]);
+    }
+
+    // Limpa cache de templates para recarregar
+    templateCache.clear();
+
+    return { success: true, message: 'Configurações salvas!' };
+  } catch (error) {
+    console.error('Erro ao salvar configurações:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Salva estado da sidebar do Template
+ * @param {string} stateJson - Estado em JSON
+ */
+function saveUserTemplateSidebarState(stateJson) {
+  try {
+    PropertiesService.getUserProperties().setProperty('TEMPLATE_SIDEBAR_STATE', stateJson);
+  } catch (e) {
+    console.warn('Erro ao salvar estado:', e.message);
+  }
+}
+
+/**
+ * Carrega estado da sidebar do Template
+ * @returns {Object|null} Estado salvo
+ */
+function getUserTemplateSidebarState() {
+  try {
+    const stateJson = PropertiesService.getUserProperties().getProperty('TEMPLATE_SIDEBAR_STATE');
+    return stateJson ? JSON.parse(stateJson) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Obtém abas de uma planilha externa pelo ID
+ * @param {string} spreadsheetId - ID da planilha
+ * @returns {Object} Lista de abas ou erro
+ */
+function getExternalSpreadsheetSheets(spreadsheetId) {
+  try {
+    if (!spreadsheetId || spreadsheetId.trim() === '') {
+      return { success: false, sheets: [], message: 'ID não fornecido' };
+    }
+
+    const ss = SpreadsheetApp.openById(spreadsheetId.trim());
+    const sheets = ss.getSheets().map(s => s.getName());
+    const name = ss.getName();
+
+    return { success: true, sheets: sheets, name: name };
+  } catch (error) {
+    return { success: false, sheets: [], message: error.message };
+  }
+}
+
+/**
+ * Salva cores customizadas das tasks
+ * @param {Object} colors - Objeto com nome da task e cor hex
+ * @returns {Object} Resultado
+ */
+function saveTaskColors(colors) {
+  try {
+    TemplateConfigService.set(TEMPLATE_CONFIG_KEYS.TASK_COLORS, JSON.stringify(colors));
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Carrega templates usando configuração dinâmica
+ * Substitui loadTemplatesFromCentralSheet para usar config do documento
+ * @returns {Object} Dados dos templates
+ */
+function loadTemplatesWithDynamicConfig() {
+  try {
+    const config = TemplateConfigService.getAll();
+    const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+    const sheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET];
+
+    if (!centralId) {
+      return { tasks: {}, total: 0, error: 'Configure o ID da planilha central na aba Configuração' };
+    }
+
+    const centralSheet = SpreadsheetApp.openById(centralId);
+    const dataSheet = centralSheet.getSheetByName(sheetName);
+
+    if (!dataSheet) {
+      return { tasks: {}, total: 0, error: `Aba "${sheetName}" não encontrada na planilha central` };
+    }
+
+    const lastRow = dataSheet.getLastRow();
+    if (lastRow < 4) {
+      return { tasks: {}, total: 0 };
+    }
+
+    const taskColorCodes = loadTaskColorCodes(centralSheet);
+    const subTradeColorCodes = loadSubTradeColorCodes(centralSheet);
+
+    // Mescla cores customizadas salvas
+    const savedColors = config[TEMPLATE_CONFIG_KEYS.TASK_COLORS];
+    if (savedColors) {
+      try {
+        const customColors = JSON.parse(savedColors);
+        Object.assign(taskColorCodes, customColors);
+      } catch (e) {}
+    }
+
+    const templateData = extractTemplateData(dataSheet, lastRow, taskColorCodes, subTradeColorCodes);
+    return templateData;
+
+  } catch (error) {
+    console.error('Erro ao carregar templates:', error);
+    return { tasks: {}, total: 0, error: error.message };
+  }
+}
+
+/**
+ * Obtém mapeamento de colunas de destino atualizado
+ * @returns {Object} Mapeamento de colunas
+ */
+function getDynamicColumnMapping() {
+  const config = TemplateConfigService.getAll();
+
+  return {
+    DESTINATION: {
+      TASK: columnLetterToIndex(config[TEMPLATE_CONFIG_KEYS.DEST_TASK]?.split(' - ')[0] || 'D'),
+      'SUB-TASK': columnLetterToIndex(config[TEMPLATE_CONFIG_KEYS.DEST_SUBTASK]?.split(' - ')[0] || 'E'),
+      'SUB-TRADE': columnLetterToIndex(config[TEMPLATE_CONFIG_KEYS.DEST_SUBTRADE]?.split(' - ')[0] || 'F'),
+      LOCAL: columnLetterToIndex(config[TEMPLATE_CONFIG_KEYS.DEST_LOCAL]?.split(' - ')[0] || 'I'),
+      DESC: columnLetterToIndex(config[TEMPLATE_CONFIG_KEYS.DEST_DESC]?.split(' - ')[0] || 'K'),
+      QTY: columnLetterToIndex(config[TEMPLATE_CONFIG_KEYS.DEST_QTY]?.split(' - ')[0] || 'L')
+    },
+    SOURCE: COLUMN_MAPPING.SOURCE
+  };
 }
