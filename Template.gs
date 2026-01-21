@@ -22,30 +22,48 @@
 
 // ============================================================================
 // CONFIGURACAO GLOBAL - TEMPLATE
-// Valores agora sao obtidos de lib/Shared/Config.gs (AppConfig)
-// Use showConfigDialog() para alterar via interface
 // ============================================================================
 
+// Fallback para AppConfig se não estiver definido (lib/Shared/Config.gs)
+const _AppConfigFallback = {
+  _defaults: {
+    CENTRAL_SPREADSHEET_ID: '1KD_NXdtEjORJJFYwiFc9uzrZeO57TPPSXWh7bokZMdU',
+    CENTRAL_SHEET_NAME: 'DATA BASE'
+  },
+  get: function(key, defaultValue) {
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const value = props.getProperty('PLB_CONFIG_' + key);
+      if (value) {
+        try { return JSON.parse(value); } catch(e) { return value; }
+      }
+    } catch(e) {}
+    return this._defaults[key] || defaultValue;
+  }
+};
+
+// Usa AppConfig se existir, senão usa fallback
+const _Config = (typeof AppConfig !== 'undefined') ? AppConfig : _AppConfigFallback;
+
 /**
- * Obtem ID da planilha central (usa AppConfig)
+ * Obtem ID da planilha central
  * @returns {string} ID da planilha
  */
 function getCentralSpreadsheetId() {
-  return AppConfig.get('CENTRAL_SPREADSHEET_ID');
+  return _Config.get('CENTRAL_SPREADSHEET_ID');
 }
 
 /**
- * Obtem nome da aba central (usa AppConfig)
+ * Obtem nome da aba central
  * @returns {string} Nome da aba
  */
 function getCentralSheetName() {
-  return AppConfig.get('CENTRAL_SHEET_NAME');
+  return _Config.get('CENTRAL_SHEET_NAME');
 }
 
 // Constantes mantidas para retrocompatibilidade (leitura apenas)
-// IMPORTANTE: Nao use diretamente - use as funcoes acima
-const CENTRAL_SPREADSHEET_ID = AppConfig.get('CENTRAL_SPREADSHEET_ID');
-const CENTRAL_SHEET_NAME = AppConfig.get('CENTRAL_SHEET_NAME');
+const CENTRAL_SPREADSHEET_ID = _Config.get('CENTRAL_SPREADSHEET_ID');
+const CENTRAL_SHEET_NAME = _Config.get('CENTRAL_SHEET_NAME');
 
 const COLUMN_MAPPING = {
   DESTINATION: { TASK: 4, 'SUB-TASK': 5, 'SUB-TRADE': 6, LOCAL: 9, DESC: 11, QTY: 12 },
@@ -1321,10 +1339,10 @@ const TemplateConfigService = {
 
     // Se não tem ID central configurado, tenta usar o AppConfig
     if (!config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]) {
-      config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID] = AppConfig.get('CENTRAL_SPREADSHEET_ID');
+      config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID] = _Config.get('CENTRAL_SPREADSHEET_ID');
     }
     if (!config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]) {
-      config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] = AppConfig.get('CENTRAL_SHEET_NAME') || 'DATA BASE';
+      config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] = _Config.get('CENTRAL_SHEET_NAME') || 'DATA BASE';
     }
 
     this._cache = config;
@@ -1595,8 +1613,8 @@ function loadTemplatesWithDynamicConfig() {
       console.warn('Erro ao carregar config:', e.message);
       // Tenta fallback para AppConfig
       config = {
-        [TEMPLATE_CONFIG_KEYS.CENTRAL_ID]: AppConfig.get('CENTRAL_SPREADSHEET_ID'),
-        [TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]: AppConfig.get('CENTRAL_SHEET_NAME') || 'DATA BASE'
+        [TEMPLATE_CONFIG_KEYS.CENTRAL_ID]: _Config.get('CENTRAL_SPREADSHEET_ID'),
+        [TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]: _Config.get('CENTRAL_SHEET_NAME') || 'DATA BASE'
       };
     }
 
