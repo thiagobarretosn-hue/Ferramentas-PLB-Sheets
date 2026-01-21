@@ -365,13 +365,34 @@
   <div id="status" class="status"></div>
 
   <script>
-    // Dados injetados pelo servidor
-    const INIT_DATA = <?!= initData ?>;
-    const TEMPLATE_DATA = <?!= templates ?>;
+    // Dados injetados pelo servidor (com fallback seguro)
+    let INIT_DATA, TEMPLATE_DATA;
+    try {
+      INIT_DATA = <?!= initData ?>;
+    } catch (e) {
+      INIT_DATA = {};
+    }
+    try {
+      TEMPLATE_DATA = <?!= templates ?>;
+    } catch (e) {
+      TEMPLATE_DATA = { tasks: {}, total: 0 };
+    }
 
-    // Parse dados
-    let initData = typeof INIT_DATA === 'string' ? JSON.parse(INIT_DATA) : INIT_DATA;
-    let templatesData = typeof TEMPLATE_DATA === 'string' ? JSON.parse(TEMPLATE_DATA) : TEMPLATE_DATA;
+    // Parse dados com fallback
+    let initData = {};
+    let templatesData = { tasks: {}, total: 0 };
+
+    try {
+      initData = typeof INIT_DATA === 'string' ? JSON.parse(INIT_DATA) : (INIT_DATA || {});
+    } catch (e) {
+      console.error('Erro ao parsear initData:', e);
+    }
+
+    try {
+      templatesData = typeof TEMPLATE_DATA === 'string' ? JSON.parse(TEMPLATE_DATA) : (TEMPLATE_DATA || { tasks: {}, total: 0 });
+    } catch (e) {
+      console.error('Erro ao parsear templatesData:', e);
+    }
 
     // Estado
     const STATE_KEY = 'TEMPLATE_SIDEBAR_STATE_V2';
@@ -402,27 +423,58 @@
 
     // Inicializacao
     window.addEventListener('load', () => {
-      initializeConfig();
-      initializeColorLists();
-      renderTemplates(templatesData);
-      updateRowIndicator();
-      updateStats();
+      try {
+        initializeConfig();
+        initializeColorLists();
+        renderTemplates(templatesData);
+        updateRowIndicator();
+        updateStats();
 
-      // Restaurar estado salvo
-      if (initData.savedState) {
-        applyState(initData.savedState);
+        // Restaurar estado salvo
+        if (initData.savedState) {
+          applyState(initData.savedState);
+        }
+
+        // Se nao tem config, abre aba Config automaticamente
+        const config = initData.config || {};
+        const keys = initData.configKeys || {};
+        if (!config[keys.CENTRAL_ID]) {
+          openTab('config');
+          showStatus('Configure a origem dos templates para comecar', 'info');
+        }
+      } catch (e) {
+        console.error('Erro na inicializacao:', e);
+        showStatus('Erro ao carregar. Verifique o console.', 'error');
+        // Abre config em caso de erro
+        openTab('config');
       }
     });
 
     function initializeConfig() {
       const config = initData.config || {};
-      const keys = initData.configKeys || {};
+      const keys = initData.configKeys || {
+        CENTRAL_ID: 'TEMPLATE_CENTRAL_SPREADSHEET_ID',
+        CENTRAL_SHEET: 'TEMPLATE_CENTRAL_SHEET_NAME',
+        DEST_TASK: 'TEMPLATE_DEST_COL_TASK',
+        DEST_SUBTASK: 'TEMPLATE_DEST_COL_SUBTASK',
+        DEST_SUBTRADE: 'TEMPLATE_DEST_COL_SUBTRADE',
+        DEST_LOCAL: 'TEMPLATE_DEST_COL_LOCAL',
+        DEST_DESC: 'TEMPLATE_DEST_COL_DESC',
+        DEST_QTY: 'TEMPLATE_DEST_COL_QTY'
+      };
+
+      // Salva keys para uso posterior
+      initData.configKeys = keys;
 
       // ID Central
-      elements.centralIdInput.value = config[keys.CENTRAL_ID] || '';
+      if (elements.centralIdInput) {
+        elements.centralIdInput.value = config[keys.CENTRAL_ID] || '';
+      }
 
       // Aba Central
-      populateSelect(elements.centralSheetSelect, initData.externalSheets, config[keys.CENTRAL_SHEET]);
+      if (elements.centralSheetSelect) {
+        populateSelect(elements.centralSheetSelect, initData.externalSheets || [], config[keys.CENTRAL_SHEET] || '');
+      }
 
       // Colunas de destino
       const destCols = initData.destColumns || [];
@@ -436,22 +488,24 @@
       ];
 
       colSelects.forEach(({ el, key, default: def }) => {
+        if (!el) return;
         el.innerHTML = '<option value="">-- Selecione --</option>';
         destCols.forEach(col => {
           const opt = new Option(col, col);
-          if (config[key] && col.startsWith(config[key].split(' - ')[0])) {
+          const savedVal = config[key] || '';
+          if (savedVal && col.startsWith(savedVal.split(' - ')[0])) {
             opt.selected = true;
-          } else if (!config[key] && col.startsWith(def)) {
+          } else if (!savedVal && col.startsWith(def)) {
             opt.selected = true;
           }
           el.add(opt);
         });
       });
 
-      // Se nao tem ID central, mostra mensagem
+      // Se nao tem ID central, mostra mensagem na aba templates
       if (!config[keys.CENTRAL_ID]) {
-        elements.noConfigMessage.classList.remove('hidden');
-        elements.templateContainer.classList.add('hidden');
+        if (elements.noConfigMessage) elements.noConfigMessage.classList.remove('hidden');
+        if (elements.templateContainer) elements.templateContainer.classList.add('hidden');
       }
     }
 
@@ -472,16 +526,28 @@
       const subTradeList = document.getElementById('subTradeColorList');
 
       // Tasks
-      taskList.innerHTML = '';
-      Object.entries(taskColors).forEach(([name, color]) => {
-        taskList.appendChild(createColorItem('task', name, color));
-      });
+      if (taskList) {
+        taskList.innerHTML = '';
+        if (taskColors && Object.keys(taskColors).length > 0) {
+          Object.entries(taskColors).forEach(([name, color]) => {
+            taskList.appendChild(createColorItem('task', name, color));
+          });
+        } else {
+          taskList.innerHTML = '<p class="text-muted">Nenhuma cor de Task configurada</p>';
+        }
+      }
 
       // SubTrades
-      subTradeList.innerHTML = '';
-      Object.entries(subTradeColors).forEach(([name, color]) => {
-        subTradeList.appendChild(createColorItem('subtrade', name, color));
-      });
+      if (subTradeList) {
+        subTradeList.innerHTML = '';
+        if (subTradeColors && Object.keys(subTradeColors).length > 0) {
+          Object.entries(subTradeColors).forEach(([name, color]) => {
+            subTradeList.appendChild(createColorItem('subtrade', name, color));
+          });
+        } else {
+          subTradeList.innerHTML = '<p class="text-muted">Nenhuma cor de SubTrade configurada</p>';
+        }
+      }
     }
 
     function createColorItem(type, name, color) {
@@ -558,16 +624,26 @@
     }
 
     function saveAndReload() {
-      const keys = initData.configKeys;
+      const keys = initData.configKeys || {
+        CENTRAL_ID: 'TEMPLATE_CENTRAL_SPREADSHEET_ID',
+        CENTRAL_SHEET: 'TEMPLATE_CENTRAL_SHEET_NAME',
+        DEST_TASK: 'TEMPLATE_DEST_COL_TASK',
+        DEST_SUBTASK: 'TEMPLATE_DEST_COL_SUBTASK',
+        DEST_SUBTRADE: 'TEMPLATE_DEST_COL_SUBTRADE',
+        DEST_LOCAL: 'TEMPLATE_DEST_COL_LOCAL',
+        DEST_DESC: 'TEMPLATE_DEST_COL_DESC',
+        DEST_QTY: 'TEMPLATE_DEST_COL_QTY'
+      };
+
       const settings = {
-        [keys.CENTRAL_ID]: elements.centralIdInput.value.trim(),
-        [keys.CENTRAL_SHEET]: elements.centralSheetSelect.value,
-        [keys.DEST_TASK]: elements.destTaskSelect.value,
-        [keys.DEST_SUBTASK]: elements.destSubTaskSelect.value,
-        [keys.DEST_SUBTRADE]: elements.destSubTradeSelect.value,
-        [keys.DEST_LOCAL]: elements.destLocalSelect.value,
-        [keys.DEST_DESC]: elements.destDescSelect.value,
-        [keys.DEST_QTY]: elements.destQtySelect.value
+        [keys.CENTRAL_ID]: elements.centralIdInput ? elements.centralIdInput.value.trim() : '',
+        [keys.CENTRAL_SHEET]: elements.centralSheetSelect ? elements.centralSheetSelect.value : '',
+        [keys.DEST_TASK]: elements.destTaskSelect ? elements.destTaskSelect.value : '',
+        [keys.DEST_SUBTASK]: elements.destSubTaskSelect ? elements.destSubTaskSelect.value : '',
+        [keys.DEST_SUBTRADE]: elements.destSubTradeSelect ? elements.destSubTradeSelect.value : '',
+        [keys.DEST_LOCAL]: elements.destLocalSelect ? elements.destLocalSelect.value : '',
+        [keys.DEST_DESC]: elements.destDescSelect ? elements.destDescSelect.value : '',
+        [keys.DEST_QTY]: elements.destQtySelect ? elements.destQtySelect.value : ''
       };
 
       showStatus('Salvando configuracoes...', 'info');

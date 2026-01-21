@@ -1382,68 +1382,104 @@ const TemplateConfigService = {
  * @returns {Object} Dados para inicialização
  */
 function getTemplateInitData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const activeSheet = ss.getActiveSheet();
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const activeSheet = ss.getActiveSheet();
 
-  // Configurações atuais
-  const config = TemplateConfigService.getAll();
-
-  // Lista de abas do documento atual
-  const localSheets = ss.getSheets()
-    .map(s => s.getName())
-    .filter(n => !['Config', 'Template Config'].includes(n));
-
-  // Colunas da aba ativa (para mapeamento de destino)
-  let destColumns = [];
-  if (activeSheet) {
-    const lastCol = activeSheet.getLastColumn();
-    if (lastCol > 0) {
-      const headers = activeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-      destColumns = headers.map((h, i) => {
-        const letter = numberToColumnLetter(i + 1);
-        return `${letter} - ${h || 'Coluna ' + letter}`;
-      });
-    }
-  }
-
-  // Lista de planilhas externas recentes (se houver)
-  let externalSheets = [];
-  const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
-  if (centralId) {
+    // Configurações atuais (com fallback)
+    let config = {};
     try {
-      const centralSS = SpreadsheetApp.openById(centralId);
-      externalSheets = centralSS.getSheets().map(s => s.getName());
+      config = TemplateConfigService.getAll();
     } catch (e) {
-      console.warn('Não foi possível acessar planilha central:', e.message);
+      console.warn('Erro ao carregar config:', e.message);
     }
-  }
 
-  // Cores das tasks (salvas ou paleta padrão)
-  const savedColors = config[TEMPLATE_CONFIG_KEYS.TASK_COLORS];
-  let taskColors = TASK_COLOR_PALETTE;
-  if (savedColors) {
+    // Lista de abas do documento atual
+    let localSheets = [];
     try {
-      taskColors = JSON.parse(savedColors);
+      localSheets = ss.getSheets()
+        .map(s => s.getName())
+        .filter(n => !['Config', 'Template Config'].includes(n));
     } catch (e) {
-      taskColors = TASK_COLOR_PALETTE;
+      console.warn('Erro ao listar abas:', e.message);
     }
+
+    // Colunas da aba ativa (para mapeamento de destino)
+    let destColumns = [];
+    try {
+      if (activeSheet) {
+        const lastCol = activeSheet.getLastColumn();
+        if (lastCol > 0) {
+          const headers = activeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+          destColumns = headers.map((h, i) => {
+            const letter = numberToColumnLetter(i + 1);
+            return `${letter} - ${h || 'Coluna ' + letter}`;
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao obter colunas:', e.message);
+    }
+
+    // Lista de planilhas externas recentes (se houver)
+    let externalSheets = [];
+    const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+    if (centralId) {
+      try {
+        const centralSS = SpreadsheetApp.openById(centralId);
+        externalSheets = centralSS.getSheets().map(s => s.getName());
+      } catch (e) {
+        console.warn('Não foi possível acessar planilha central:', e.message);
+      }
+    }
+
+    // Cores das tasks (salvas ou paleta padrão)
+    let taskColors = TASK_COLOR_PALETTE || {};
+    const savedColors = config[TEMPLATE_CONFIG_KEYS.TASK_COLORS];
+    if (savedColors) {
+      try {
+        taskColors = JSON.parse(savedColors);
+      } catch (e) {
+        taskColors = TASK_COLOR_PALETTE || {};
+      }
+    }
+
+    // Estado salvo do usuário
+    let savedState = null;
+    try {
+      savedState = getUserTemplateSidebarState();
+    } catch (e) {
+      console.warn('Erro ao carregar estado:', e.message);
+    }
+
+    return {
+      config: config,
+      configKeys: TEMPLATE_CONFIG_KEYS,
+      localSheets: localSheets,
+      externalSheets: externalSheets,
+      destColumns: destColumns,
+      taskColors: taskColors,
+      defaultColors: TASK_COLOR_PALETTE || {},
+      subTradeColors: SUBTRADE_COLOR_PALETTE || {},
+      savedState: savedState,
+      activeSheetName: activeSheet ? activeSheet.getName() : ''
+    };
+  } catch (error) {
+    console.error('Erro em getTemplateInitData:', error);
+    // Retorna objeto mínimo para não quebrar a sidebar
+    return {
+      config: {},
+      configKeys: TEMPLATE_CONFIG_KEYS,
+      localSheets: [],
+      externalSheets: [],
+      destColumns: [],
+      taskColors: {},
+      defaultColors: {},
+      subTradeColors: {},
+      savedState: null,
+      activeSheetName: ''
+    };
   }
-
-  // Estado salvo do usuário
-  const savedState = getUserTemplateSidebarState();
-
-  return {
-    config: config,
-    configKeys: TEMPLATE_CONFIG_KEYS,
-    localSheets: localSheets,
-    externalSheets: externalSheets,
-    destColumns: destColumns,
-    taskColors: taskColors,
-    defaultColors: TASK_COLOR_PALETTE,
-    subTradeColors: SUBTRADE_COLOR_PALETTE,
-    savedState: savedState,
-    activeSheetName: activeSheet ? activeSheet.getName() : ''
-  };
 }
 
 /**
@@ -1552,28 +1588,59 @@ function saveTaskColors(colors) {
  */
 function loadTemplatesWithDynamicConfig() {
   try {
-    const config = TemplateConfigService.getAll();
+    let config = {};
+    try {
+      config = TemplateConfigService.getAll();
+    } catch (e) {
+      console.warn('Erro ao carregar config:', e.message);
+      // Tenta fallback para AppConfig
+      config = {
+        [TEMPLATE_CONFIG_KEYS.CENTRAL_ID]: AppConfig.get('CENTRAL_SPREADSHEET_ID'),
+        [TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]: AppConfig.get('CENTRAL_SHEET_NAME') || 'DATA BASE'
+      };
+    }
+
     const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
-    const sheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET];
+    const sheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || 'DATA BASE';
 
     if (!centralId) {
-      return { tasks: {}, total: 0, error: 'Configure o ID da planilha central na aba Configuração' };
+      return {
+        tasks: {},
+        total: 0,
+        error: 'Configure o ID da planilha central na aba "1. Config"'
+      };
     }
 
     const centralSheet = SpreadsheetApp.openById(centralId);
     const dataSheet = centralSheet.getSheetByName(sheetName);
 
     if (!dataSheet) {
-      return { tasks: {}, total: 0, error: `Aba "${sheetName}" não encontrada na planilha central` };
+      return {
+        tasks: {},
+        total: 0,
+        error: `Aba "${sheetName}" não encontrada na planilha central`
+      };
     }
 
     const lastRow = dataSheet.getLastRow();
     if (lastRow < 4) {
-      return { tasks: {}, total: 0 };
+      return { tasks: {}, total: 0, message: 'Planilha central vazia ou sem dados suficientes' };
     }
 
-    const taskColorCodes = loadTaskColorCodes(centralSheet);
-    const subTradeColorCodes = loadSubTradeColorCodes(centralSheet);
+    let taskColorCodes = {};
+    let subTradeColorCodes = {};
+
+    try {
+      taskColorCodes = loadTaskColorCodes(centralSheet);
+    } catch (e) {
+      console.warn('Erro ao carregar cores de tasks:', e.message);
+    }
+
+    try {
+      subTradeColorCodes = loadSubTradeColorCodes(centralSheet);
+    } catch (e) {
+      console.warn('Erro ao carregar cores de subtrades:', e.message);
+    }
 
     // Mescla cores customizadas salvas
     const savedColors = config[TEMPLATE_CONFIG_KEYS.TASK_COLORS];
@@ -1589,7 +1656,11 @@ function loadTemplatesWithDynamicConfig() {
 
   } catch (error) {
     console.error('Erro ao carregar templates:', error);
-    return { tasks: {}, total: 0, error: error.message };
+    return {
+      tasks: {},
+      total: 0,
+      error: `Erro ao carregar: ${error.message}`
+    };
   }
 }
 
