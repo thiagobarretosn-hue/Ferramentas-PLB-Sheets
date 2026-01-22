@@ -624,10 +624,6 @@
     }
 
     function saveAndReload() {
-      // DEBUG: Verifica se configKeys está correto
-      console.log('=== DEBUG saveAndReload ===');
-      console.log('initData.configKeys:', initData.configKeys);
-
       const keys = initData.configKeys || {
         CENTRAL_ID: 'TEMPLATE_CENTRAL_SPREADSHEET_ID',
         CENTRAL_SHEET: 'TEMPLATE_CENTRAL_SHEET_NAME',
@@ -639,11 +635,7 @@
         DEST_QTY: 'TEMPLATE_DEST_COL_QTY'
       };
 
-      console.log('keys usadas:', keys);
-      console.log('keys.CENTRAL_ID =', keys.CENTRAL_ID);
-
       const centralIdValue = elements.centralIdInput ? elements.centralIdInput.value.trim() : '';
-      console.log('Valor do input centralId:', centralIdValue);
 
       const settings = {
         [keys.CENTRAL_ID]: centralIdValue,
@@ -655,8 +647,6 @@
         [keys.DEST_DESC]: elements.destDescSelect ? elements.destDescSelect.value : '',
         [keys.DEST_QTY]: elements.destQtySelect ? elements.destQtySelect.value : ''
       };
-
-      console.log('Settings a salvar:', JSON.stringify(settings, null, 2));
 
       showStatus('Salvando configuracoes...', 'info');
       google.script.run

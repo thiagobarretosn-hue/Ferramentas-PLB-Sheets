@@ -1510,7 +1510,6 @@ Aba: ${savedSheet}
 
 Reabra a sidebar para aplicar.`;
 
-  console.log(msg);
   SpreadsheetApp.getUi().alert('✅ Configuração Forçada', msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
@@ -1543,21 +1542,10 @@ function getTemplateInitData() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const activeSheet = ss.getActiveSheet();
 
-    // DEBUG: Mostra o que está salvo no DocumentProperties
-    console.log('=== getTemplateInitData DEBUG ===');
-    const rawProps = PropertiesService.getDocumentProperties().getProperties();
-    const templateProps = {};
-    Object.keys(rawProps).forEach(k => {
-      if (k.startsWith('TEMPLATE_')) templateProps[k] = rawProps[k];
-    });
-    console.log('DocumentProperties (TEMPLATE_*):', JSON.stringify(templateProps));
-
     // Configurações atuais (com fallback)
     let config = {};
     try {
       config = TemplateConfigService.getAll();
-      console.log('TemplateConfigService.getAll():', JSON.stringify(config));
-      console.log('CENTRAL_ID:', config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]);
     } catch (e) {
       console.warn('Erro ao carregar config:', e.message);
     }
@@ -1657,22 +1645,11 @@ function getTemplateInitData() {
  */
 function saveTemplateConfig(settings) {
   try {
-    // DEBUG: Log o que foi recebido
-    console.log('=== saveTemplateConfig RECEBIDO ===');
-    console.log('settings:', JSON.stringify(settings, null, 2));
-    console.log('CENTRAL_ID key:', TEMPLATE_CONFIG_KEYS.CENTRAL_ID);
-    console.log('Valor para CENTRAL_ID:', settings[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]);
-
     TemplateConfigService.setAll(settings);
 
     // Limpa cache de templates e config para recarregar com novos valores
     templateCache.clear();
     TemplateConfigService.clearCache();
-
-    // DEBUG: Verifica se foi salvo
-    const saved = TemplateConfigService.getAll();
-    console.log('=== APOS SALVAR ===');
-    console.log('CENTRAL_ID salvo:', saved[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]);
 
     return { success: true, message: 'Configurações salvas!' };
   } catch (error) {
