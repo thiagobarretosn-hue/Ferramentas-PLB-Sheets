@@ -1368,11 +1368,15 @@ const TemplateConfigService = {
       config[propKey] = value !== null ? value : (TEMPLATE_CONFIG_DEFAULTS[propKey] || '');
     });
 
-    // Se não tem ID central configurado, tenta usar o AppConfig
-    if (!config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]) {
+    // IMPORTANTE: Só usa fallback se DocumentProperties NUNCA foi configurado
+    // Verifica se existe QUALQUER propriedade salva (indica que usuário já configurou)
+    const hasAnyConfig = props.getProperty(TEMPLATE_CONFIG_KEYS.CENTRAL_ID) !== null;
+
+    // Se não tem config salva E não tem ID, usa fallback
+    if (!hasAnyConfig && !config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]) {
       config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID] = _Config.get('CENTRAL_SPREADSHEET_ID');
     }
-    if (!config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]) {
+    if (!hasAnyConfig && !config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET]) {
       config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] = _Config.get('CENTRAL_SHEET_NAME') || 'DATA BASE';
     }
 
@@ -1423,8 +1427,112 @@ const TemplateConfigService = {
   clearCache: function() {
     this._cache = null;
     this._cacheTime = null;
+  },
+
+  /**
+   * DEBUG: Mostra todas as configurações salvas
+   * @returns {Object} Configurações brutas do DocumentProperties
+   */
+  debug: function() {
+    const props = PropertiesService.getDocumentProperties();
+    const all = props.getProperties();
+    const templateProps = {};
+
+    Object.keys(all).forEach(key => {
+      if (key.startsWith('TEMPLATE_')) {
+        templateProps[key] = all[key];
+      }
+    });
+
+    console.log('=== DEBUG TemplateConfigService ===');
+    console.log('DocumentProperties (TEMPLATE_*):', JSON.stringify(templateProps, null, 2));
+    console.log('getAll() retorna:', JSON.stringify(this.getAll(), null, 2));
+
+    return {
+      raw: templateProps,
+      processed: this.getAll()
+    };
   }
 };
+
+/**
+ * DEBUG: Função para testar configuração do Template
+ * Execute esta função para ver o que está salvo
+ */
+function debugTemplateConfig() {
+  const result = TemplateConfigService.debug();
+
+  const msg = `=== CONFIG DEBUG ===
+
+RAW (DocumentProperties):
+${JSON.stringify(result.raw, null, 2)}
+
+PROCESSED (getAll):
+CENTRAL_ID: ${result.processed[TEMPLATE_CONFIG_KEYS.CENTRAL_ID] || '(vazio)'}
+CENTRAL_SHEET: ${result.processed[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || '(vazio)'}
+`;
+
+  console.log(msg);
+  SpreadsheetApp.getUi().alert('Debug Config', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+  return result;
+}
+
+/**
+ * FORÇA configuração manual do ID da planilha central
+ * Use esta função se a sidebar não estiver salvando corretamente
+ * @param {string} spreadsheetId - ID da planilha (ex: '1IE_NTWtwB9PHlrFsM853SkkVwWttiZxVZPcBDE6qjKk')
+ * @param {string} [sheetName='DATA BASE'] - Nome da aba
+ */
+function forceSetCentralSpreadsheet(spreadsheetId, sheetName) {
+  if (!spreadsheetId) {
+    SpreadsheetApp.getUi().alert('Erro', 'Forneça o ID da planilha como parâmetro', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  const props = PropertiesService.getDocumentProperties();
+
+  // Salva diretamente no DocumentProperties
+  props.setProperty(TEMPLATE_CONFIG_KEYS.CENTRAL_ID, spreadsheetId);
+  props.setProperty(TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET, sheetName || 'DATA BASE');
+
+  // Limpa caches
+  TemplateConfigService.clearCache();
+  templateCache.clear();
+
+  // Verifica se salvou
+  const savedId = props.getProperty(TEMPLATE_CONFIG_KEYS.CENTRAL_ID);
+  const savedSheet = props.getProperty(TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET);
+
+  const msg = `Configuração salva!
+
+ID: ${savedId}
+Aba: ${savedSheet}
+
+Reabra a sidebar para aplicar.`;
+
+  console.log(msg);
+  SpreadsheetApp.getUi().alert('✅ Configuração Forçada', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/**
+ * Configura a planilha central do usuário
+ * Execute esta função e depois reabra a sidebar
+ */
+function configurarPlanilhaCentral() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    '⚙️ Configurar Planilha Central',
+    'Cole o ID da planilha central de templates:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const id = response.getResponseText().trim();
+    if (id) {
+      forceSetCentralSpreadsheet(id, 'DATA BASE');
+    }
+  }
+}
 
 /**
  * Obtém dados iniciais para a sidebar do Template
@@ -1435,10 +1543,21 @@ function getTemplateInitData() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const activeSheet = ss.getActiveSheet();
 
+    // DEBUG: Mostra o que está salvo no DocumentProperties
+    console.log('=== getTemplateInitData DEBUG ===');
+    const rawProps = PropertiesService.getDocumentProperties().getProperties();
+    const templateProps = {};
+    Object.keys(rawProps).forEach(k => {
+      if (k.startsWith('TEMPLATE_')) templateProps[k] = rawProps[k];
+    });
+    console.log('DocumentProperties (TEMPLATE_*):', JSON.stringify(templateProps));
+
     // Configurações atuais (com fallback)
     let config = {};
     try {
       config = TemplateConfigService.getAll();
+      console.log('TemplateConfigService.getAll():', JSON.stringify(config));
+      console.log('CENTRAL_ID:', config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]);
     } catch (e) {
       console.warn('Erro ao carregar config:', e.message);
     }
@@ -1538,11 +1657,22 @@ function getTemplateInitData() {
  */
 function saveTemplateConfig(settings) {
   try {
+    // DEBUG: Log o que foi recebido
+    console.log('=== saveTemplateConfig RECEBIDO ===');
+    console.log('settings:', JSON.stringify(settings, null, 2));
+    console.log('CENTRAL_ID key:', TEMPLATE_CONFIG_KEYS.CENTRAL_ID);
+    console.log('Valor para CENTRAL_ID:', settings[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]);
+
     TemplateConfigService.setAll(settings);
 
     // Limpa cache de templates e config para recarregar com novos valores
     templateCache.clear();
     TemplateConfigService.clearCache();
+
+    // DEBUG: Verifica se foi salvo
+    const saved = TemplateConfigService.getAll();
+    console.log('=== APOS SALVAR ===');
+    console.log('CENTRAL_ID salvo:', saved[TEMPLATE_CONFIG_KEYS.CENTRAL_ID]);
 
     return { success: true, message: 'Configurações salvas!' };
   } catch (error) {
