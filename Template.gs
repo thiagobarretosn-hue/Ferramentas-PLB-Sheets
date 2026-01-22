@@ -61,7 +61,9 @@ function getCentralSheetName() {
   return _Config.get('CENTRAL_SHEET_NAME');
 }
 
-// Constantes mantidas para retrocompatibilidade (leitura apenas)
+// DEPRECATED: Constantes antigas - NÃO USAR DIRETAMENTE
+// Use TemplateConfigService.get(TEMPLATE_CONFIG_KEYS.CENTRAL_ID) em vez disso
+// Mantidas apenas para retrocompatibilidade com código legado
 const CENTRAL_SPREADSHEET_ID = _Config.get('CENTRAL_SPREADSHEET_ID');
 const CENTRAL_SHEET_NAME = _Config.get('CENTRAL_SHEET_NAME');
 
@@ -571,14 +573,22 @@ function getUniqueName(ss, base) {
 // ============================================================================
 
 function getSystemConfiguration() {
+  // PRIORIZA CONFIGURACAO DINAMICA do TemplateConfigService
+  const templateConfig = TemplateConfigService.getAll();
+  const dynamicCentralId = templateConfig[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+  const dynamicSheetName = templateConfig[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET];
+
   const savedConfig = PropertiesService.getScriptProperties().getProperty('SYSTEM_CONFIG');
   const config = savedConfig ?
     JSON.parse(savedConfig) : {
-    defaultInsertRow: 57,
-    centralSpreadsheetId: CENTRAL_SPREADSHEET_ID,
-    centralSheetName: CENTRAL_SHEET_NAME
+    defaultInsertRow: 57
   };
+
+  // Usa config dinâmica se disponível, senão fallback para _Config
+  config.centralSpreadsheetId = dynamicCentralId || _Config.get('CENTRAL_SPREADSHEET_ID');
+  config.centralSheetName = dynamicSheetName || _Config.get('CENTRAL_SHEET_NAME') || 'DATA BASE';
   config.defaultInsertRow = validateInteger(config.defaultInsertRow, 1, 5000);
+
   return config;
 }
 
@@ -591,45 +601,21 @@ function saveSystemConfiguration(config) {
 // TEMPLATES - CARREGAMENTO E CACHE
 // ============================================================================
 
+/**
+ * Carrega templates com cache - USA CONFIGURACAO DINAMICA
+ * @param {boolean} forceRefresh - Forçar recarregamento
+ * @returns {Object} Dados dos templates
+ */
 function loadTemplatesWithCache(forceRefresh = false) {
   if (!forceRefresh) {
     const cachedData = templateCache.getData();
     if (cachedData) return cachedData;
   }
 
-  const freshData = loadTemplatesFromCentralSheet();
+  // USA CONFIGURACAO DINAMICA em vez de getSystemConfiguration()
+  const freshData = loadTemplatesWithDynamicConfig();
   templateCache.setData(freshData);
   return freshData;
-}
-
-function loadTemplatesFromCentralSheet() {
-  try {
-    const config = getSystemConfiguration();
-    const centralSheet = SpreadsheetApp.openById(config.centralSpreadsheetId);
-    const dataSheet = centralSheet.getSheetByName(config.centralSheetName);
-
-    if (!dataSheet) {
-      return { tasks: {}, total: 0, error: 'Planilha central não encontrada' };
-    }
-
-    const lastRow = dataSheet.getLastRow();
-    if (lastRow < 4) {
-      return { tasks: {}, total: 0 };
-    }
-
-    const taskColorCodes = loadTaskColorCodes(centralSheet);
-    const subTradeColorCodes = loadSubTradeColorCodes(centralSheet);
-    const templateData = extractTemplateData(dataSheet, lastRow, taskColorCodes, subTradeColorCodes);
-    return templateData;
-
-  } catch (error) {
-    console.error('Erro ao carregar templates:', error);
-    return {
-      tasks: {},
-      total: 0,
-      error: error.message
-    };
-  }
 }
 
 function loadTaskColorCodes(spreadsheet) {
@@ -943,8 +929,10 @@ function createTemplateFromSelection() {
   try {
     const spreadsheet = SpreadsheetApp.getActive();
     const sheet = spreadsheet.getActiveSheet();
-    const config = getSystemConfiguration();
-    if (sheet.getName() === config.centralSheetName) {
+    // USA CONFIGURACAO DINAMICA
+    const config = TemplateConfigService.getAll();
+    const centralSheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || 'DATA BASE';
+    if (sheet.getName() === centralSheetName) {
       throw new Error('Selecione uma aba de orçamento, não a planilha central');
     }
 
@@ -1036,9 +1024,18 @@ function extractSelectionData(sheet, startRow, numRows) {
 
 function findExistingTemplate(localName) {
   try {
-    const config = getSystemConfiguration();
-    const centralSheet = SpreadsheetApp.openById(config.centralSpreadsheetId);
-    const dataSheet = centralSheet.getSheetByName(config.centralSheetName);
+    // USA CONFIGURACAO DINAMICA
+    const config = TemplateConfigService.getAll();
+    const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+    const sheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || 'DATA BASE';
+
+    if (!centralId) {
+      console.warn('ID da planilha central não configurado');
+      return null;
+    }
+
+    const centralSheet = SpreadsheetApp.openById(centralId);
+    const dataSheet = centralSheet.getSheetByName(sheetName);
 
     if (!dataSheet || dataSheet.getLastRow() < 4) {
       return null;
@@ -1088,9 +1085,17 @@ function saveTemplateToDatabase(templateData) {
   try {
     lock.waitLock(30000);
 
-    const config = getSystemConfiguration();
-    const centralSheet = SpreadsheetApp.openById(config.centralSpreadsheetId);
-    const dataSheet = centralSheet.getSheetByName(config.centralSheetName);
+    // USA CONFIGURACAO DINAMICA
+    const config = TemplateConfigService.getAll();
+    const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+    const sheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || 'DATA BASE';
+
+    if (!centralId) {
+      throw new Error('ID da planilha central não configurado. Configure na sidebar.');
+    }
+
+    const centralSheet = SpreadsheetApp.openById(centralId);
+    const dataSheet = centralSheet.getSheetByName(sheetName);
 
     if (!dataSheet) {
       throw new Error('Planilha central não encontrada');
@@ -1160,9 +1165,17 @@ function updateExistingTemplate(oldTemplates, newTemplates) {
   try {
     lock.waitLock(30000);
 
-    const config = getSystemConfiguration();
-    const centralSheet = SpreadsheetApp.openById(config.centralSpreadsheetId);
-    const dataSheet = centralSheet.getSheetByName(config.centralSheetName);
+    // USA CONFIGURACAO DINAMICA
+    const config = TemplateConfigService.getAll();
+    const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+    const sheetName = config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || 'DATA BASE';
+
+    if (!centralId) {
+      throw new Error('ID da planilha central não configurado. Configure na sidebar.');
+    }
+
+    const centralSheet = SpreadsheetApp.openById(centralId);
+    const dataSheet = centralSheet.getSheetByName(sheetName);
 
     if (!dataSheet) {
       throw new Error('Planilha central não encontrada');
@@ -1260,7 +1273,16 @@ function getRefreshedGroups(sheetName, startRow, groupColLetter) {
 }
 
 function openCentralDatabase() {
-  const url = `https://docs.google.com/spreadsheets/d/${CENTRAL_SPREADSHEET_ID}/edit`;
+  // USA CONFIGURACAO DINAMICA
+  const config = TemplateConfigService.getAll();
+  const centralId = config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID];
+
+  if (!centralId) {
+    SpreadsheetApp.getUi().alert('Configure o ID da planilha central na sidebar de Templates primeiro.');
+    return;
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${centralId}/edit`;
   const html = HtmlService.createHtmlOutput(
     `<div style="font-family:Arial, sans-serif; font-size:13px; padding:6px;">
        📂 Abrindo Base...
@@ -1629,8 +1651,25 @@ function loadTemplatesWithDynamicConfig() {
       };
     }
 
-    const centralSheet = SpreadsheetApp.openById(centralId);
-    const dataSheet = centralSheet.getSheetByName(sheetName);
+    let centralSheet, dataSheet;
+    try {
+      centralSheet = SpreadsheetApp.openById(centralId);
+    } catch (e) {
+      if (e.message && e.message.includes('permiss')) {
+        return {
+          tasks: {},
+          total: 0,
+          error: 'Sem permissao para acessar a planilha. Execute qualquer funcao do menu para autorizar o script.'
+        };
+      }
+      return {
+        tasks: {},
+        total: 0,
+        error: `Erro ao acessar planilha central: ${e.message}`
+      };
+    }
+
+    dataSheet = centralSheet.getSheetByName(sheetName);
 
     if (!dataSheet) {
       return {
