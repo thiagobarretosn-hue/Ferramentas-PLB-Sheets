@@ -46,19 +46,21 @@ const _AppConfigFallback = {
 const _Config = (typeof AppConfig !== 'undefined') ? AppConfig : _AppConfigFallback;
 
 /**
- * Obtem ID da planilha central
+ * Obtem ID da planilha central - USA CONFIGURACAO DINAMICA
  * @returns {string} ID da planilha
  */
 function getCentralSpreadsheetId() {
-  return _Config.get('CENTRAL_SPREADSHEET_ID');
+  const config = TemplateConfigService.getAll();
+  return config[TEMPLATE_CONFIG_KEYS.CENTRAL_ID] || _Config.get('CENTRAL_SPREADSHEET_ID');
 }
 
 /**
- * Obtem nome da aba central
+ * Obtem nome da aba central - USA CONFIGURACAO DINAMICA
  * @returns {string} Nome da aba
  */
 function getCentralSheetName() {
-  return _Config.get('CENTRAL_SHEET_NAME');
+  const config = TemplateConfigService.getAll();
+  return config[TEMPLATE_CONFIG_KEYS.CENTRAL_SHEET] || _Config.get('CENTRAL_SHEET_NAME') || 'DATA BASE';
 }
 
 // DEPRECATED: Constantes antigas - NÃO USAR DIRETAMENTE
@@ -747,12 +749,15 @@ function adjustFormula(formula, originalRow, targetRow) {
   if (!formula) return '';
   try {
     const rowDifference = (targetRow || 0) - (originalRow || targetRow || 0);
+    // USA MAPEAMENTO DINAMICO
+    const destQtyCol = getDynamicColumnMapping().DESTINATION.QTY;
+
     return String(formula).replace(/([A-Z]+)(\d+)/g, (match, column, row) => {
       const currentRowNum = SharedUtils_toInteger(row);
       const newRowNum = currentRowNum + rowDifference;
 
       if (column === 'T') {
-        return numberToColumnLetter(COLUMN_MAPPING.DESTINATION.QTY) + newRowNum;
+        return numberToColumnLetter(destQtyCol) + newRowNum;
       }
 
       return column + newRowNum;
@@ -978,7 +983,8 @@ function createTemplateFromSelection() {
 }
 
 function extractSelectionData(sheet, startRow, numRows) {
-  const destCol = COLUMN_MAPPING.DESTINATION;
+  // USA MAPEAMENTO DINAMICO
+  const destCol = getDynamicColumnMapping().DESTINATION;
   const columnData = {
     task: sheet.getRange(startRow, destCol.TASK, numRows, 1).getValues(),
     subTask: sheet.getRange(startRow, destCol['SUB-TASK'], numRows, 1).getValues(),
@@ -1146,9 +1152,12 @@ function adjustFormulaForDatabase(formula, originalRow, targetRow) {
   if (!formula) return '';
   try {
     const rowDifference = targetRow - originalRow;
+    // USA MAPEAMENTO DINAMICO
+    const destQtyColLetter = numberToColumnLetter(getDynamicColumnMapping().DESTINATION.QTY);
+
     return formula.replace(/([A-Z]+)(\d+)/g, (match, column, row) => {
       const newRowNumber = SharedUtils_toInteger(row) + rowDifference;
-      if (column === numberToColumnLetter(COLUMN_MAPPING.DESTINATION.QTY)) {
+      if (column === destQtyColLetter) {
         return `T${newRowNumber}`;
       }
       return `${column}${newRowNumber}`;
@@ -1531,28 +1540,9 @@ function saveTemplateConfig(settings) {
   try {
     TemplateConfigService.setAll(settings);
 
-    // Atualiza COLUMN_MAPPING dinâmicamente para a sessão
-    if (settings[TEMPLATE_CONFIG_KEYS.DEST_TASK]) {
-      COLUMN_MAPPING.DESTINATION.TASK = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_TASK].split(' - ')[0]);
-    }
-    if (settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTASK]) {
-      COLUMN_MAPPING.DESTINATION['SUB-TASK'] = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTASK].split(' - ')[0]);
-    }
-    if (settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTRADE]) {
-      COLUMN_MAPPING.DESTINATION['SUB-TRADE'] = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_SUBTRADE].split(' - ')[0]);
-    }
-    if (settings[TEMPLATE_CONFIG_KEYS.DEST_LOCAL]) {
-      COLUMN_MAPPING.DESTINATION.LOCAL = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_LOCAL].split(' - ')[0]);
-    }
-    if (settings[TEMPLATE_CONFIG_KEYS.DEST_DESC]) {
-      COLUMN_MAPPING.DESTINATION.DESC = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_DESC].split(' - ')[0]);
-    }
-    if (settings[TEMPLATE_CONFIG_KEYS.DEST_QTY]) {
-      COLUMN_MAPPING.DESTINATION.QTY = columnLetterToIndex(settings[TEMPLATE_CONFIG_KEYS.DEST_QTY].split(' - ')[0]);
-    }
-
-    // Limpa cache de templates para recarregar
+    // Limpa cache de templates e config para recarregar com novos valores
     templateCache.clear();
+    TemplateConfigService.clearCache();
 
     return { success: true, message: 'Configurações salvas!' };
   } catch (error) {
