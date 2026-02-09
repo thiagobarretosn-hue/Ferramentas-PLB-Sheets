@@ -864,8 +864,9 @@ function getPipesElegiveis() {
     return [];
   }
 
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[K.SOURCE_SHEET]);
-  if (!sourceSheet) return [];
+  // Usa a aba ativa em vez da configurada como fonte
+  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sourceSheet || sourceSheet.getName() === BOM_CONFIG.SHEETS.CONFIG) return [];
   const lastRow = sourceSheet.getLastRow();
   if (lastRow < 2) return [];
   const data = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
@@ -915,8 +916,9 @@ function validarTipoFixacao(section) {
 function processarFixadoresSelecionados(selectedPipes) {
   const config = ConfigService.getAll();
   const K = BOM_CONFIG.KEYS;
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[K.SOURCE_SHEET]);
-  if (!sourceSheet || !selectedPipes || selectedPipes.length === 0) {
+  // Usa a aba ativa em vez da configurada como fonte
+  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sourceSheet || sourceSheet.getName() === BOM_CONFIG.SHEETS.CONFIG || !selectedPipes || selectedPipes.length === 0) {
     return { success: false, message: 'Dados inválidos' };
   }
 
@@ -965,6 +967,8 @@ function processarFixadoresSelecionados(selectedPipes) {
     const formatoOrigem = sourceSheet.getRange(pipe.rowIndex, 1, 1, maxCol);
     formatoOrigem.copyFormatToRange(sourceSheet, 1, maxCol, insertRow, insertRow + linhasParaInserir.length - 1);
     const rangeDestino = sourceSheet.getRange(insertRow, 1, linhasParaInserir.length, maxCol);
+    // Limpa validações de dados copiadas para evitar conflito ao setar valores
+    rangeDestino.clearDataValidations();
     rangeDestino.setValues(linhasParaInserir);
 
     // Restaura fórmulas
@@ -986,8 +990,9 @@ function processarFixadoresSelecionados(selectedPipes) {
 function removerFixadoresSelecionados(selectedPipes) {
   const config = ConfigService.getAll();
   const K = BOM_CONFIG.KEYS;
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(config[K.SOURCE_SHEET]);
-  if (!sourceSheet || !selectedPipes || selectedPipes.length === 0) {
+  // Usa a aba ativa em vez da configurada como fonte
+  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sourceSheet || sourceSheet.getName() === BOM_CONFIG.SHEETS.CONFIG || !selectedPipes || selectedPipes.length === 0) {
     return { success: false, message: 'Dados inválidos' };
   }
 
