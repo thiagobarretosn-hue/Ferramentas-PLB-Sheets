@@ -183,9 +183,11 @@ function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors)
   );
 
   // Ambos IGUAIS (e ambos códigos existem) → verde nos dois lados
+  // IMPORTANTE: usar $ nas colunas para travar referência quando rangeBoth inclui 2 colunas
+  // Sem $, a fórmula desloca no lado direito (ex: G=H vira H=I)
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(' + bothExist + ', ' + L + r + '=' + R + r + ')')
+      .whenFormulaSatisfied('=AND(' + bothExist + ', $' + L + r + '=$' + R + r + ')')
       .setBackground(colors.GREEN)
       .setRanges(rangeBoth)
       .build()
