@@ -110,7 +110,7 @@ LOOP: a cada 3 unidades
 
 **Banco de Dados Central:**
 ```javascript
-const CENTRAL_SPREADSHEET_ID = '1KD_NXdtEjORJJFYwiFc9uzrZeO57TPPSXWh7bokZMdU';
+const CENTRAL_SPREADSHEET_ID = '1IE_NTWtwB9PHlrFsM853SkkVwWttiZxVZPcBDE6qjKk';
 
 // Estrutura:
 // DATA BASE → Templates
@@ -235,7 +235,7 @@ function backendFunction(params) {
 ## 6. DEPENDÊNCIAS EXTERNAS
 
 ### Planilha Central de Templates
-- **ID:** `1KD_NXdtEjORJJFYwiFc9uzrZeO57TPPSXWh7bokZMdU`
+- **ID:** `1IE_NTWtwB9PHlrFsM853SkkVwWttiZxVZPcBDE6qjKk`
 - **Abas:** DATA BASE, Task, SubTrade
 
 ### Google Drive

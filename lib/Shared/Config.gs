@@ -23,7 +23,7 @@
 
 const APP_CONFIG_DEFAULTS = {
   // Template.gs - ID da planilha central de templates
-  CENTRAL_SPREADSHEET_ID: '1KD_NXdtEjORJJFYwiFc9uzrZeO57TPPSXWh7bokZMdU',
+  CENTRAL_SPREADSHEET_ID: '1IE_NTWtwB9PHlrFsM853SkkVwWttiZxVZPcBDE6qjKk',
   CENTRAL_SHEET_NAME: 'DATA BASE',
 
   // SuperBusca.gs - Configuracoes padrao

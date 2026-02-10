@@ -27,7 +27,7 @@
 // Fallback para AppConfig se não estiver definido (lib/Shared/Config.gs)
 const _AppConfigFallback = {
   _defaults: {
-    CENTRAL_SPREADSHEET_ID: '1KD_NXdtEjORJJFYwiFc9uzrZeO57TPPSXWh7bokZMdU',
+    CENTRAL_SPREADSHEET_ID: '1IE_NTWtwB9PHlrFsM853SkkVwWttiZxVZPcBDE6qjKk',
     CENTRAL_SHEET_NAME: 'DATA BASE'
   },
   get: function(key, defaultValue) {
