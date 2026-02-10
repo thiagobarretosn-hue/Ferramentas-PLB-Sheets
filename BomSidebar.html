@@ -212,6 +212,14 @@
       background: #fff;
     }
     
+    /* Botões link inline */
+    .btn-link {
+      background: none; border: none; color: var(--primary);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      padding: 2px 4px; text-decoration: underline;
+    }
+    .btn-link:hover { color: var(--primary-dark, #1a5276); }
+
     /* Aba de Exportar PDF */
     #pdf-list-container {
       max-height: 300px;
@@ -358,7 +366,14 @@
             </div>
           </div>
           <div class="config-section">
-            <h3>Relatórios para Exportar</h3>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <h3 style="margin:0;">Relatórios para Exportar</h3>
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="btn-link" onclick="toggleAllPdfChecks(true)">Todos</button>
+                <span style="color:var(--border);">|</span>
+                <button type="button" class="btn-link" onclick="toggleAllPdfChecks(false)">Nenhum</button>
+              </div>
+            </div>
             <div id="pdf-list-container">
               (Carregando automaticamente...)
             </div>
@@ -866,6 +881,10 @@
         .getReportSheetNamesForHtml();
     }
     
+    function toggleAllPdfChecks(checked) {
+      document.querySelectorAll('.pdf-check').forEach(cb => cb.checked = checked);
+    }
+
     function exportPdfs() {
       const sheetNames = [];
       document.querySelectorAll('.pdf-check:checked').forEach(cb => {
