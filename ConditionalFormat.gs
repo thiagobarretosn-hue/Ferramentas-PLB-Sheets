@@ -21,7 +21,7 @@ const CF_CONFIG = {
   START_ROW: 134,
   END_ROW: 169,
   COLORS: {
-    GREEN:  '#D9EAD3',  // Valor MAIOR
+    GREEN:  '#D9EAD3',  // Valor MAIOR ou IGUAL
     RED:    '#F4CCCC',  // Valor MENOR
     YELLOW: '#FFF2CC'   // Código faltante
   }
@@ -127,6 +127,15 @@ function _addCodeComparisonRules(sheet, rules, startRow, numRows, yellowColor) {
       .build()
   );
 
+  // E e F iguais (ambos preenchidos e batem) → verde
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(E' + startRow + '<>"", F' + startRow + '<>"", E' + startRow + '=F' + startRow + ')')
+      .setBackground(CF_CONFIG.COLORS.GREEN)
+      .setRanges([rangeE, rangeF])
+      .build()
+  );
+
   // E e F diferentes (ambos preenchidos mas não batem)
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
@@ -147,6 +156,15 @@ function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors)
   const L = pair.leftLetter;
   const R = pair.rightLetter;
   const r = startRow;
+
+  // Ambos IGUAIS → verde nos dois lados
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=' + L + r + '=' + R + r)
+      .setBackground(colors.GREEN)
+      .setRanges([rangeLeft, rangeRight])
+      .build()
+  );
 
   // Coluna esquerda (Building) MAIOR → verde
   rules.push(
