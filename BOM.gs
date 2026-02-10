@@ -257,6 +257,7 @@ const ConfigService = {
  * @returns {Array} Valores únicos ordenados
  */
 function getUniqueColumnValues(sheet, columnIndex) {
+  if (!sheet) return [];
   const cacheKey = `unique_${sheet.getSheetId()}_${columnIndex}`;
   const cached = CacheManager.get(cacheKey);
   if (cached) return cached;
