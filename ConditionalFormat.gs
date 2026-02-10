@@ -148,29 +148,53 @@ function _addCodeComparisonRules(sheet, rules, startRow, numRows, yellowColor) {
 }
 
 /**
- * Adiciona regras de comparação de valores (maior/menor) para um par de colunas
+ * Adiciona regras de comparação de valores (maior/menor/igual) para um par de colunas.
+ * Só compara quando AMBOS os códigos existem ($E e $F preenchidos).
+ * Quando código falta num lado → laranja nas colunas de valor correspondentes.
  * @private
  */
 function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors) {
   const rangeLeft  = sheet.getRange(startRow, pair.leftCol, numRows, 1);
   const rangeRight = sheet.getRange(startRow, pair.rightCol, numRows, 1);
+  const rangeBoth  = [rangeLeft, rangeRight];
   const L = pair.leftLetter;
   const R = pair.rightLetter;
   const r = startRow;
 
-  // Ambos IGUAIS → verde nos dois lados
+  // Condição base: ambos os códigos existem
+  const bothExist = '$E' + r + '<>"", $F' + r + '<>""';
+
+  // Código falta no PROJECT (E preenchido, F vazio) → laranja nas duas colunas de valor
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + L + r + '=' + R + r)
+      .whenFormulaSatisfied('=AND($E' + r + '<>"", $F' + r + '="")')
+      .setBackground(colors.ORANGE)
+      .setRanges(rangeBoth)
+      .build()
+  );
+
+  // Código falta no BUILDING (F preenchido, E vazio) → laranja nas duas colunas de valor
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($F' + r + '<>"", $E' + r + '="")')
+      .setBackground(colors.ORANGE)
+      .setRanges(rangeBoth)
+      .build()
+  );
+
+  // Ambos IGUAIS (e ambos códigos existem) → verde nos dois lados
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(' + bothExist + ', ' + L + r + '=' + R + r + ')')
       .setBackground(colors.GREEN)
-      .setRanges([rangeLeft, rangeRight])
+      .setRanges(rangeBoth)
       .build()
   );
 
   // Coluna esquerda (Building) MAIOR → vermelho
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + L + r + '>' + R + r)
+      .whenFormulaSatisfied('=AND(' + bothExist + ', ' + L + r + '>' + R + r + ')')
       .setBackground(colors.RED)
       .setRanges([rangeLeft])
       .build()
@@ -179,7 +203,7 @@ function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors)
   // Coluna esquerda (Building) MENOR → amarelo
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + L + r + '<' + R + r)
+      .whenFormulaSatisfied('=AND(' + bothExist + ', ' + L + r + '<' + R + r + ')')
       .setBackground(colors.YELLOW)
       .setRanges([rangeLeft])
       .build()
@@ -188,7 +212,7 @@ function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors)
   // Coluna direita (Project) MAIOR → vermelho
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + R + r + '>' + L + r)
+      .whenFormulaSatisfied('=AND(' + bothExist + ', ' + R + r + '>' + L + r + ')')
       .setBackground(colors.RED)
       .setRanges([rangeRight])
       .build()
@@ -197,7 +221,7 @@ function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors)
   // Coluna direita (Project) MENOR → amarelo
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + R + r + '<' + L + r)
+      .whenFormulaSatisfied('=AND(' + bothExist + ', ' + R + r + '<' + L + r + ')')
       .setBackground(colors.YELLOW)
       .setRanges([rangeRight])
       .build()
