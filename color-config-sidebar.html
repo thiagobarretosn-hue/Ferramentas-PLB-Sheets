@@ -33,7 +33,7 @@
       font-size:12px; transition:all .2s;
     }
     input[type="range"] { padding: 0; }
-    input[type="text"]:focus, input[type="number"]:focus { outline:none; border-color:#667eea; background:white; box-shadow:0 0 0 3px rgba(102,126,234,0.1); }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { outline:none; border-color:#667eea; background:white; box-shadow:0 0 0 3px rgba(102,126,234,0.1); }
     .range-group { display: flex; align-items: center; gap: 10px; }
     .range-group span { font-weight: 500; color: #667eea; min-width: 30px; text-align: right; }
     .checkbox-group { display:flex; align-items:center; gap:8px; padding:8px 0; }
@@ -89,8 +89,10 @@
       <input type="text" id="column-range" placeholder="A:O">
     </div>
     <div class="form-group">
-      <label for="group-column">Coluna de Agrupamento (ex: A)</label>
-      <input type="text" id="group-column" placeholder="A">
+      <label for="group-column">Coluna de Agrupamento</label>
+      <select id="group-column" style="width:100%; padding:8px 12px; border:2px solid #e1e8ed; border-radius:8px; background:#f8f9fa; font-size:12px;">
+        <option value="">Selecione...</option>
+      </select>
     </div>
     <div class="checkbox-group">
       <input type="checkbox" id="automatic-coloring">
@@ -138,6 +140,7 @@
     let currentGroups = [];
     let sheetName = '';
     let groupColors = {};
+    let sheetHeaders = [];
 
     // --- DOM Elements ---
     const elements = {
@@ -169,7 +172,9 @@
           currentGroups = data.currentGroups;
           sheetName = data.sheetName;
           groupColors = config.groupColors || {};
-          
+          sheetHeaders = data.headers || [];
+
+          populateGroupColumnDropdown();
           initializeUI();
           renderColorGroups();
           disableButtons(false);
@@ -180,6 +185,17 @@
         })
         .getInitialDataForSidebar();
     });
+
+    function populateGroupColumnDropdown() {
+      const select = elements.groupColumn;
+      select.innerHTML = '<option value="">Selecione...</option>';
+      sheetHeaders.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h.letter;
+        opt.textContent = h.label;
+        select.appendChild(opt);
+      });
+    }
 
     function initializeUI() {
         elements.sheetNameDisplay.textContent = sheetName;

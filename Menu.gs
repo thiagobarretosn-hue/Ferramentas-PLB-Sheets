@@ -96,15 +96,16 @@ function onOpen() {
 
 /**
  * Gerencia todos os triggers de edição do sistema
- * Redireciona para os handlers apropriados baseado na aba editada
  *
  * IMPORTANTE: Simple trigger - limite de 30 segundos
  * - Não pode acessar PropertiesService
  * - Não pode enviar emails
  * - Não pode criar arquivos no Drive
  *
- * Handlers registrados:
- * - onEditColorTrigger() - Coloração automática por grupo
+ * NOTA: Coloração automática é gerenciada por installable trigger
+ *       (onEditColorTrigger) criado em saveColorConfiguration().
+ *       Simple triggers NÃO podem acessar PropertiesService,
+ *       por isso a lógica de cores não pode ficar aqui.
  *
  * @trigger onEdit - Executada automaticamente ao editar uma célula
  * @param {GoogleAppsScript.Events.SheetsOnEdit} e - Evento de edição
@@ -113,26 +114,6 @@ function onOpen() {
 function onEdit(e) {
   if (!e || !e.source || !e.range) return;
 
-  try {
-    const sheet = e.source.getActiveSheet();
-    const sheetName = sheet.getName();
-
-    // ========================================
-    // TRIGGER: Coloracao automatica
-    // ========================================
-    if (typeof onEditColorTrigger === 'function') {
-      const allConfigs = getAllColorConfigs();
-      const config = allConfigs[sheetName];
-
-      if (config && config.automaticColoring) {
-        const editedCol = e.range.getColumn();
-        if (editedCol === config.groupCol) {
-          onEditColorTrigger(e);
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error(`[onEdit] Erro: ${error.message}`);
-  }
+  // Extensões futuras de simple trigger vão aqui
+  // (apenas funcionalidades que NÃO precisem de PropertiesService)
 }

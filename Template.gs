@@ -269,13 +269,25 @@ function saveColorConfiguration(configData, sheetName) {
 }
 
 function onEditColorTrigger(e) {
-  const sheet = e.source.getActiveSheet();
-  const sheetName = sheet.getName();
-  const allConfigs = getAllColorConfigs();
-  const config = allConfigs[sheetName];
+  if (!e || !e.source || !e.range) return;
 
-  if (config && config.automaticColoring && e.range.getColumn() === config.groupCol) {
-    applyGroupColors(sheetName, config);
+  try {
+    const sheet = e.source.getActiveSheet();
+    const sheetName = sheet.getName();
+    const allConfigs = getAllColorConfigs();
+    const config = allConfigs[sheetName];
+
+    if (!config || !config.automaticColoring) return;
+
+    const editedRow = e.range.getRow();
+    const editedCol = e.range.getColumn();
+
+    // Recolorir quando qualquer célula na região de dados é editada
+    if (editedRow >= config.startRow && editedCol >= config.startCol && editedCol <= config.endCol) {
+      applyGroupColors(sheetName, config);
+    }
+  } catch (error) {
+    console.error('[onEditColorTrigger] Erro: ' + error.message);
   }
 }
 
@@ -1241,10 +1253,22 @@ function getInitialDataForSidebar() {
 
   const currentGroups = getCurrentGroups(sheet, config.startRow, config.groupCol);
 
+  // Cabeçalhos da aba para dropdown de seleção de coluna
+  const lastCol = sheet.getLastColumn();
+  const headers = [];
+  if (lastCol > 0) {
+    const headerValues = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    headerValues.forEach((h, i) => {
+      const letter = numberToColumnLetter(i + 1);
+      headers.push({ letter: letter, name: h ? String(h) : '', label: letter + (h ? ' - ' + h : '') });
+    });
+  }
+
   return {
     config: config,
     currentGroups: currentGroups,
-    sheetName: sheetName
+    sheetName: sheetName,
+    headers: headers
   };
 }
 
