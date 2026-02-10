@@ -1,6 +1,6 @@
 /**
  * @fileoverview Menu Principal - Ferramentas PLB Sheets
- * @version 1.1.0
+ * @version 2.0.0 - V3.0 Arquitetura independente (sem aba Config)
  *
  * Este arquivo centraliza todos os menus e funções onOpen do sistema.
  * Facilita a adição ou remoção de funcionalidades do menu principal.
@@ -39,17 +39,15 @@ function onOpen() {
   // MENU: RELATÓRIOS DINÂMICOS (BOM)
   // ========================================
   ui.createMenu('🔧 Relatórios Dinâmicos')
-    .addItem('⚙️ Painel de Controle (Sidebar)', 'openConfigSidebar')
     .addItem('📊 Gerador de BOM (Painel)', 'openBomSidebar')
     .addSeparator()
     .addItem('🔧 Fixadores → Fonte', 'abrirSeletorFixadores')
     .addSeparator()
-    .addItem('📄 Exportar PDFs (da Aba Config)', 'exportPDFsWithFeedback')
+    .addItem('📄 Exportar PDFs', 'exportPDFsWithFeedback')
     .addSeparator()
     .addItem('🗑️ Limpar Relatórios', 'clearOldReports')
     .addItem('🔄 Limpar Cache', 'forceRefreshCache')
     .addItem('🧪 Diagnóstico', 'testSystem')
-    .addItem('🔧 Recriar Config', 'forceCreateConfig')
     .addToUi();
 
   // ========================================
@@ -90,11 +88,6 @@ function onOpen() {
     .addItem('🔧 Configuracoes Gerais', 'showConfigDialog')
     .addToUi();
 
-  // ========================================
-  // INICIALIZAÇÃO
-  // ========================================
-  // Garante que a aba Config existe (BOM)
-  ensureConfigExists();
 }
 
 // ============================================================================
@@ -111,19 +104,13 @@ function onOpen() {
  * - Não pode criar arquivos no Drive
  *
  * Handlers registrados:
- * - Aba 'Config': onEditBom() - Atualiza interface de configuração do BOM
- * - Outras abas: onEditColorTrigger() - Coloração automática por grupo
+ * - onEditColorTrigger() - Coloração automática por grupo
  *
  * @trigger onEdit - Executada automaticamente ao editar uma célula
  * @param {GoogleAppsScript.Events.SheetsOnEdit} e - Evento de edição
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} e.source - Planilha
- * @param {GoogleAppsScript.Spreadsheet.Range} e.range - Range editado
- * @param {*} e.value - Novo valor da célula
- * @param {*} e.oldValue - Valor anterior da célula
  * @returns {void}
  */
 function onEdit(e) {
-  // Validacao rapida do evento
   if (!e || !e.source || !e.range) return;
 
   try {
@@ -131,24 +118,14 @@ function onEdit(e) {
     const sheetName = sheet.getName();
 
     // ========================================
-    // TRIGGER: BOM Config
-    // ========================================
-    if (sheetName === 'Config' && typeof onEditBom === 'function') {
-      onEditBom(e);
-      return; // Sai cedo - aba Config e exclusiva do BOM
-    }
-
-    // ========================================
     // TRIGGER: Coloracao automatica
     // ========================================
     if (typeof onEditColorTrigger === 'function') {
-      // Verifica se ha configuracao de cores para esta aba
       const allConfigs = getAllColorConfigs();
       const config = allConfigs[sheetName];
 
       if (config && config.automaticColoring) {
         const editedCol = e.range.getColumn();
-        // So processa se editou a coluna de grupo
         if (editedCol === config.groupCol) {
           onEditColorTrigger(e);
         }
@@ -156,7 +133,6 @@ function onEdit(e) {
     }
 
   } catch (error) {
-    // Log silencioso - nao interrompe o usuario
     console.error(`[onEdit] Erro: ${error.message}`);
   }
 }

@@ -215,11 +215,84 @@
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--text-light); }
+
+    /* ===== CONFIG PANEL ===== */
+    .config-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 20px; background: #fff3cd; cursor: pointer;
+      border-bottom: 1px solid var(--border); font-size: 12px;
+      font-weight: 500; color: #856404; flex-shrink: 0;
+    }
+    .config-toggle:hover { background: #ffeeba; }
+    .config-toggle .arrow { transition: transform 0.2s; }
+    .config-toggle.open .arrow { transform: rotate(180deg); }
+    .config-body {
+      display: none; padding: 12px 20px; background: white;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .config-body.open { display: block; }
+    .config-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .config-grid .form-group { margin-bottom: 4px; }
+    .config-grid label {
+      display: block; font-size: 11px; font-weight: 500;
+      margin-bottom: 2px; color: var(--text-light);
+    }
+    .config-grid select {
+      width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+      border-radius: 4px; font-size: 11px; font-family: inherit;
+      background: var(--bg);
+    }
+    .config-grid select:focus {
+      outline: none; border-color: var(--primary);
+    }
+    .config-actions {
+      margin-top: 8px; text-align: right;
+    }
+    .btn-save-config {
+      padding: 6px 16px; background: var(--success); color: white;
+      border: none; border-radius: 4px; font-size: 11px;
+      font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .btn-save-config:hover { filter: brightness(1.1); }
   </style>
 </head>
 <body>
   <div class="header">
     <h2>🔧 Incluir Fixadores</h2>
+  </div>
+
+  <div class="config-toggle" id="configToggle">
+    <span>⚙️ Mapeamento de Colunas</span>
+    <span class="arrow">▼</span>
+  </div>
+  <div class="config-body" id="configBody">
+    <div class="config-grid">
+      <div class="form-group">
+        <label>Coluna Seção (RISER/COLG.)</label>
+        <select id="cfgSection"></select>
+      </div>
+      <div class="form-group">
+        <label>Coluna Descrição (PIPE)</label>
+        <select id="cfgDesc"></select>
+      </div>
+      <div class="form-group">
+        <label>Coluna Quantidade</label>
+        <select id="cfgQty"></select>
+      </div>
+      <div class="form-group">
+        <label>Coluna UOM</label>
+        <select id="cfgUom"></select>
+      </div>
+      <div class="form-group">
+        <label>Coluna Trade (FIX)</label>
+        <select id="cfgTrade"></select>
+      </div>
+    </div>
+    <div class="config-actions">
+      <button class="btn-save-config" id="btnSaveConfig">Salvar e Recarregar</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -302,8 +375,75 @@
     let filteredPipes = [];
     let currentTab = 'all';
 
+    // ===== CONFIG PANEL =====
+    const CONFIG_KEY_MAP = {
+      'cfgSection': 'Fixador: Coluna Seção',
+      'cfgDesc': 'Fixador: Coluna Descrição',
+      'cfgQty': 'Fixador: Coluna Quantidade',
+      'cfgUom': 'Fixador: Coluna UOM',
+      'cfgTrade': 'Fixador: Coluna Trade (FIX)'
+    };
+
+    function initConfigPanel() {
+      // Toggle
+      document.getElementById('configToggle').addEventListener('click', () => {
+        document.getElementById('configToggle').classList.toggle('open');
+        document.getElementById('configBody').classList.toggle('open');
+      });
+
+      // Save button
+      document.getElementById('btnSaveConfig').addEventListener('click', saveAndReload);
+
+      // Load columns and current config
+      google.script.run
+        .withSuccessHandler(columns => {
+          google.script.run
+            .withSuccessHandler(savedConfig => {
+              populateConfigDropdowns(columns, savedConfig);
+            })
+            .withFailureHandler(err => showStatus('Erro ao carregar config: ' + err.message, 'error'))
+            .getFixadorConfig();
+        })
+        .withFailureHandler(err => showStatus('Erro ao carregar colunas: ' + err.message, 'error'))
+        .getActiveSheetColumns();
+    }
+
+    function populateConfigDropdowns(columns, savedConfig) {
+      for (const [selectId, configKey] of Object.entries(CONFIG_KEY_MAP)) {
+        const select = document.getElementById(selectId);
+        select.options.length = 0;
+        select.add(new Option('-- Selecione --', ''));
+        columns.forEach(col => {
+          const opt = new Option(col, col);
+          opt.selected = (col === savedConfig[configKey]);
+          select.add(opt);
+        });
+      }
+    }
+
+    function saveAndReload() {
+      const config = {};
+      for (const [selectId, configKey] of Object.entries(CONFIG_KEY_MAP)) {
+        config[configKey] = document.getElementById(selectId).value;
+      }
+
+      showStatus('Salvando configuração...', 'info');
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result.success) {
+            showStatus('Configuração salva! Recarregando tubos...', 'success');
+            loadPipeData();
+          } else {
+            showStatus('Erro ao salvar: ' + result.message, 'error');
+          }
+        })
+        .withFailureHandler(err => showStatus('Erro: ' + err.message, 'error'))
+        .saveFixadorConfig(config);
+    }
+
     // ===== INICIALIZAÇÃO =====
     window.addEventListener('load', () => {
+      initConfigPanel();
       loadPipeData();
     });
 

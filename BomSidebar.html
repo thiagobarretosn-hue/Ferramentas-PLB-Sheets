@@ -495,8 +495,21 @@
     }
     
     function onSourceSheetChange() {
-      showStatus('Para mudar a "Aba Origem", por favor, use a aba "Config" e recarregue este painel (F5).', 'info');
-      document.getElementById('sourceSheetSelect').value = currentConfig[CONFIG_KEYS.SOURCE_SHEET];
+      const newSource = document.getElementById('sourceSheetSelect').value;
+      if (!newSource) return;
+      currentConfig[CONFIG_KEYS.SOURCE_SHEET] = newSource;
+
+      showStatus('Carregando colunas da nova aba...', 'info');
+      google.script.run
+        .withSuccessHandler(columns => {
+          allColumns = columns || [];
+          populateGroupDropdowns();
+          populateReportConfig();
+          saveState();
+          loadPanels();
+        })
+        .withFailureHandler(onError)
+        .getSheetColumnsByName(newSource);
     }
 
     // Popula "1. Agrupamento"
@@ -569,6 +582,7 @@
                                  <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Carregando...)</div></div>`;
           
           // Retorna uma promessa que resolve quando o painel está pronto
+          const sheetName = document.getElementById('sourceSheetSelect').value;
           return new Promise((resolve, reject) => {
             google.script.run
               .withSuccessHandler(values => {
@@ -579,7 +593,7 @@
                 onError(err);
                 reject(err);
               })
-              .getUniqueValuesForColumn(level.colName);
+              .getUniqueValuesForColumn(level.colName, sheetName);
           });
         } else {
           container.innerHTML = `<div class="panel-header" style="background: var(--disabled-text);">${level.id.replace('panel-', 'NÍVEL ')}</div>
@@ -694,17 +708,18 @@
       showStatus('Atualizando pré-visualização...', 'info');
       document.getElementById('generateBtn').disabled = true;
 
+      const sheetName = document.getElementById('sourceSheetSelect').value;
       google.script.run
         .withSuccessHandler(combinations => {
           buildPreviewTable(combinations);
           if (savedState) {
             applyPreviewState(savedState.kojoState, savedState.previewState);
           }
-          saveState(); // Salva o estado da pré-visualização
+          saveState();
           showStatus('Pré-visualização atualizada!', 'success');
         })
         .withFailureHandler(onError)
-        .getCombinationsForPreview(selectedGroups, groupConfigs);
+        .getCombinationsForPreview(selectedGroups, groupConfigs, sheetName);
     }
     
     function buildPreviewTable(combinations) {
