@@ -1,5 +1,4 @@
 /**
- * @OnlyCurrentDoc
  * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS + FIXADORES (BOM)
  * @version 3.0.0 - Arquitetura independente (sem aba Config)
  *
