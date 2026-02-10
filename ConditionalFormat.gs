@@ -102,45 +102,50 @@ function clearComparisonFormatting() {
 // ============================================================
 
 /**
- * Adiciona regras para comparação de códigos (E vs F)
- * - Laranja quando código existe num lado mas falta no outro
+ * Adiciona regras para comparação de códigos (E vs F).
+ * REGRA: todas as fórmulas com rangeF ou [rangeE,rangeF] precisam de $ nas colunas
+ *        para evitar deslocamento quando a fórmula é avaliada em células de colunas
+ *        diferentes do ponto de ancoragem.
  * @private
  */
-function _addCodeComparisonRules(sheet, rules, startRow, numRows, yellowColor) {
-  const rangeE = sheet.getRange(startRow, 5, numRows, 1);  // E
-  const rangeF = sheet.getRange(startRow, 6, numRows, 1);  // F
+function _addCodeComparisonRules(sheet, rules, startRow, numRows, orangeColor) {
+  const rangeE = sheet.getRange(startRow, 5, numRows, 1);  // col E
+  const rangeF = sheet.getRange(startRow, 6, numRows, 1);  // col F
+  const r      = startRow;
 
-  // E tem valor mas F está vazio → falta no projeto
+  // E tem valor mas F está vazio → falta no projeto  (range único: sem risco de deslocamento)
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(E' + startRow + '<>"", F' + startRow + '="")')
-      .setBackground(yellowColor)
+      .whenFormulaSatisfied('=AND($E' + r + '<>"", $F' + r + '="")')
+      .setBackground(orangeColor)
       .setRanges([rangeE])
       .build()
   );
 
-  // F tem valor mas E está vazio → falta no building
+  // F tem valor mas E está vazio → falta no building  (range único: sem risco de deslocamento)
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(F' + startRow + '<>"", E' + startRow + '="")')
-      .setBackground(yellowColor)
+      .whenFormulaSatisfied('=AND($F' + r + '<>"", $E' + r + '="")')
+      .setBackground(orangeColor)
       .setRanges([rangeF])
       .build()
   );
 
-  // E e F iguais (ambos preenchidos e batem) → verde
+  // E e F IGUAIS → verde
+  // $ obrigatório: [rangeE, rangeF] = 2 colunas → sem $, F desloca para G
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(E' + startRow + '<>"", F' + startRow + '<>"", E' + startRow + '=F' + startRow + ')')
+      .whenFormulaSatisfied('=AND($E' + r + '<>"", $F' + r + '<>"", $E' + r + '=$F' + r + ')')
       .setBackground(CF_CONFIG.COLORS.GREEN)
       .setRanges([rangeE, rangeF])
       .build()
   );
 
-  // E e F diferentes (ambos preenchidos mas não batem) → laranja
+  // E e F DIFERENTES → laranja
+  // $ obrigatório: [rangeE, rangeF] = 2 colunas → sem $, E/F deslocam para F/G
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(E' + startRow + '<>"", F' + startRow + '<>"", E' + startRow + '<>F' + startRow + ')')
+      .whenFormulaSatisfied('=AND($E' + r + '<>"", $F' + r + '<>"", $E' + r + '<>$F' + r + ')')
       .setBackground(CF_CONFIG.COLORS.ORANGE)
       .setRanges([rangeE, rangeF])
       .build()
