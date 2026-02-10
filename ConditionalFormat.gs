@@ -21,9 +21,10 @@ const CF_CONFIG = {
   START_ROW: 134,
   END_ROW: 169,
   COLORS: {
-    GREEN:  '#D9EAD3',  // Valor MAIOR ou IGUAL
-    RED:    '#F4CCCC',  // Valor MENOR
-    YELLOW: '#FFF2CC'   // Código faltante
+    GREEN:  '#D9EAD3',  // Valores IGUAIS
+    RED:    '#F4CCCC',  // Valor MAIOR
+    YELLOW: '#FFF2CC',  // Valor MENOR
+    ORANGE: '#FCE5CD'   // Código faltante / diferente
   }
 };
 
@@ -45,7 +46,7 @@ function setupComparisonFormatting() {
   const newRules = [];
 
   // ─── Par E-F: Comparação de CÓDIGOS (faltantes) ───
-  _addCodeComparisonRules(sheet, newRules, START_ROW, numRows, COLORS.YELLOW);
+  _addCodeComparisonRules(sheet, newRules, START_ROW, numRows, COLORS.ORANGE);
 
   // ─── Pares de VALORES: G-H, I-J, K-L ───
   const valuePairs = [
@@ -102,7 +103,7 @@ function clearComparisonFormatting() {
 
 /**
  * Adiciona regras para comparação de códigos (E vs F)
- * - Amarelo quando código existe num lado mas falta no outro
+ * - Laranja quando código existe num lado mas falta no outro
  * @private
  */
 function _addCodeComparisonRules(sheet, rules, startRow, numRows, yellowColor) {
@@ -136,11 +137,11 @@ function _addCodeComparisonRules(sheet, rules, startRow, numRows, yellowColor) {
       .build()
   );
 
-  // E e F diferentes (ambos preenchidos mas não batem)
+  // E e F diferentes (ambos preenchidos mas não batem) → laranja
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=AND(E' + startRow + '<>"", F' + startRow + '<>"", E' + startRow + '<>F' + startRow + ')')
-      .setBackground('#FCE5CD')  // Laranja claro
+      .setBackground(CF_CONFIG.COLORS.ORANGE)
       .setRanges([rangeE, rangeF])
       .build()
   );
@@ -166,38 +167,38 @@ function _addValueComparisonRules(sheet, rules, startRow, numRows, pair, colors)
       .build()
   );
 
-  // Coluna esquerda (Building) MAIOR → verde
+  // Coluna esquerda (Building) MAIOR → vermelho
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + L + r + '>' + R + r)
-      .setBackground(colors.GREEN)
-      .setRanges([rangeLeft])
-      .build()
-  );
-
-  // Coluna esquerda (Building) MENOR → vermelho
-  rules.push(
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + L + r + '<' + R + r)
       .setBackground(colors.RED)
       .setRanges([rangeLeft])
       .build()
   );
 
-  // Coluna direita (Project) MAIOR → verde
+  // Coluna esquerda (Building) MENOR → amarelo
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=' + L + r + '<' + R + r)
+      .setBackground(colors.YELLOW)
+      .setRanges([rangeLeft])
+      .build()
+  );
+
+  // Coluna direita (Project) MAIOR → vermelho
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + R + r + '>' + L + r)
-      .setBackground(colors.GREEN)
+      .setBackground(colors.RED)
       .setRanges([rangeRight])
       .build()
   );
 
-  // Coluna direita (Project) MENOR → vermelho
+  // Coluna direita (Project) MENOR → amarelo
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + R + r + '<' + L + r)
-      .setBackground(colors.RED)
+      .setBackground(colors.YELLOW)
       .setRanges([rangeRight])
       .build()
   );
