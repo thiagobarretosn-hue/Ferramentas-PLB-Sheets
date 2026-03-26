@@ -1,119 +1,37 @@
 /**
- * @fileoverview Menu Principal - Ferramentas PLB Sheets
- * @version 2.0.0 - V3.0 Arquitetura independente (sem aba Config)
+ * @fileoverview Menu Principal - AMBAR TOOL (branch Cost)
+ * @version 1.0.0
  *
- * Este arquivo centraliza todos os menus e funções onOpen do sistema.
- * Facilita a adição ou remoção de funcionalidades do menu principal.
- *
- * IMPORTANTE: Este é o único arquivo que deve conter funções onOpen e onEdit.
- * Todas as outras funcionalidades devem ser chamadas a partir daqui.
- *
- * Menus Disponíveis:
- * - 🔧 Relatórios Dinâmicos (BOM) - Geração e exportação de relatórios
- * - 🏗️ PLB Templates - Sistema de templates
- * - 📑 Gerenciar Abas - Organização e cores de abas
- * - 🔍 Super Busca - Busca rápida de materiais
- * - ⚙️ Configurações - Configurações gerais do sistema
+ * Aplicações ativas neste branch:
+ * - Gerenciador de Abas (SheetManager.gs)
+ * - Super Busca (SuperBusca.gs)
  */
 
 // ============================================================================
-// FUNÇÃO PRINCIPAL - onOpen (TRIGGER SIMPLES)
+// FUNÇÃO PRINCIPAL - onOpen
 // ============================================================================
 
 /**
- * Cria todos os menus quando a planilha é aberta
- * Esta é a ÚNICA função onOpen que deve existir no projeto
- *
- * IMPORTANTE: Simple triggers têm limitações:
- * - Não podem acessar serviços que requerem autorização (não se aplica a createMenu)
- * - Tempo máximo de execução de 30 segundos
- * - Não podem fazer alterações que afetem outros usuários
- *
- * @trigger onOpen - Executada automaticamente ao abrir a planilha
- * @returns {void}
+ * Cria o menu AMBAR TOOL ao abrir a planilha
+ * @trigger onOpen
  */
 function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-
-  // ========================================
-  // MENU: RELATÓRIOS DINÂMICOS (BOM)
-  // ========================================
-  ui.createMenu('🔧 Relatórios Dinâmicos')
-    .addItem('📊 Gerador de BOM (Painel)', 'openBomSidebar')
+  SpreadsheetApp.getUi()
+    .createMenu('AMBAR TOOL')
+    .addItem('📑 Gerenciador de Abas', 'showSheetManager')
     .addSeparator()
-    .addItem('🔧 Fixadores → Fonte', 'abrirSeletorFixadores')
-    .addSeparator()
-    .addItem('📄 Exportar PDFs', 'exportPDFsWithFeedback')
-    .addSeparator()
-    .addItem('🗑️ Limpar Relatórios', 'clearOldReports')
-    .addItem('🔄 Limpar Cache', 'forceRefreshCache')
-    .addItem('🧪 Diagnóstico', 'testSystem')
+    .addItem('🔍 Super Busca', 'abrirSuperBuscaSidebar')
     .addToUi();
-
-  // ========================================
-  // MENU: PLB TEMPLATES
-  // ========================================
-  ui.createMenu('🏗️ PLB Templates')
-    .addItem('📋 Abrir Sidebar', 'openTemplateSidebar')
-    .addItem('🔄 Atualizar Templates', 'refreshTemplates')
-    .addSeparator()
-    .addItem('➕ Criar Template da Seleção', 'createTemplateFromSelection')
-    .addItem('⚙️ Configurar Sistema', 'openSystemConfig')
-    .addSeparator()
-    .addItem('📂 Abrir Base de Dados', 'openCentralDatabase')
-    .addItem('🧪 Testar Sistema', 'testSystemTemplate')
-    .addItem('Substituir SHELL em FIRESTOP', 'substituirShellFirestop')
-    .addToUi();
-
-  // ========================================
-  // MENU: GERENCIAR ABAS
-  // ========================================
-  ui.createMenu('📑 Gerenciar Abas')
-    .addItem('Gerenciador de Abas', 'showSheetManager')
-    .addItem('🎨 Configurar Cores', 'openColorConfig')
-    .addItem('✨ Aplicar Cores', 'applyGroupColors')
-    .addToUi();
-
-  // ========================================
-  // MENU: SUPER BUSCA
-  // ========================================
-  ui.createMenu('🔍 Super Busca')
-    .addItem('🚀 Abrir Painel', 'abrirSuperBuscaSidebar')
-    .addToUi();
-
-  // ========================================
-  // MENU: CONFIGURACOES DO SISTEMA
-  // ========================================
-  ui.createMenu('⚙️ Configuracoes')
-    .addItem('🔧 Configuracoes Gerais', 'showConfigDialog')
-    .addToUi();
-
 }
 
 // ============================================================================
-// FUNCAO onEdit - TRIGGER DE EDIÇÃO
+// TRIGGER DE EDIÇÃO
 // ============================================================================
 
 /**
- * Gerencia todos os triggers de edição do sistema
- *
- * IMPORTANTE: Simple trigger - limite de 30 segundos
- * - Não pode acessar PropertiesService
- * - Não pode enviar emails
- * - Não pode criar arquivos no Drive
- *
- * NOTA: Coloração automática é gerenciada por installable trigger
- *       (onEditColorTrigger) criado em saveColorConfiguration().
- *       Simple triggers NÃO podem acessar PropertiesService,
- *       por isso a lógica de cores não pode ficar aqui.
- *
- * @trigger onEdit - Executada automaticamente ao editar uma célula
- * @param {GoogleAppsScript.Events.SheetsOnEdit} e - Evento de edição
- * @returns {void}
+ * @trigger onEdit
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e
  */
 function onEdit(e) {
   if (!e || !e.source || !e.range) return;
-
-  // Extensões futuras de simple trigger vão aqui
-  // (apenas funcionalidades que NÃO precisem de PropertiesService)
 }

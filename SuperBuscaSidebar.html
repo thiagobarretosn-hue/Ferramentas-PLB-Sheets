@@ -111,6 +111,7 @@
     const DEFAULT_COL_INDEX = 6;
 
     window.onload = () => {
+      document.getElementById('searchInput').addEventListener('input', runFilter);
       google.script.run.withSuccessHandler(populateSheetSelect).getSheetList();
     };
 
@@ -191,7 +192,6 @@
       updateFooter();
       const currentSearch = document.getElementById('searchInput').value;
       if (currentSearch) runFilter();
-      document.getElementById('searchInput').addEventListener('input', runFilter);
     }
 
     function runFilter() {
@@ -269,9 +269,14 @@
           selectedSet.clear();
           document.querySelectorAll('.result-item.selected').forEach(el => el.classList.remove('selected'));
           updateFooter();
-          btn.innerText = "SUCESSO!";
+          btn.innerText = 'SUCESSO!';
           setTimeout(() => updateFooter(), 1500);
           document.getElementById('searchInput').focus();
+        })
+        .withFailureHandler(err => {
+          btn.innerText = 'ERRO';
+          setTimeout(() => updateFooter(), 2000);
+          console.error('Erro ao inserir:', err.message);
         })
         .inserirItensSelecionados(itens);
     }
