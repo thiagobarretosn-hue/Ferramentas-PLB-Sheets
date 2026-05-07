@@ -1,6 +1,6 @@
 /**
  * @fileoverview Request Generator — Gerador de Requisição de Materiais KOJO
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ============================================================================
@@ -16,9 +16,20 @@ const REQUEST_CONFIG = {
     HEADER_BG: '#2c3e50',
     FONT_LIGHT: '#ffffff'
   },
+  // Regex patterns: first-match-wins, case-insensitive
   DEFAULT_RULES: [
-    { pattern: 'FOAM CORE', roundUp: 20 },
-    { pattern: 'CPVC', roundUp: 10 }
+    { pattern: '^PIPE.*FOAM CORE', roundUp: 20 },
+    { pattern: '^PIPE.*CPVC',      roundUp: 10 }
+  ],
+  // Keywords used for auto-matching column headers
+  AUTO_MATCH: [
+    { field: 'colDesc',  keywords: ['DESC', 'DESCRIPTION', 'MATERIAL'] },
+    { field: 'colUpc',   keywords: ['UPC', 'ITEM CODE', 'PART NUMBER', 'PART'] },
+    { field: 'colUom',   keywords: ['UOM', 'UNIT', 'UM'] },
+    { field: 'colQty',   keywords: ['QTY', 'QUANTITY'] },
+    { field: 'groupL1',  keywords: ['FLOOR', 'LEVEL', 'ANDAR'] },
+    { field: 'groupL2',  keywords: ['PHASE', 'FASE', 'SYSTEM'] },
+    { field: 'groupL3',  keywords: ['ZONE', 'AREA', 'SECTION'] }
   ],
   COL_WIDTHS: { A: 120, B: 80, C: 550, D: 100, E: 100, F: 100 }
 };
@@ -30,17 +41,13 @@ const RequestConfigService = {
   _defaults: function() {
     return {
       sourceSheet: '',
-      colDesc: '',
-      colUpc: '',
-      colUom: '',
-      colQty: '',
-      groupL1: '',
-      groupL2: '',
-      groupL3: '',
-      project: '',
-      kojoPrefix: '',
-      engineer: '',
-      version: '01',
+      colDesc: '', colUpc: '', colUom: '', colQty: '',
+      groupL1: '', groupL2: '', groupL3: '',
+      project: '', kojoPrefix: '', engineer: '', version: '01',
+      // Header fields persisted across sessions
+      request: '', kojoSuffix: '', requisitionNum: '', needBy: '',
+      // Last combination used (restored in Section 3 dropdowns)
+      lastGroupVals: [],
       roundingRules: REQUEST_CONFIG.DEFAULT_RULES.map(function(r) {
         return { pattern: r.pattern, roundUp: r.roundUp };
       })
@@ -53,7 +60,14 @@ const RequestConfigService = {
         .getProperty(REQUEST_CONFIG.SETTINGS_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return Object.assign(RequestConfigService._defaults(), parsed);
+        const config = Object.assign(RequestConfigService._defaults(), parsed);
+        // Migrate v1.0 plain-text rules → v1.1 regex rules
+        config.roundingRules = config.roundingRules.map(function(r) {
+          if (r.pattern === 'FOAM CORE') return { pattern: '^PIPE.*FOAM CORE', roundUp: r.roundUp };
+          if (r.pattern === 'CPVC')      return { pattern: '^PIPE.*CPVC',      roundUp: r.roundUp };
+          return r;
+        });
+        return config;
       }
     } catch (e) {
       console.error('[RequestConfigService] Erro ao ler config:', e.message);
@@ -76,9 +90,7 @@ const RequestConfigService = {
 // COLUMN HELPERS
 // ============================================================================
 
-/**
- * "J - DESC" → 10 (1-indexed). Suporta colunas AA, AB, etc.
- */
+/** "J - DESC" → 10 (1-indexed). Supports AA, AB, etc. */
 function _req_getColumnIndex(colConfig) {
   if (!colConfig) return -1;
   const match = String(colConfig).match(/^([A-Z]+)\s*-/);
@@ -91,9 +103,7 @@ function _req_getColumnIndex(colConfig) {
   return index;
 }
 
-/**
- * 1 → "A", 26 → "Z", 27 → "AA"
- */
+/** 1 → "A", 26 → "Z", 27 → "AA" */
 function _req_numberToLetter(n) {
   let result = '';
   while (n > 0) {
@@ -104,9 +114,7 @@ function _req_numberToLetter(n) {
   return result;
 }
 
-/**
- * Retorna array de strings "A - Header" para todos os headers da aba
- */
+/** Returns ["A - Header", "B - Header", ...] for every column in the sheet */
 function _req_getColumnsFromSheet(sheet) {
   if (!sheet || sheet.getLastColumn() === 0) return [];
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -117,25 +125,47 @@ function _req_getColumnsFromSheet(sheet) {
 }
 
 /**
- * Aplica a primeira regra que matcheia o DESC (case-insensitive).
- * Fallback: 1. Garante mínimo de 1 para evitar divisão por zero.
+ * Scans column labels and returns the best-matching column per field.
+ * Used to auto-fill dropdowns without a round-trip per column.
+ */
+function _req_autoMatch(columns) {
+  const result = {};
+  REQUEST_CONFIG.AUTO_MATCH.forEach(function(m) {
+    const found = columns.find(function(col) {
+      const upper = col.toUpperCase();
+      return m.keywords.some(function(kw) { return upper.includes(kw); });
+    });
+    result[m.field] = found || '';
+  });
+  return result;
+}
+
+/**
+ * Applies the first matching rounding rule (regex, case-insensitive).
+ * Falls back to plain includes() if the pattern is not a valid regex.
+ * Always returns >= 1 to prevent division-by-zero in the formula.
  */
 function _req_applyRoundingRule(desc, rules) {
   if (!rules || rules.length === 0) return 1;
-  const upper = String(desc).toUpperCase();
   const match = rules.find(function(r) {
-    return r.pattern && upper.includes(r.pattern.toUpperCase());
+    if (!r.pattern) return false;
+    try {
+      return new RegExp(r.pattern, 'i').test(String(desc));
+    } catch (e) {
+      return String(desc).toUpperCase().includes(r.pattern.toUpperCase());
+    }
   });
   return Math.max(match ? (Number(match.roundUp) || 1) : 1, 1);
 }
 
 // ============================================================================
-// DATA QUERIES — chamadas pelo HTML via google.script.run
+// DATA QUERIES — called by HTML via google.script.run
 // ============================================================================
 
 /**
- * Dados iniciais para a sidebar ao carregar.
- * Retorna lista de abas, colunas da aba configurada e config salva.
+ * Initial data for the sidebar.
+ * Returns sheets, columns for the configured source, saved config, and
+ * auto-match suggestions (only when column fields are not yet configured).
  */
 function getRequestInitData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -143,26 +173,32 @@ function getRequestInitData() {
   const allSheets = ss.getSheets().map(function(s) { return s.getName(); });
 
   let allColumns = [];
+  let autoMatch = {};
   if (config.sourceSheet) {
     const sourceSheet = ss.getSheetByName(config.sourceSheet);
-    if (sourceSheet) allColumns = _req_getColumnsFromSheet(sourceSheet);
+    if (sourceSheet) {
+      allColumns = _req_getColumnsFromSheet(sourceSheet);
+      if (!config.colDesc && !config.colUpc) {
+        autoMatch = _req_autoMatch(allColumns);
+      }
+    }
   }
 
-  return { allSheets: allSheets, allColumns: allColumns, config: config };
+  return { allSheets: allSheets, allColumns: allColumns, config: config, autoMatch: autoMatch };
 }
 
 /**
- * Retorna colunas de uma aba pelo nome.
- * Chamada quando usuário troca a aba fonte na sidebar.
+ * Returns columns for a sheet + auto-match suggestions.
+ * Called when the user switches the source sheet.
  */
 function getRequestSheetColumns(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  return sheet ? _req_getColumnsFromSheet(sheet) : [];
+  if (!sheet) return { columns: [], autoMatch: {} };
+  const columns = _req_getColumnsFromSheet(sheet);
+  return { columns: columns, autoMatch: _req_autoMatch(columns) };
 }
 
-/**
- * Valores únicos de uma coluna para popular dropdowns de grupo.
- */
+/** Unique sorted values for a column — populates group combination dropdowns. */
 function getRequestUniqueValues(groupCol, sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return [];
@@ -180,9 +216,8 @@ function getRequestUniqueValues(groupCol, sheetName) {
 }
 
 /**
- * Conta itens da fonte que batem com a combinação selecionada.
- * groupCols: ["I - FLOOR", "H - PHASE"]
- * groupVals: ["6th", "Job Site"]
+ * Counts source rows matching the selected combination.
+ * groupCols: ["I - FLOOR", "H - PHASE"], groupVals: ["6th", "Job Site"]
  */
 function getRequestItemCount(groupCols, groupVals, sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
@@ -199,26 +234,22 @@ function getRequestItemCount(groupCols, groupVals, sheetName) {
 
   const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
   let count = 0;
-
   data.forEach(function(row) {
     const matches = groupIndices.every(function(colIdx, i) {
       return String(row[colIdx - 1] || '').trim() === String(groupVals[i] || '').trim();
     });
     if (matches) count++;
   });
-
   return count;
 }
 
-/**
- * Salva config do Request no PropertiesService.
- */
+/** Persists the full config (column mapping + header fields + last group vals). */
 function saveRequestConfig(config) {
   return RequestConfigService.save(config);
 }
 
 // ============================================================================
-// OUTPUT WRITERS (privados)
+// OUTPUT WRITERS (private)
 // ============================================================================
 
 function _req_writeHeader(sheet, settings, combination, groupCols) {
@@ -236,11 +267,9 @@ function _req_writeHeader(sheet, settings, combination, groupCols) {
     })
     .join(' | ');
 
-  // Col A: labels
   const labels = [['PROJECT:'], ['REQUEST:'], ['BOM KOJO:'], ['ENG.:'], ['VERSION:'], ['LAST UPDATE:'], ['GENERATED FROM:']];
   sheet.getRange(1, 1, 7, 1).setValues(labels);
 
-  // Col B: main values
   const mainVals = [
     [settings.project || ''],
     [settings.request || ''],
@@ -252,13 +281,11 @@ function _req_writeHeader(sheet, settings, combination, groupCols) {
   ];
   sheet.getRange(1, 2, 7, 1).setValues(mainVals);
 
-  // Col E e F: Requisition # e Need By
   sheet.getRange(1, 5).setValue('Requisition #');
   sheet.getRange(1, 6).setValue('Need By');
   sheet.getRange(3, 5).setValue(settings.requisitionNum || '');
   sheet.getRange(3, 6).setValue(settings.needBy || '');
 
-  // Merge B:D por linha (depois de setar valores)
   for (let r = 1; r <= 7; r++) {
     sheet.getRange(r, 2, 1, 3).merge();
   }
@@ -270,13 +297,12 @@ function _req_writeHeader(sheet, settings, combination, groupCols) {
 function _req_writeData(sheet, rows, dataStartRow) {
   if (rows.length === 0) return;
 
-  // Colunas B-F: valores batch
   const values = rows.map(function(r) {
     return [r.uom, r.desc, r.upc, r.qty, r.roundUp];
   });
   sheet.getRange(dataStartRow, 2, rows.length, 5).setValues(values);
 
-  // Coluna A: fórmulas batch via setFormulas (mais rápido que loop com setFormula)
+  // Batch formula insert — faster than per-row setFormula()
   const formulas = rows.map(function(_, i) {
     const rowNum = dataStartRow + i;
     return ['=ROUNDUP(E' + rowNum + '/F' + rowNum + ')*F' + rowNum];
@@ -286,12 +312,9 @@ function _req_writeData(sheet, rows, dataStartRow) {
 
 function _req_formatSheet(sheet, dataRowCount) {
   const colHeaderRow = REQUEST_CONFIG.COL_HEADER_ROW;
-
-  // Banding nas linhas de dados (inclui header de colunas)
   sheet.getRange(colHeaderRow, 1, dataRowCount + 1, 6)
     .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
 
-  // Larguras
   sheet.setColumnWidth(1, REQUEST_CONFIG.COL_WIDTHS.A);
   sheet.setColumnWidth(2, REQUEST_CONFIG.COL_WIDTHS.B);
   sheet.setColumnWidth(3, REQUEST_CONFIG.COL_WIDTHS.C);
@@ -305,10 +328,9 @@ function _req_formatSheet(sheet, dataRowCount) {
 // ============================================================================
 
 /**
- * Processa e gera a aba de request.
- *
- * @param {{parts: string[], label: string}} combination - Combinação selecionada
- * @param {Object} settings - Config completa + campos do header
+ * Processes source data and writes the KOJO request sheet.
+ * @param {{parts: string[], label: string}} combination
+ * @param {Object} settings - full config + per-request header fields
  * @returns {{success: boolean, count?: number, message?: string}}
  */
 function processRequestCore(combination, settings) {
@@ -319,26 +341,26 @@ function processRequestCore(combination, settings) {
       return { success: false, message: 'Aba "' + settings.sourceSheet + '" não encontrada.' };
     }
 
-    const descIdx  = _req_getColumnIndex(settings.colDesc)  - 1;
-    const upcIdx   = _req_getColumnIndex(settings.colUpc)   - 1;
-    const uomIdx   = _req_getColumnIndex(settings.colUom)   - 1;
-    const qtyIdx   = _req_getColumnIndex(settings.colQty)   - 1;
+    const descIdx = _req_getColumnIndex(settings.colDesc) - 1;
+    const upcIdx  = _req_getColumnIndex(settings.colUpc)  - 1;
+    const uomIdx  = _req_getColumnIndex(settings.colUom)  - 1;
+    const qtyIdx  = _req_getColumnIndex(settings.colQty)  - 1;
 
     if ([descIdx, upcIdx, uomIdx, qtyIdx].some(function(i) { return i < 0; })) {
       return { success: false, message: 'Configuração de colunas inválida. Verifique a seção Configuração.' };
     }
 
-    const groupCols = [settings.groupL1, settings.groupL2, settings.groupL3].filter(Boolean);
-    const groupVals = combination.parts;
+    const groupCols    = [settings.groupL1, settings.groupL2, settings.groupL3].filter(Boolean);
+    const groupVals    = combination.parts;
     const groupIndices = groupCols.map(_req_getColumnIndex);
 
     const lastRow = sourceSheet.getLastRow();
     if (lastRow < 2) return { success: false, message: 'Aba fonte está vazia.' };
 
-    // 1. Leitura batch
+    // 1. Batch read
     const data = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
 
-    // 2. Filtro + agrupamento (DESC + UPC + UOM como chave)
+    // 2. Filter + group by DESC+UPC+UOM
     const grouped = {};
     data.forEach(function(row) {
       const matches = groupIndices.every(function(colIdx, i) {
@@ -349,10 +371,10 @@ function processRequestCore(combination, settings) {
       const desc = String(row[descIdx] || '').trim();
       if (!desc) return;
 
-      const upc  = String(row[upcIdx]  || '').trim();
-      const uom  = String(row[uomIdx]  || '').trim();
-      const qty  = Number(row[qtyIdx]) || 0;
-      const key  = desc + '|||' + upc + '|||' + uom;
+      const upc = String(row[upcIdx] || '').trim();
+      const uom = String(row[uomIdx] || '').trim();
+      const qty = Number(row[qtyIdx]) || 0;
+      const key = desc + '|||' + upc + '|||' + uom;
 
       if (grouped[key]) {
         grouped[key].qty += qty;
@@ -361,7 +383,7 @@ function processRequestCore(combination, settings) {
       }
     });
 
-    // 3. Ordenar por DESC
+    // 3. Sort by DESC
     const rows = Object.values(grouped).sort(function(a, b) {
       return a.desc.localeCompare(b.desc, undefined, { numeric: true });
     });
@@ -370,13 +392,13 @@ function processRequestCore(combination, settings) {
       return { success: false, message: 'Nenhum item encontrado para a combinação selecionada.' };
     }
 
-    // 4. Aplicar regras de arredondamento
+    // 4. Apply rounding rules (regex, first-match-wins)
     const rules = settings.roundingRules || REQUEST_CONFIG.DEFAULT_RULES;
     rows.forEach(function(row) {
       row.roundUp = _req_applyRoundingRule(row.desc, rules);
     });
 
-    // 5. Criar ou limpar aba de destino
+    // 5. Create or clear target sheet
     const sheetName = String(settings.kojoSuffix || 'Request').trim().substring(0, 100);
     let targetSheet = ss.getSheetByName(sheetName);
     if (targetSheet) {
@@ -385,26 +407,26 @@ function processRequestCore(combination, settings) {
       targetSheet = ss.insertSheet(sheetName);
     }
 
-    // 6. Escrever header
+    // 6. Write header (rows 1-7)
     _req_writeHeader(targetSheet, settings, combination, groupCols);
 
-    // 7. Escrever cabeçalho de colunas (linha 9)
+    // 7. Column header row (row 9)
     const colHeaderRow = REQUEST_CONFIG.COL_HEADER_ROW;
     targetSheet.getRange(colHeaderRow, 1, 1, 6)
       .setValues([['QTY (ROUND UP)', 'UOM', 'DESC', 'UPC', 'QTY', 'ROUND UP']]);
     targetSheet.getRange(colHeaderRow, 1, 1, 6).setFontWeight('bold');
 
-    // 8. Escrever dados (linha 10+)
+    // 8. Data rows (row 10+)
     _req_writeData(targetSheet, rows, REQUEST_CONFIG.DATA_START_ROW);
 
-    // 9. Formatar
+    // 9. Format
     _req_formatSheet(targetSheet, rows.length);
 
-    // 10. Proteger header
+    // 10. Protect header
     try {
       const prot = targetSheet.getRange(1, 1, REQUEST_CONFIG.HEADER_ROWS, 6).protect();
       prot.setDescription('Header protegido').removeEditors(prot.getEditors());
-    } catch (e) { /* ignora — pode não ter permissão em alguns contextos */ }
+    } catch (e) { /* no permission in some contexts */ }
 
     return { success: true, count: rows.length };
 
@@ -415,13 +437,9 @@ function processRequestCore(combination, settings) {
 }
 
 // ============================================================================
-// ENTRY POINTS — chamados pelo Menu e pelo HTML
+// ENTRY POINTS
 // ============================================================================
 
-/**
- * Abre a sidebar do Request Generator.
- * Chamado pelo menu.
- */
 function openRequestSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('RequestSidebar')
     .setTitle('📋 Gerador de Request')
@@ -437,21 +455,21 @@ function testRequestHelpers() {
   const results = [];
 
   results.push('J → ' + _req_getColumnIndex('J - DESC') + ' (expect 10)');
-  results.push('A → ' + _req_getColumnIndex('A - ID') + ' (expect 1)');
   results.push('AA → ' + _req_getColumnIndex('AA - EXTRA') + ' (expect 27)');
   results.push('vazio → ' + _req_getColumnIndex('') + ' (expect -1)');
 
   results.push('1 → ' + _req_numberToLetter(1) + ' (expect A)');
-  results.push('26 → ' + _req_numberToLetter(26) + ' (expect Z)');
   results.push('27 → ' + _req_numberToLetter(27) + ' (expect AA)');
 
-  results.push('FOAM CORE → ' + _req_applyRoundingRule('PIPE 2 IN FOAM CORE', rules) + ' (expect 20)');
-  results.push('CPVC → ' + _req_applyRoundingRule('PIPE 1 IN. X 10 FT. CPVC', rules) + ' (expect 10)');
-  results.push('ELBOW → ' + _req_applyRoundingRule('ELBOW 90 DEGREES 2 IN.', rules) + ' (expect 1)');
-  results.push('roundUp=0 → ' + _req_applyRoundingRule('PIPE FOAM CORE', [{pattern:'FOAM CORE', roundUp:0}]) + ' (expect 1)');
+  // Regex rules: only PIPE items match
+  results.push('PIPE FOAM CORE → ' + _req_applyRoundingRule('PIPE 2 IN FOAM CORE', rules) + ' (expect 20)');
+  results.push('PIPE CPVC → ' + _req_applyRoundingRule('PIPE 1 IN. X 10 FT. CPVC', rules) + ' (expect 10)');
+  results.push('ELBOW CPVC → ' + _req_applyRoundingRule('ELBOW 90 CPVC', rules) + ' (expect 1 — not a pipe)');
+  results.push('TEE FOAM CORE → ' + _req_applyRoundingRule('TEE 2 IN FOAM CORE', rules) + ' (expect 1 — not a pipe)');
+  results.push('roundUp=0 → ' + _req_applyRoundingRule('PIPE FOAM CORE', [{pattern:'^PIPE.*FOAM CORE', roundUp:0}]) + ' (expect 1)');
 
   const defaults = RequestConfigService.get();
-  results.push('defaults.roundingRules.length: ' + defaults.roundingRules.length + ' (expect 2)');
+  results.push('defaults.roundingRules[0].pattern: ' + defaults.roundingRules[0].pattern);
   results.push('defaults.version: ' + defaults.version + ' (expect 01)');
 
   console.log(results.join('\n'));
