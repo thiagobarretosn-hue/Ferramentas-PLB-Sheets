@@ -1,6 +1,6 @@
 /**
  * @fileoverview Menu Principal - Ferramentas PLB Sheets
- * @version 2.0.0 - V3.0 Arquitetura independente (sem aba Config)
+ * @version 2.1.0 - Adicionado Request Generator
  *
  * Este arquivo centraliza todos os menus e funções onOpen do sistema.
  * Facilita a adição ou remoção de funcionalidades do menu principal.
@@ -40,6 +40,8 @@ function onOpen() {
   // ========================================
   ui.createMenu('🔧 Relatórios Dinâmicos')
     .addItem('📊 Gerador de BOM (Painel)', 'openBomSidebar')
+    .addSeparator()
+    .addItem('📋 Gerador de Request', 'openRequestSidebar')
     .addSeparator()
     .addItem('🔧 Fixadores → Fonte', 'abrirSeletorFixadores')
     .addSeparator()
