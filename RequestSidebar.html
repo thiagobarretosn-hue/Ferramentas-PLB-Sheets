@@ -24,15 +24,17 @@
     .btn-danger { background: #e74c3c; color: #fff; }
     .preview { background: #eaf4fb; border: 1px solid #aed6f1; padding: 5px 8px; border-radius: 3px; font-size: 11px; color: #2471a3; margin-top: 4px; }
     .kojo-full { font-size: 10px; color: #7f8c8d; margin-top: -4px; margin-bottom: 6px; font-style: italic; min-height: 14px; }
-    table.rules { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    table.rules { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
     table.rules th { background: #ecf0f1; padding: 4px 5px; text-align: left; font-size: 10px; border: 1px solid #ddd; }
     table.rules td { padding: 2px 3px; border: 1px solid #ddd; }
     table.rules input[type="text"] { margin: 0; padding: 2px 4px; font-size: 11px; }
+    .rules-note { font-size: 10px; color: #7f8c8d; margin-bottom: 4px; font-style: italic; }
     .fallback-note { font-size: 10px; color: #7f8c8d; margin-top: 4px; }
     #status { padding: 8px 14px; font-size: 11px; min-height: 24px; }
     .status-ok { color: #27ae60; }
     .status-err { color: #e74c3c; }
     .loading { color: #7f8c8d; font-style: italic; }
+    .auto-badge { font-size: 9px; background: #27ae60; color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
   </style>
 </head>
 <body>
@@ -105,10 +107,11 @@
 <!-- ==================== SECTION 4: ROUNDING ==================== -->
 <div class="section">
   <div class="section-title">🔢 Regras de Arredondamento</div>
+  <p class="rules-note">Padrão aceita regex (ex: <code>^PIPE.*CPVC</code>) ou texto simples.</p>
   <table class="rules">
     <thead>
       <tr>
-        <th>Padrão (texto no DESC)</th>
+        <th>Padrão (regex ou texto no DESC)</th>
         <th style="width:65px">Round Up</th>
         <th style="width:28px"></th>
       </tr>
@@ -116,7 +119,7 @@
     <tbody id="rules-body"></tbody>
   </table>
   <button class="btn btn-small btn-secondary" id="btn-add-rule">+ Regra</button>
-  <p class="fallback-note">↳ Fallback: itens sem match → Round Up = 1</p>
+  <p class="fallback-note">↳ Fallback: itens sem match → Round Up = 1<br>↳ Primeira regra que bater vence (ordem importa)</p>
 </div>
 
 <!-- ==================== GENERATE ==================== -->
@@ -158,14 +161,22 @@
     state.config = data.config || {};
 
     populateSheetDropdown(state.allSheets, state.config.sourceSheet);
-    populateColumnDropdowns(state.allColumns, state.config);
+
+    // Apply auto-match when column fields are not yet configured
+    var configForCols = state.config;
+    if (data.autoMatch && Object.keys(data.autoMatch).length > 0 && !state.config.colDesc) {
+      configForCols = Object.assign({}, state.config, data.autoMatch);
+      showStatus('✨ Colunas detectadas automaticamente — revise e salve.', 'ok');
+    }
+
+    populateColumnDropdowns(state.allColumns, configForCols);
     populateHeaderFields(state.config);
     populateRulesTable(state.config.roundingRules);
 
     if (state.config.groupL1 && state.config.sourceSheet) {
       loadGroupSelectors(state.config);
     }
-    showStatus('', '');
+    if (!data.autoMatch || state.config.colDesc) showStatus('', '');
   }
 
   function onError(err) {
@@ -212,10 +223,14 @@
   }
 
   function populateHeaderFields(config) {
-    document.getElementById('inp-project').value     = config.project    || '';
-    document.getElementById('inp-version').value     = config.version    || '01';
-    document.getElementById('inp-kojo-prefix').value = config.kojoPrefix || '';
-    document.getElementById('inp-engineer').value    = config.engineer   || '';
+    document.getElementById('inp-project').value      = config.project       || '';
+    document.getElementById('inp-version').value      = config.version       || '01';
+    document.getElementById('inp-kojo-prefix').value  = config.kojoPrefix    || '';
+    document.getElementById('inp-engineer').value     = config.engineer      || '';
+    document.getElementById('inp-request').value      = config.request       || '';
+    document.getElementById('inp-kojo-suffix').value  = config.kojoSuffix    || '';
+    document.getElementById('inp-req-num').value      = config.requisitionNum || '';
+    document.getElementById('inp-need-by').value      = config.needBy        || '';
     updateKojoPreview();
   }
 
@@ -223,7 +238,7 @@
     document.getElementById('rules-body').innerHTML = '';
     var defaultRules = (rules && rules.length > 0)
       ? rules
-      : [{ pattern: 'FOAM CORE', roundUp: 20 }, { pattern: 'CPVC', roundUp: 10 }];
+      : [{ pattern: '^PIPE.*FOAM CORE', roundUp: 20 }, { pattern: '^PIPE.*CPVC', roundUp: 10 }];
     defaultRules.forEach(function(r) { addRuleRow(r.pattern, r.roundUp); });
   }
 
@@ -231,23 +246,34 @@
     var tbody = document.getElementById('rules-body');
     var tr = document.createElement('tr');
     tr.innerHTML =
-      '<td><input type="text" class="rule-pattern" value="' + (pattern || '') + '" placeholder="ex: FOAM CORE"></td>' +
+      '<td><input type="text" class="rule-pattern" value="' + escHtml(pattern || '') + '" placeholder="ex: ^PIPE.*CPVC"></td>' +
       '<td><input type="text" class="rule-roundup" value="' + (roundUp || '') + '" style="width:55px"></td>' +
       '<td><button class="btn btn-small btn-danger btn-rm">✕</button></td>';
     tr.querySelector('.btn-rm').addEventListener('click', function() { tr.remove(); });
     tbody.appendChild(tr);
   }
 
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
   /* ============================================================
-     SOURCE SHEET CHANGE
+     SOURCE SHEET CHANGE — auto-match columns
   ============================================================ */
   function onSourceSheetChange() {
     var sheetName = document.getElementById('sel-source-sheet').value;
     if (!sheetName) return;
+    showStatus('Carregando colunas...', 'loading');
     google.script.run
-      .withSuccessHandler(function(cols) {
-        state.allColumns = cols;
-        populateColumnDropdowns(cols, {});
+      .withSuccessHandler(function(result) {
+        state.allColumns = result.columns || [];
+        // Auto-match: pre-select dropdowns based on header keywords
+        populateColumnDropdowns(result.columns || [], result.autoMatch || {});
+        if (result.autoMatch && Object.keys(result.autoMatch).some(function(k) { return result.autoMatch[k]; })) {
+          showStatus('✨ Colunas detectadas automaticamente — revise e salve.', 'ok');
+        } else {
+          showStatus('', '');
+        }
       })
       .withFailureHandler(onError)
       .getRequestSheetColumns(sheetName);
@@ -274,19 +300,24 @@
 
   function collectConfig() {
     return {
-      sourceSheet: document.getElementById('sel-source-sheet').value,
-      colDesc:  document.getElementById('sel-col-desc').value,
-      colUpc:   document.getElementById('sel-col-upc').value,
-      colUom:   document.getElementById('sel-col-uom').value,
-      colQty:   document.getElementById('sel-col-qty').value,
-      groupL1:  document.getElementById('sel-group-l1').value,
-      groupL2:  document.getElementById('sel-group-l2').value,
-      groupL3:  document.getElementById('sel-group-l3').value,
-      project:  document.getElementById('inp-project').value,
-      kojoPrefix: document.getElementById('inp-kojo-prefix').value,
-      engineer: document.getElementById('inp-engineer').value,
-      version:  document.getElementById('inp-version').value,
-      roundingRules: collectRules()
+      sourceSheet:    document.getElementById('sel-source-sheet').value,
+      colDesc:        document.getElementById('sel-col-desc').value,
+      colUpc:         document.getElementById('sel-col-upc').value,
+      colUom:         document.getElementById('sel-col-uom').value,
+      colQty:         document.getElementById('sel-col-qty').value,
+      groupL1:        document.getElementById('sel-group-l1').value,
+      groupL2:        document.getElementById('sel-group-l2').value,
+      groupL3:        document.getElementById('sel-group-l3').value,
+      project:        document.getElementById('inp-project').value,
+      kojoPrefix:     document.getElementById('inp-kojo-prefix').value,
+      engineer:       document.getElementById('inp-engineer').value,
+      version:        document.getElementById('inp-version').value,
+      request:        document.getElementById('inp-request').value,
+      kojoSuffix:     document.getElementById('inp-kojo-suffix').value.trim(),
+      requisitionNum: document.getElementById('inp-req-num').value,
+      needBy:         document.getElementById('inp-need-by').value,
+      roundingRules:  collectRules(),
+      lastGroupVals:  collectCurrentGroupVals()
     };
   }
 
@@ -300,8 +331,17 @@
     return rules;
   }
 
+  function collectCurrentGroupVals() {
+    var config = state.config;
+    var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
+    return groups.map(function(_, i) {
+      var sel = document.getElementById('sel-gval-' + i);
+      return sel ? sel.value : '';
+    });
+  }
+
   /* ============================================================
-     GROUP SELECTORS
+     GROUP SELECTORS — load + restore last values
   ============================================================ */
   function loadGroupSelectors(config) {
     var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
@@ -313,26 +353,33 @@
       return;
     }
 
+    var lastGroupVals = config.lastGroupVals || [];
+    var loaded = 0;
+
     groups.forEach(function(groupCol, i) {
       var label = groupCol.replace(/^[A-Z]+ - /, '');
       var selId = 'sel-gval-' + i;
       var div = document.createElement('div');
-      div.innerHTML = '<label>' + label + '</label><select id="' + selId + '"><option>Carregando...</option></select>';
+      div.innerHTML = '<label>' + escHtml(label) + '</label><select id="' + selId + '"><option>Carregando...</option></select>';
       container.appendChild(div);
 
       google.script.run
-        .withSuccessHandler((function(id) {
+        .withSuccessHandler((function(id, idx) {
           return function(vals) {
             var sel = document.getElementById(id);
+            var savedVal = String(lastGroupVals[idx] || '');
             sel.innerHTML = '<option value="">-- Selecione --</option>';
             vals.forEach(function(v) {
               var opt = document.createElement('option');
               opt.value = v; opt.textContent = v;
+              if (v === savedVal) opt.selected = true;
               sel.appendChild(opt);
             });
             sel.addEventListener('change', updateComboPreview);
+            loaded++;
+            if (loaded === groups.length) updateComboPreview();
           };
-        })(selId))
+        })(selId, i))
         .withFailureHandler(onError)
         .getRequestUniqueValues(groupCol, config.sourceSheet);
     });
@@ -390,12 +437,13 @@
       return showStatus('⚠️ Informe o BOM KOJO Suffix.', 'err');
 
     var combination = { parts: vals, label: vals.join(' | ') };
+    var rules = collectRules();
     var settings = Object.assign({}, config, {
       request:        document.getElementById('inp-request').value,
       kojoSuffix:     document.getElementById('inp-kojo-suffix').value.trim(),
       requisitionNum: document.getElementById('inp-req-num').value,
       needBy:         document.getElementById('inp-need-by').value,
-      roundingRules:  collectRules()
+      roundingRules:  rules
     });
 
     var btn = document.getElementById('btn-generate');
@@ -407,6 +455,17 @@
         btn.disabled = false;
         if (result.success) {
           showStatus('✅ Request gerado com ' + result.count + ' itens!', 'ok');
+          // Persist last-used header fields + group vals + rules for next session
+          var fullConfig = Object.assign({}, config, {
+            request:        settings.request,
+            kojoSuffix:     settings.kojoSuffix,
+            requisitionNum: settings.requisitionNum,
+            needBy:         settings.needBy,
+            roundingRules:  rules,
+            lastGroupVals:  vals
+          });
+          state.config = fullConfig;
+          google.script.run.saveRequestConfig(fullConfig);
         } else {
           showStatus('❌ ' + result.message, 'err');
         }
