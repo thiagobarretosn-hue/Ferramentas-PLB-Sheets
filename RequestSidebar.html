@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #2c3e50; background: #f8f9fa; }
+    .header { background: #2c3e50; color: #fff; padding: 10px 14px; font-weight: bold; font-size: 13px; }
+    .section { padding: 10px 14px; border-bottom: 1px solid #e0e0e0; background: #fff; }
+    .section-title { font-weight: bold; color: #2c3e50; margin-bottom: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    label { display: block; margin-bottom: 2px; color: #555; font-size: 10px; }
+    select, input[type="text"] {
+      width: 100%; padding: 4px 6px; border: 1px solid #bdc3c7; border-radius: 3px;
+      font-size: 11px; margin-bottom: 6px; background: #fff;
+    }
+    select:focus, input:focus { outline: none; border-color: #3498db; }
+    .row2 { display: flex; gap: 6px; }
+    .row2 > div { flex: 1; }
+    .btn { padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+    .btn-primary { background: #27ae60; color: #fff; width: 100%; padding: 10px; font-size: 13px; font-weight: bold; margin-top: 4px; }
+    .btn-primary:disabled { background: #95a5a6; cursor: not-allowed; }
+    .btn-secondary { background: #3498db; color: #fff; }
+    .btn-small { padding: 2px 7px; font-size: 10px; }
+    .btn-danger { background: #e74c3c; color: #fff; }
+    .preview { background: #eaf4fb; border: 1px solid #aed6f1; padding: 5px 8px; border-radius: 3px; font-size: 11px; color: #2471a3; margin-top: 4px; }
+    .kojo-full { font-size: 10px; color: #7f8c8d; margin-top: -4px; margin-bottom: 6px; font-style: italic; min-height: 14px; }
+    table.rules { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    table.rules th { background: #ecf0f1; padding: 4px 5px; text-align: left; font-size: 10px; border: 1px solid #ddd; }
+    table.rules td { padding: 2px 3px; border: 1px solid #ddd; }
+    table.rules input[type="text"] { margin: 0; padding: 2px 4px; font-size: 11px; }
+    .fallback-note { font-size: 10px; color: #7f8c8d; margin-top: 4px; }
+    #status { padding: 8px 14px; font-size: 11px; min-height: 24px; }
+    .status-ok { color: #27ae60; }
+    .status-err { color: #e74c3c; }
+    .loading { color: #7f8c8d; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<div class="header">📋 Gerador de Request</div>
+
+<!-- ==================== SECTION 1: CONFIG ==================== -->
+<div class="section">
+  <div class="section-title">⚙️ Configuração</div>
+
+  <label>Aba Fonte</label>
+  <select id="sel-source-sheet"></select>
+
+  <div class="row2">
+    <div><label>Coluna DESC</label><select id="sel-col-desc"></select></div>
+    <div><label>Coluna UPC</label><select id="sel-col-upc"></select></div>
+  </div>
+  <div class="row2">
+    <div><label>Coluna UOM</label><select id="sel-col-uom"></select></div>
+    <div><label>Coluna QTY (raw)</label><select id="sel-col-qty"></select></div>
+  </div>
+
+  <label>Agrupar por Nível 1</label>
+  <select id="sel-group-l1"></select>
+  <label>Agrupar por Nível 2</label>
+  <select id="sel-group-l2"></select>
+  <label>Agrupar por Nível 3</label>
+  <select id="sel-group-l3"></select>
+
+  <button class="btn btn-secondary" id="btn-save-config" style="width:100%">💾 Salvar Configuração</button>
+</div>
+
+<!-- ==================== SECTION 2: HEADER ==================== -->
+<div class="section">
+  <div class="section-title">📋 Header do Request</div>
+
+  <div class="row2">
+    <div><label>PROJECT</label><input type="text" id="inp-project" /></div>
+    <div><label>VERSION</label><input type="text" id="inp-version" value="01" /></div>
+  </div>
+
+  <label>REQUEST (descrição)</label>
+  <input type="text" id="inp-request" placeholder="ex: RISERS 6th Floor" />
+
+  <label>KOJO PREFIX</label>
+  <input type="text" id="inp-kojo-prefix" placeholder="ex: MTN.PLB.RGH.JS.B1067" />
+
+  <label>BOM KOJO Suffix (nome da aba gerada)</label>
+  <input type="text" id="inp-kojo-suffix" placeholder="ex: CA.RSR.F6" />
+  <div class="kojo-full" id="kojo-preview"></div>
+
+  <label>ENG.</label>
+  <input type="text" id="inp-engineer" />
+
+  <div class="row2">
+    <div><label>Requisition #</label><input type="text" id="inp-req-num" placeholder="REQ-A4799" /></div>
+    <div><label>Need By</label><input type="text" id="inp-need-by" placeholder="MM/DD/YYYY" /></div>
+  </div>
+</div>
+
+<!-- ==================== SECTION 3: COMBINATION ==================== -->
+<div class="section">
+  <div class="section-title">🔽 Seleção da Combinação</div>
+  <div id="group-selectors">
+    <p class="loading">Salve a configuração para carregar os grupos.</p>
+  </div>
+  <div class="preview" id="combo-preview" style="display:none"></div>
+</div>
+
+<!-- ==================== SECTION 4: ROUNDING ==================== -->
+<div class="section">
+  <div class="section-title">🔢 Regras de Arredondamento</div>
+  <table class="rules">
+    <thead>
+      <tr>
+        <th>Padrão (texto no DESC)</th>
+        <th style="width:65px">Round Up</th>
+        <th style="width:28px"></th>
+      </tr>
+    </thead>
+    <tbody id="rules-body"></tbody>
+  </table>
+  <button class="btn btn-small btn-secondary" id="btn-add-rule">+ Regra</button>
+  <p class="fallback-note">↳ Fallback: itens sem match → Round Up = 1</p>
+</div>
+
+<!-- ==================== GENERATE ==================== -->
+<div style="padding:12px 14px;">
+  <button class="btn btn-primary" id="btn-generate">📋 GERAR REQUEST</button>
+</div>
+<div id="status"></div>
+
+<script>
+  /* ============================================================
+     STATE
+  ============================================================ */
+  var state = { config: {}, allSheets: [], allColumns: [] };
+
+  /* ============================================================
+     INIT
+  ============================================================ */
+  document.addEventListener('DOMContentLoaded', function() {
+    bindEvents();
+    google.script.run
+      .withSuccessHandler(onInitData)
+      .withFailureHandler(onError)
+      .getRequestInitData();
+    showStatus('Carregando...', 'loading');
+  });
+
+  function bindEvents() {
+    document.getElementById('btn-save-config').addEventListener('click', onSaveConfig);
+    document.getElementById('btn-add-rule').addEventListener('click', function() { addRuleRow('', ''); });
+    document.getElementById('btn-generate').addEventListener('click', onGenerate);
+    document.getElementById('inp-kojo-prefix').addEventListener('input', updateKojoPreview);
+    document.getElementById('inp-kojo-suffix').addEventListener('input', updateKojoPreview);
+    document.getElementById('sel-source-sheet').addEventListener('change', onSourceSheetChange);
+  }
+
+  function onInitData(data) {
+    state.allSheets = data.allSheets || [];
+    state.allColumns = data.allColumns || [];
+    state.config = data.config || {};
+
+    populateSheetDropdown(state.allSheets, state.config.sourceSheet);
+    populateColumnDropdowns(state.allColumns, state.config);
+    populateHeaderFields(state.config);
+    populateRulesTable(state.config.roundingRules);
+
+    if (state.config.groupL1 && state.config.sourceSheet) {
+      loadGroupSelectors(state.config);
+    }
+    showStatus('', '');
+  }
+
+  function onError(err) {
+    showStatus('Erro: ' + (err.message || err), 'err');
+  }
+
+  /* ============================================================
+     POPULATE HELPERS
+  ============================================================ */
+  function populateSheetDropdown(sheets, selected) {
+    var sel = document.getElementById('sel-source-sheet');
+    sel.innerHTML = '<option value="">-- Selecione --</option>';
+    sheets.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      if (s === selected) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function populateColumnDropdowns(columns, config) {
+    var map = {
+      'sel-col-desc': config.colDesc || '',
+      'sel-col-upc':  config.colUpc  || '',
+      'sel-col-uom':  config.colUom  || '',
+      'sel-col-qty':  config.colQty  || '',
+      'sel-group-l1': config.groupL1 || '',
+      'sel-group-l2': config.groupL2 || '',
+      'sel-group-l3': config.groupL3 || ''
+    };
+    Object.keys(map).forEach(function(id) {
+      var sel = document.getElementById(id);
+      var isGroup = id.startsWith('sel-group');
+      sel.innerHTML = isGroup
+        ? '<option value="">-- Nenhum --</option>'
+        : '<option value="">-- Selecione --</option>';
+      columns.forEach(function(col) {
+        var opt = document.createElement('option');
+        opt.value = col; opt.textContent = col;
+        if (col === map[id]) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  function populateHeaderFields(config) {
+    document.getElementById('inp-project').value     = config.project    || '';
+    document.getElementById('inp-version').value     = config.version    || '01';
+    document.getElementById('inp-kojo-prefix').value = config.kojoPrefix || '';
+    document.getElementById('inp-engineer').value    = config.engineer   || '';
+    updateKojoPreview();
+  }
+
+  function populateRulesTable(rules) {
+    document.getElementById('rules-body').innerHTML = '';
+    var defaultRules = (rules && rules.length > 0)
+      ? rules
+      : [{ pattern: 'FOAM CORE', roundUp: 20 }, { pattern: 'CPVC', roundUp: 10 }];
+    defaultRules.forEach(function(r) { addRuleRow(r.pattern, r.roundUp); });
+  }
+
+  function addRuleRow(pattern, roundUp) {
+    var tbody = document.getElementById('rules-body');
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="text" class="rule-pattern" value="' + (pattern || '') + '" placeholder="ex: FOAM CORE"></td>' +
+      '<td><input type="text" class="rule-roundup" value="' + (roundUp || '') + '" style="width:55px"></td>' +
+      '<td><button class="btn btn-small btn-danger btn-rm">✕</button></td>';
+    tr.querySelector('.btn-rm').addEventListener('click', function() { tr.remove(); });
+    tbody.appendChild(tr);
+  }
+
+  /* ============================================================
+     SOURCE SHEET CHANGE
+  ============================================================ */
+  function onSourceSheetChange() {
+    var sheetName = document.getElementById('sel-source-sheet').value;
+    if (!sheetName) return;
+    google.script.run
+      .withSuccessHandler(function(cols) {
+        state.allColumns = cols;
+        populateColumnDropdowns(cols, {});
+      })
+      .withFailureHandler(onError)
+      .getRequestSheetColumns(sheetName);
+  }
+
+  /* ============================================================
+     SAVE CONFIG
+  ============================================================ */
+  function onSaveConfig() {
+    var config = collectConfig();
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          state.config = config;
+          showStatus('✅ Configuração salva!', 'ok');
+          loadGroupSelectors(config);
+        } else {
+          showStatus('Erro ao salvar: ' + result.message, 'err');
+        }
+      })
+      .withFailureHandler(onError)
+      .saveRequestConfig(config);
+  }
+
+  function collectConfig() {
+    return {
+      sourceSheet: document.getElementById('sel-source-sheet').value,
+      colDesc:  document.getElementById('sel-col-desc').value,
+      colUpc:   document.getElementById('sel-col-upc').value,
+      colUom:   document.getElementById('sel-col-uom').value,
+      colQty:   document.getElementById('sel-col-qty').value,
+      groupL1:  document.getElementById('sel-group-l1').value,
+      groupL2:  document.getElementById('sel-group-l2').value,
+      groupL3:  document.getElementById('sel-group-l3').value,
+      project:  document.getElementById('inp-project').value,
+      kojoPrefix: document.getElementById('inp-kojo-prefix').value,
+      engineer: document.getElementById('inp-engineer').value,
+      version:  document.getElementById('inp-version').value,
+      roundingRules: collectRules()
+    };
+  }
+
+  function collectRules() {
+    var rules = [];
+    document.querySelectorAll('#rules-body tr').forEach(function(tr) {
+      var pattern = tr.querySelector('.rule-pattern').value.trim();
+      var roundUp = Math.max(parseInt(tr.querySelector('.rule-roundup').value) || 1, 1);
+      if (pattern) rules.push({ pattern: pattern, roundUp: roundUp });
+    });
+    return rules;
+  }
+
+  /* ============================================================
+     GROUP SELECTORS
+  ============================================================ */
+  function loadGroupSelectors(config) {
+    var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
+    var container = document.getElementById('group-selectors');
+    container.innerHTML = '';
+
+    if (groups.length === 0) {
+      container.innerHTML = '<p class="loading">Nenhum nível de grupo configurado.</p>';
+      return;
+    }
+
+    groups.forEach(function(groupCol, i) {
+      var label = groupCol.replace(/^[A-Z]+ - /, '');
+      var selId = 'sel-gval-' + i;
+      var div = document.createElement('div');
+      div.innerHTML = '<label>' + label + '</label><select id="' + selId + '"><option>Carregando...</option></select>';
+      container.appendChild(div);
+
+      google.script.run
+        .withSuccessHandler((function(id) {
+          return function(vals) {
+            var sel = document.getElementById(id);
+            sel.innerHTML = '<option value="">-- Selecione --</option>';
+            vals.forEach(function(v) {
+              var opt = document.createElement('option');
+              opt.value = v; opt.textContent = v;
+              sel.appendChild(opt);
+            });
+            sel.addEventListener('change', updateComboPreview);
+          };
+        })(selId))
+        .withFailureHandler(onError)
+        .getRequestUniqueValues(groupCol, config.sourceSheet);
+    });
+  }
+
+  function updateComboPreview() {
+    var config = state.config;
+    var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
+    var vals = groups.map(function(_, i) {
+      var sel = document.getElementById('sel-gval-' + i);
+      return sel ? sel.value : '';
+    });
+
+    if (vals.some(function(v) { return !v; })) {
+      document.getElementById('combo-preview').style.display = 'none';
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(count) {
+        var el = document.getElementById('combo-preview');
+        el.style.display = 'block';
+        el.textContent = '→ ' + count + ' itens encontrados para esta combinação';
+      })
+      .withFailureHandler(onError)
+      .getRequestItemCount(groups, vals, config.sourceSheet);
+  }
+
+  /* ============================================================
+     KOJO PREVIEW
+  ============================================================ */
+  function updateKojoPreview() {
+    var prefix = document.getElementById('inp-kojo-prefix').value.trim();
+    var suffix = document.getElementById('inp-kojo-suffix').value.trim();
+    var full = prefix && suffix ? prefix + '.' + suffix : (prefix || suffix || '');
+    document.getElementById('kojo-preview').textContent = full ? '→ ' + full : '';
+  }
+
+  /* ============================================================
+     GENERATE
+  ============================================================ */
+  function onGenerate() {
+    var config = state.config;
+    var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
+    var vals = groups.map(function(_, i) {
+      var sel = document.getElementById('sel-gval-' + i);
+      return sel ? sel.value : '';
+    });
+
+    if (!config.sourceSheet)
+      return showStatus('⚠️ Configure e salve a Aba Fonte antes de gerar.', 'err');
+    if (groups.length > 0 && vals.some(function(v) { return !v; }))
+      return showStatus('⚠️ Selecione um valor para cada nível de grupo.', 'err');
+    if (!document.getElementById('inp-kojo-suffix').value.trim())
+      return showStatus('⚠️ Informe o BOM KOJO Suffix.', 'err');
+
+    var combination = { parts: vals, label: vals.join(' | ') };
+    var settings = Object.assign({}, config, {
+      request:        document.getElementById('inp-request').value,
+      kojoSuffix:     document.getElementById('inp-kojo-suffix').value.trim(),
+      requisitionNum: document.getElementById('inp-req-num').value,
+      needBy:         document.getElementById('inp-need-by').value,
+      roundingRules:  collectRules()
+    });
+
+    var btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+    showStatus('⏳ Gerando request...', 'loading');
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        btn.disabled = false;
+        if (result.success) {
+          showStatus('✅ Request gerado com ' + result.count + ' itens!', 'ok');
+        } else {
+          showStatus('❌ ' + result.message, 'err');
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        onError(err);
+      })
+      .processRequestCore(combination, settings);
+  }
+
+  /* ============================================================
+     UTILS
+  ============================================================ */
+  function showStatus(msg, type) {
+    var el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = type === 'err' ? 'status-err' : type === 'loading' ? 'loading' : 'status-ok';
+  }
+</script>
+</body>
+</html>
