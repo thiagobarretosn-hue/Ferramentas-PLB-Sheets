@@ -1,6 +1,6 @@
 /**
  * @fileoverview Menu Principal - Ferramentas PLB Sheets
- * @version 3.0.0 - Menu único Sheet Tools
+ * @version 3.1.0 - Cores unificadas em um item; Gerenciador de Abas atualizado
  */
 
 function onOpen() {
@@ -9,9 +9,8 @@ function onOpen() {
     .addItem('📊 Gerador de BOM', 'openBomSidebar')
     .addItem('📋 Gerador de Request', 'openRequestSidebar')
     .addSeparator()
-    .addItem('Gerenciador de Abas', 'showSheetManager')
-    .addItem('🎨 Configurar Cores', 'openColorConfig')
-    .addItem('✨ Aplicar Cores', 'applyGroupColors')
+    .addItem('📑 Gerenciador de Abas', 'showSheetManager')
+    .addItem('🎨 Cores das Abas', 'openColorConfig')
     .addSeparator()
     .addItem('🔍 Super Busca', 'abrirSuperBuscaSidebar')
     .addToUi();
