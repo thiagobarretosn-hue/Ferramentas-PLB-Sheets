@@ -5,236 +5,518 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #1a73e8; --bg: #f8f9fa; --surface: #ffffff;
-      --border: #dadce0; --text: #202124; --hover: #e8f0fe;
+      --primary: #1a73e8; --primary-dark: #1557b0;
+      --success: #34a853; --danger: #ea4335;
+      --bg: #f8f9fa; --surface: #ffffff;
+      --border: #dadce0; --text: #202124;
+      --text-light: #5f6368; --hover: #e8f0fe;
+      --chip-bg: #e8f0fe; --chip-text: #1a73e8;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Roboto', sans-serif; margin: 0; padding: 0;
-      background-color: var(--bg); display: flex; flex-direction: column;
-      height: 100vh; overflow: hidden; font-size: 13px;
+      font-family: 'Roboto', sans-serif;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      height: 100vh; overflow: hidden;
+      font-size: 13px; color: var(--text);
     }
-    /* CONFIG */
+
+    /* ── CONFIG ── */
     .config-header {
-      background: #e8eaed; padding: 8px 16px; font-size: 11px;
-      color: #5f6368; cursor: pointer; display: flex;
+      background: #e8eaed; padding: 8px 16px;
+      font-size: 11px; color: var(--text-light);
+      cursor: pointer; display: flex;
       justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      user-select: none;
     }
     .config-panel {
-      display: none; background: #f1f3f4; padding: 12px 16px;
-      border-bottom: 1px solid var(--border); flex-direction: column; gap: 8px;
+      display: none; background: #f1f3f4;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-direction: column; gap: 8px;
+      flex-shrink: 0;
     }
     .config-panel.open { display: flex; }
     .config-row { display: flex; gap: 8px; align-items: center; }
-    .config-row label { flex: 1; font-weight: 500; color: var(--text); }
-    
+    .config-row label { width: 52px; font-weight: 500; flex-shrink: 0; }
     select {
-      flex: 2; padding: 4px; border: 1px solid var(--border);
-      border-radius: 4px; background: white; width: 100%;
+      flex: 1; padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px; background: white;
+      font-size: 12px; font-family: inherit;
     }
     .btn-reload {
-      background-color: #5f6368; color: white; border: none; padding: 6px;
-      border-radius: 4px; cursor: pointer; width: 100%; margin-top: 4px;
+      background: var(--text-light); color: white;
+      border: none; padding: 6px 12px;
+      border-radius: 4px; cursor: pointer;
+      font-size: 12px; font-family: inherit;
+      width: 100%;
     }
-    /* BUSCA */
-    .header {
-      padding: 12px 16px; background: var(--surface);
-      border-bottom: 1px solid var(--border); z-index: 10;
+    .btn-reload:hover { background: #444; }
+
+    /* ── PAINEL DE SELECIONADOS ── */
+    .selected-panel {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      display: none;
+    }
+    .selected-panel-header {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+    }
+    .selected-panel-header span {
+      font-size: 11px; font-weight: 500;
+      color: var(--primary);
+    }
+    .btn-clear-all {
+      background: none; border: none;
+      font-size: 11px; color: var(--danger);
+      cursor: pointer; padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .btn-clear-all:hover { background: #fce8e6; }
+    .chips-container {
+      display: flex; flex-wrap: wrap;
+      gap: 4px; padding: 0 12px 8px;
+      max-height: 80px; overflow-y: auto;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--chip-bg); color: var(--chip-text);
+      border-radius: 12px; padding: 3px 8px;
+      font-size: 11px; font-weight: 500;
+      max-width: 160px;
+    }
+    .chip-name {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chip-remove {
+      background: none; border: none;
+      color: var(--chip-text); cursor: pointer;
+      font-size: 13px; line-height: 1;
+      padding: 0; flex-shrink: 0;
+      opacity: 0.7;
+    }
+    .chip-remove:hover { opacity: 1; }
+
+    /* ── BUSCA ── */
+    .search-header {
+      padding: 10px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .search-wrapper {
+      position: relative;
+    }
+    .search-icon {
+      position: absolute; left: 10px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light); font-size: 14px;
+      pointer-events: none;
     }
     input#searchInput {
-      width: 100%; box-sizing: border-box; padding: 10px 12px;
-      border: 1px solid var(--border); border-radius: 4px;
-      font-size: 14px; outline: none;
+      width: 100%; padding: 8px 30px 8px 32px;
+      border: 1px solid var(--border);
+      border-radius: 20px; font-size: 13px;
+      outline: none; font-family: inherit;
+      background: var(--bg);
     }
-    input#searchInput:focus { border-color: var(--primary); }
-    .results-container { flex: 1; overflow-y: auto; padding: 8px 0; }
+    input#searchInput:focus {
+      border-color: var(--primary);
+      background: white;
+    }
+    .clear-search {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none;
+      color: var(--text-light); cursor: pointer;
+      font-size: 16px; display: none;
+      padding: 0; line-height: 1;
+    }
+
+    /* ── RESULTADOS ── */
+    .results-info {
+      padding: 4px 12px;
+      font-size: 11px; color: var(--text-light);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      display: none;
+    }
+    .results-container {
+      flex: 1; overflow-y: auto;
+    }
     .result-item {
-      padding: 8px 16px; cursor: pointer; display: flex;
-      align-items: center; gap: 10px; color: var(--text);
+      padding: 8px 16px; cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text);
+      outline: none;
     }
-    .result-item:hover { background-color: #f1f3f4; }
-    .result-item.selected { background-color: var(--hover); color: var(--primary); font-weight: 500; }
+    .result-item:hover { background: #f1f3f4; }
+    .result-item.selected { background: var(--hover); color: var(--primary); font-weight: 500; }
+    .result-item.focused { outline: 2px solid var(--primary); outline-offset: -2px; }
     .custom-check {
-      width: 16px; height: 16px; border: 2px solid #5f6368; border-radius: 2px;
+      width: 16px; height: 16px;
+      border: 2px solid #5f6368; border-radius: 2px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0; background: white;
     }
-    .result-item.selected .custom-check { background-color: var(--primary); border-color: var(--primary); }
-    .result-item.selected .custom-check::after { content: '✓'; color: white; font-size: 12px; font-weight: bold; }
-    .footer {
-      padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center;
+    .result-item.selected .custom-check {
+      background: var(--primary); border-color: var(--primary);
     }
+    .check-mark {
+      color: white; font-size: 11px; font-weight: bold; display: none;
+    }
+    .result-item.selected .check-mark { display: block; }
+    .item-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .empty-msg {
+      padding: 24px 16px; text-align: center;
+      color: var(--text-light); font-size: 12px;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      padding: 10px 16px; background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .footer-info { font-size: 11px; color: var(--text-light); }
     button#btnInsert {
-      background-color: var(--primary); color: white; border: none; padding: 8px 20px;
-      border-radius: 4px; font-weight: 600; cursor: pointer; opacity: 0.5; pointer-events: none;
+      background: var(--primary); color: white;
+      border: none; padding: 8px 20px;
+      border-radius: 4px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      font-size: 12px; opacity: 0.5; pointer-events: none;
+      transition: background 0.15s;
     }
     button#btnInsert.active { opacity: 1; pointer-events: auto; }
+    button#btnInsert.active:hover { background: var(--primary-dark); }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 60px; left: 50%;
+      transform: translateX(-50%);
+      background: #323232; color: white;
+      padding: 8px 16px; border-radius: 4px;
+      font-size: 12px; display: none; z-index: 100;
+      white-space: nowrap;
+    }
+    .toast.error { background: var(--danger); }
+    .toast.success { background: var(--success); }
   </style>
 </head>
 <body>
 
-  <div class="config-header" onclick="toggleConfig()">
-    <span>⚙️ Configuração da Fonte</span>
+  <!-- CONFIGURAÇÃO -->
+  <div class="config-header" onclick="toggleConfig()" title="Clique para configurar a fonte de dados">
+    <span>⚙️ Fonte de Dados</span>
     <span id="configIcon">▼</span>
   </div>
-
   <div class="config-panel" id="configPanel">
     <div class="config-row">
       <label>Aba:</label>
-      <select id="sheetSelect" onchange="loadColumnsForSheet()"></select>
+      <select id="sheetSelect" onchange="onSheetChange()"></select>
     </div>
     <div class="config-row">
       <label>Coluna:</label>
-      <select id="colSelect"></select>
+      <select id="colSelect" onchange="onColChange()"></select>
     </div>
-    <button class="btn-reload" onclick="reloadData()">Atualizar Lista</button>
+    <button class="btn-reload" onclick="reloadData()">↺ Atualizar Lista</button>
   </div>
 
-  <div class="header">
-    <input type="text" id="searchInput" placeholder="Filtrar..." autocomplete="off" autofocus>
+  <!-- PAINEL DE SELECIONADOS -->
+  <div class="selected-panel" id="selectedPanel">
+    <div class="selected-panel-header">
+      <span id="selectedCount">0 selecionados</span>
+      <button class="btn-clear-all" onclick="clearAllSelected()">Limpar tudo</button>
+    </div>
+    <div class="chips-container" id="chipsContainer"></div>
   </div>
 
+  <!-- BUSCA -->
+  <div class="search-header">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Filtrar..." autocomplete="off" autofocus>
+      <button class="clear-search" id="clearSearch" onclick="clearSearchInput()" title="Limpar">✕</button>
+    </div>
+  </div>
+
+  <!-- INFO DE RESULTADOS -->
+  <div class="results-info" id="resultsInfo"></div>
+
+  <!-- LISTA -->
   <div class="results-container" id="resultsList">
-    <div style="padding:20px; text-align:center; color:#888;">Carregando...</div>
+    <div class="empty-msg">Carregando...</div>
   </div>
 
+  <!-- RODAPÉ -->
   <div class="footer">
-    <span class="info-text" id="statusText">0 itens</span>
+    <span class="footer-info" id="statusText">0 selecionado(s)</span>
     <button id="btnInsert" onclick="inserirDados()">INSERIR</button>
   </div>
 
+  <div class="toast" id="toast"></div>
+
   <script>
-    let rawData = [];
-    let selectedSet = new Set();
-    const DEFAULT_SHEET = '5.COST.LIST';
-    const DEFAULT_COL_INDEX = 6;
+    let rawData    = [];        // todos os dados da coluna
+    let filtered   = [];        // resultado do filtro atual
+    let selectedSet = new Set(); // itens selecionados
+    let focusedIdx  = -1;       // índice focado por teclado
 
+    // =========================================================
+    // INICIALIZAÇÃO
+    // =========================================================
     window.onload = () => {
-      google.script.run.withSuccessHandler(populateSheetSelect).getSheetList();
-    };
-
-    function populateSheetSelect(sheets) {
-      const select = document.getElementById('sheetSelect');
-      select.innerHTML = '';
-      sheets.forEach(sheetName => {
-        const option = document.createElement('option');
-        option.value = sheetName;
-        option.text = sheetName;
-        if (sheetName === DEFAULT_SHEET) option.selected = true;
-        select.appendChild(option);
-      });
-      loadColumnsForSheet(true); 
-    }
-
-    function loadColumnsForSheet(isInitialLoad = false) {
-      const sheetName = document.getElementById('sheetSelect').value;
-      const colSelect = document.getElementById('colSelect');
-      colSelect.innerHTML = '<option>Carregando...</option>';
-      colSelect.disabled = true;
+      // Registra listener de teclado UMA VEZ
+      document.getElementById('searchInput').addEventListener('input', onSearchInput);
+      document.getElementById('searchInput').addEventListener('keydown', onSearchKeydown);
 
       google.script.run
-        .withSuccessHandler((headers) => populateColumnSelect(headers, isInitialLoad))
+        .withSuccessHandler(onInitData)
+        .withFailureHandler(err => showToast('Erro ao carregar: ' + err.message, 'error'))
+        .getSuperBuscaInitData();
+    };
+
+    function onInitData(data) {
+      // Escolhe aba inicial: userState → defaultSheet
+      const targetSheet = (data.userState && data.userState.sheetName) || data.defaultSheet;
+      const targetCol   = (data.userState && data.userState.colIndex)  || data.defaultCol;
+
+      // Popula dropdown de abas
+      const sheetSel = document.getElementById('sheetSelect');
+      sheetSel.innerHTML = '';
+      data.sheets.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = (name === targetSheet);
+        sheetSel.appendChild(opt);
+      });
+
+      // Carrega colunas da aba selecionada
+      loadColumnsForSheet(targetCol, true);
+    }
+
+    function loadColumnsForSheet(targetColIndex, isFirstLoad) {
+      const sheetName = document.getElementById('sheetSelect').value;
+      const colSel = document.getElementById('colSelect');
+      colSel.innerHTML = '<option>...</option>';
+      colSel.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(headers => {
+          colSel.innerHTML = '';
+          colSel.disabled = false;
+          headers.forEach(h => {
+            const opt = document.createElement('option');
+            opt.value = h.index;
+            opt.textContent = h.name;
+            opt.selected = (h.index === targetColIndex);
+            colSel.appendChild(opt);
+          });
+          if (isFirstLoad) reloadData();
+        })
+        .withFailureHandler(err => {
+          colSel.disabled = false;
+          showToast('Erro ao carregar colunas: ' + err.message, 'error');
+        })
         .getColumnHeaders(sheetName);
     }
 
-    function populateColumnSelect(headers, isInitialLoad) {
-      const select = document.getElementById('colSelect');
-      select.innerHTML = '';
-      select.disabled = false;
+    // =========================================================
+    // EVENTOS DE CONFIG
+    // =========================================================
+    function onSheetChange() {
+      loadColumnsForSheet(null, true);
+      persistState();
+    }
 
-      if (headers.length === 0) {
-        select.innerHTML = '<option>(Sem colunas)</option>';
-        return;
-      }
+    function onColChange() {
+      persistState();
+    }
 
-      headers.forEach(h => {
-        const option = document.createElement('option');
-        option.value = h.index;
-        option.text = h.name;
-        if (isInitialLoad && h.index === DEFAULT_COL_INDEX) {
-          option.selected = true;
-        }
-        select.appendChild(option);
-      });
-
-      if (isInitialLoad) reloadData();
+    function persistState() {
+      const sheetName = document.getElementById('sheetSelect').value;
+      const colIndex  = Number(document.getElementById('colSelect').value);
+      if (!sheetName || !colIndex) return;
+      google.script.run.saveSuperBuscaState(sheetName, colIndex);
     }
 
     function toggleConfig() {
       const panel = document.getElementById('configPanel');
       panel.classList.toggle('open');
-      document.getElementById('configIcon').innerText = panel.classList.contains('open') ? '▲' : '▼';
+      document.getElementById('configIcon').textContent = panel.classList.contains('open') ? '▲' : '▼';
     }
 
     function reloadData() {
       const list = document.getElementById('resultsList');
-      list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Carregando dados...</div>';
-      
+      list.innerHTML = '<div class="empty-msg">Carregando dados...</div>';
+      document.getElementById('resultsInfo').style.display = 'none';
+      focusedIdx = -1;
+
       const sheetVal = document.getElementById('sheetSelect').value;
-      const colVal = document.getElementById('colSelect').value;
+      const colVal   = document.getElementById('colSelect').value;
 
       google.script.run
         .withSuccessHandler(onDataLoaded)
-        .withFailureHandler(err => list.innerHTML = `Erro: ${err.message}`)
+        .withFailureHandler(err => {
+          list.innerHTML = `<div class="empty-msg">Erro: ${err.message}</div>`;
+        })
         .getDadosParaBusca(sheetVal, colVal);
     }
 
     function onDataLoaded(data) {
       rawData = data || [];
-      const list = document.getElementById('resultsList');
-      list.innerHTML = rawData.length === 0 
-        ? '<div style="padding:20px; text-align:center; color:#888;">Lista vazia.</div>'
-        : '<div style="padding:20px; text-align:center; color:#888;">Digite para filtrar...</div>';
-      
-      selectedSet.clear();
-      updateFooter();
-      const currentSearch = document.getElementById('searchInput').value;
-      if (currentSearch) runFilter();
-      document.getElementById('searchInput').addEventListener('input', runFilter);
+      filtered = [];
+      renderEmptyState();
+      // Reabre com a busca atual se houver
+      const q = document.getElementById('searchInput').value;
+      if (q.trim()) runFilter();
+    }
+
+    // =========================================================
+    // BUSCA E FILTRO
+    // =========================================================
+    function onSearchInput() {
+      const val = document.getElementById('searchInput').value;
+      document.getElementById('clearSearch').style.display = val ? 'block' : 'none';
+      runFilter();
+      focusedIdx = -1;
     }
 
     function runFilter() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      if (!query.trim()) {
-        renderList([]); 
-        document.getElementById('resultsList').innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Digite para filtrar...</div>';
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      if (!query) {
+        filtered = [];
+        renderEmptyState();
         return;
       }
       const tokens = query.split(/\s+/).filter(t => t.length > 0);
-      const filtered = rawData.filter(item => {
-        const itemLower = item.toLowerCase();
-        return tokens.every(token => itemLower.includes(token));
+      filtered = rawData.filter(item => {
+        const lower = item.toLowerCase();
+        return tokens.every(t => lower.includes(t));
       });
-      renderList(filtered);
+      renderList();
     }
 
-    // --- FUNÇÃO DE RENDERIZAÇÃO SEM LIMITES ---
-    function renderList(items) {
+    function clearSearchInput() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('clearSearch').style.display = 'none';
+      filtered = [];
+      renderEmptyState();
+      focusedIdx = -1;
+      document.getElementById('searchInput').focus();
+    }
+
+    // =========================================================
+    // RENDERIZAÇÃO
+    // =========================================================
+    function renderEmptyState() {
+      const info = document.getElementById('resultsInfo');
+      info.style.display = 'none';
+      const container = document.getElementById('resultsList');
+      const div = document.createElement('div');
+      div.className = 'empty-msg';
+      div.textContent = rawData.length > 0 ? 'Digite para filtrar...' : 'Lista vazia.';
+      container.innerHTML = '';
+      container.appendChild(div);
+    }
+
+    function renderList() {
       const container = document.getElementById('resultsList');
       container.innerHTML = '';
+      focusedIdx = -1;
 
-      if (items.length === 0) {
-        container.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Nenhum resultado.</div>';
+      const info = document.getElementById('resultsInfo');
+      if (filtered.length === 0) {
+        info.style.display = 'none';
+        const div = document.createElement('div');
+        div.className = 'empty-msg';
+        div.textContent = 'Nenhum resultado.';
+        container.appendChild(div);
         return;
       }
 
-      // REMOVIDO: const limit = 50;
-      // REMOVIDO: const viewItems = items.slice(0, limit);
-      
-      // AGORA EXIBE TUDO
-      items.forEach(text => {
+      info.textContent = `${filtered.length} de ${rawData.length} itens`;
+      info.style.display = 'block';
+
+      filtered.forEach((text, idx) => {
         const div = document.createElement('div');
-        const isSelected = selectedSet.has(text);
-        div.className = `result-item ${isSelected ? 'selected' : ''}`;
-        div.onclick = () => toggleItem(text, div);
-        div.innerHTML = `<div class="custom-check"></div><span>${text}</span>`;
+        div.className = 'result-item' + (selectedSet.has(text) ? ' selected' : '');
+        div.dataset.idx = idx;
+        div.tabIndex = -1;
+
+        const check = document.createElement('div');
+        check.className = 'custom-check';
+        const mark = document.createElement('span');
+        mark.className = 'check-mark';
+        mark.textContent = '✓';
+        check.appendChild(mark);
+
+        const span = document.createElement('span');
+        span.className = 'item-text';
+        span.textContent = text; // seguro — textContent
+
+        div.appendChild(check);
+        div.appendChild(span);
+
+        div.addEventListener('click', () => toggleItem(text, div));
         container.appendChild(div);
       });
-      
-      // REMOVIDO: Bloco "if (items.length > limit) { ... }"
     }
 
+    // =========================================================
+    // NAVEGAÇÃO POR TECLADO
+    // ↑↓ navega, Space seleciona, Enter insere
+    // =========================================================
+    function onSearchKeydown(e) {
+      const items = document.querySelectorAll('.result-item');
+      if (items.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocused(Math.min(focusedIdx + 1, items.length - 1), items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocused(Math.max(focusedIdx - 1, 0), items);
+      } else if (e.key === ' ' && focusedIdx >= 0) {
+        e.preventDefault();
+        const text = filtered[focusedIdx];
+        if (text !== undefined) toggleItem(text, items[focusedIdx]);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focusedIdx >= 0 && filtered[focusedIdx] !== undefined) {
+          // Seleciona o item focado se ainda não estiver selecionado
+          const text = filtered[focusedIdx];
+          if (!selectedSet.has(text)) toggleItem(text, items[focusedIdx]);
+        }
+        if (selectedSet.size > 0) inserirDados();
+      } else if (e.key === 'Escape') {
+        clearSearchInput();
+      }
+    }
+
+    function setFocused(idx, items) {
+      if (focusedIdx >= 0 && items[focusedIdx]) {
+        items[focusedIdx].classList.remove('focused');
+      }
+      focusedIdx = idx;
+      if (items[focusedIdx]) {
+        items[focusedIdx].classList.add('focused');
+        items[focusedIdx].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    // =========================================================
+    // SELEÇÃO
+    // =========================================================
     function toggleItem(text, el) {
       if (selectedSet.has(text)) {
         selectedSet.delete(text);
@@ -244,36 +526,118 @@
         el.classList.add('selected');
       }
       updateFooter();
+      updateSelectedPanel();
     }
 
+    function clearAllSelected() {
+      selectedSet.clear();
+      document.querySelectorAll('.result-item.selected').forEach(el => el.classList.remove('selected'));
+      updateFooter();
+      updateSelectedPanel();
+    }
+
+    function removeFromSelection(text) {
+      selectedSet.delete(text);
+      // Remove classe do item visível, se existir
+      document.querySelectorAll('.result-item').forEach(el => {
+        const span = el.querySelector('.item-text');
+        if (span && span.textContent === text) el.classList.remove('selected');
+      });
+      updateFooter();
+      updateSelectedPanel();
+    }
+
+    // =========================================================
+    // PAINEL DE SELECIONADOS (CHIPS)
+    // =========================================================
+    function updateSelectedPanel() {
+      const panel    = document.getElementById('selectedPanel');
+      const chips    = document.getElementById('chipsContainer');
+      const countEl  = document.getElementById('selectedCount');
+      const count    = selectedSet.size;
+
+      chips.innerHTML = '';
+      panel.style.display = count > 0 ? 'block' : 'none';
+      countEl.textContent = `${count} selecionado(s)`;
+
+      selectedSet.forEach(text => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+
+        const name = document.createElement('span');
+        name.className = 'chip-name';
+        name.textContent = text;
+        name.title = text;
+
+        const btn = document.createElement('button');
+        btn.className = 'chip-remove';
+        btn.textContent = '×';
+        btn.title = 'Remover';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeFromSelection(text);
+        });
+
+        chip.appendChild(name);
+        chip.appendChild(btn);
+        chips.appendChild(chip);
+      });
+    }
+
+    // =========================================================
+    // FOOTER
+    // =========================================================
     function updateFooter() {
       const count = selectedSet.size;
-      document.getElementById('statusText').innerText = `${count} selecionado(s)`;
+      document.getElementById('statusText').textContent = `${count} selecionado(s)`;
       const btn = document.getElementById('btnInsert');
       if (count > 0) {
         btn.classList.add('active');
-        btn.innerText = `INSERIR (${count})`;
+        btn.textContent = `INSERIR (${count})`;
       } else {
         btn.classList.remove('active');
-        btn.innerText = 'INSERIR';
+        btn.textContent = 'INSERIR';
       }
     }
 
+    // =========================================================
+    // INSERIR
+    // =========================================================
     function inserirDados() {
       const itens = Array.from(selectedSet);
       if (itens.length === 0) return;
+
       const btn = document.getElementById('btnInsert');
-      btn.innerText = '...';
+      btn.textContent = '...';
+      btn.classList.remove('active');
+
       google.script.run
-        .withSuccessHandler(() => {
-          selectedSet.clear();
-          document.querySelectorAll('.result-item.selected').forEach(el => el.classList.remove('selected'));
+        .withSuccessHandler(result => {
+          if (result && result.success) {
+            showToast(`✓ ${result.data.inserted} item(s) inserido(s)`, 'success');
+            clearAllSelected();
+            clearSearchInput();
+          } else {
+            showToast('Erro: ' + (result && result.error ? result.error : 'Falha desconhecida'), 'error');
+            updateFooter();
+          }
+        })
+        .withFailureHandler(err => {
+          showToast('Erro ao inserir: ' + err.message, 'error');
           updateFooter();
-          btn.innerText = "SUCESSO!";
-          setTimeout(() => updateFooter(), 1500);
-          document.getElementById('searchInput').focus();
         })
         .inserirItensSelecionados(itens);
+    }
+
+    // =========================================================
+    // TOAST
+    // =========================================================
+    function showToast(msg, type) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = `toast${type ? ' ' + type : ''}`;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2500);
     }
   </script>
 </body>
