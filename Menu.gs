@@ -1,6 +1,6 @@
 /**
  * @fileoverview Menu Principal - Ferramentas PLB Sheets
- * @version 2.1.0 - Adicionado Request Generator
+ * @version 2.2.0 - Desabilitado: Templates, Fixadores (sem uso)
  *
  * Este arquivo centraliza todos os menus e funções onOpen do sistema.
  * Facilita a adição ou remoção de funcionalidades do menu principal.
@@ -10,7 +10,6 @@
  *
  * Menus Disponíveis:
  * - 🔧 Relatórios Dinâmicos (BOM) - Geração e exportação de relatórios
- * - 🏗️ PLB Templates - Sistema de templates
  * - 📑 Gerenciar Abas - Organização e cores de abas
  * - 🔍 Super Busca - Busca rápida de materiais
  * - ⚙️ Configurações - Configurações gerais do sistema
@@ -43,28 +42,11 @@ function onOpen() {
     .addSeparator()
     .addItem('📋 Gerador de Request', 'openRequestSidebar')
     .addSeparator()
-    .addItem('🔧 Fixadores → Fonte', 'abrirSeletorFixadores')
-    .addSeparator()
     .addItem('📄 Exportar PDFs', 'exportPDFsWithFeedback')
     .addSeparator()
     .addItem('🗑️ Limpar Relatórios', 'clearOldReports')
     .addItem('🔄 Limpar Cache', 'forceRefreshCache')
     .addItem('🧪 Diagnóstico', 'testSystem')
-    .addToUi();
-
-  // ========================================
-  // MENU: PLB TEMPLATES
-  // ========================================
-  ui.createMenu('🏗️ PLB Templates')
-    .addItem('📋 Abrir Sidebar', 'openTemplateSidebar')
-    .addItem('🔄 Atualizar Templates', 'refreshTemplates')
-    .addSeparator()
-    .addItem('➕ Criar Template da Seleção', 'createTemplateFromSelection')
-    .addItem('⚙️ Configurar Sistema', 'openSystemConfig')
-    .addSeparator()
-    .addItem('📂 Abrir Base de Dados', 'openCentralDatabase')
-    .addItem('🧪 Testar Sistema', 'testSystemTemplate')
-    .addItem('Substituir SHELL em FIRESTOP', 'substituirShellFirestop')
     .addToUi();
 
   // ========================================
