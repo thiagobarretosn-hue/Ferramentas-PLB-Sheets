@@ -20,7 +20,7 @@
       display: flex; flex-direction: column;
       height: 100%; overflow: hidden;
     }
-    
+
     /* Layout Principal */
     .header {
       background: var(--header-bg); color: white;
@@ -28,23 +28,23 @@
       flex-shrink: 0;
     }
     .header h2 { font-size: 18px; font-weight: 600; margin: 0; }
-    
+
     .content {
       display: flex;
       flex: 1;
-      overflow: hidden; 
+      overflow: hidden;
     }
-    
-    /* ✅ Coluna da Esquerda (Configuração) */
+
+    /* Coluna da Esquerda (Configuração) */
     .config-panel {
       width: 320px;
       background: var(--card);
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column;
       flex-shrink: 0;
-      overflow: hidden; /* Scroll será interno */
+      overflow: hidden;
     }
-    
+
     .tab-buttons {
       display: flex;
       border-bottom: 1px solid var(--border);
@@ -63,15 +63,14 @@
       border-bottom-color: var(--primary);
       background: var(--card);
     }
-    
-    /* ✅ CORREÇÃO (Bug 1): Área de scroll para as abas */
+
     .config-scroll-area {
       overflow-y: auto;
       flex-grow: 1;
     }
     .tab-content { padding: 16px; }
     .tab-content:not(.active) { display: none; }
-    
+
     .config-section h3 {
       font-size: 14px; font-weight: 600;
       color: var(--section-bg); margin-bottom: 12px;
@@ -88,24 +87,23 @@
       border-radius: 6px; font-size: 12px;
       font-family: inherit; background: var(--input-bg);
     }
-    
-    /* ✅ CORREÇÃO (Bug 1): Footer do painel de config */
+
     .footer-config {
       padding: 16px;
       border-top: 1px solid var(--border);
       background: var(--card);
       flex-shrink: 0;
     }
-    
-    /* ✅ Coluna da Direita (Resultados) */
+
+    /* Coluna da Direita (Resultados) */
     .results-panel {
       flex: 1;
       display: flex;
       flex-direction: column;
-      overflow-y: auto; /* ✅ CORREÇÃO: Painel direito rola */
+      overflow-y: auto;
       padding: 20px;
     }
-    
+
     /* Painel de Filtros */
     .filter-panel { margin-bottom: 20px; }
     .filter-header {
@@ -113,8 +111,7 @@
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
     }
-    
-    /* ✅ CORREÇÃO: Painéis de filtro em 3 colunas (grid) */
+
     .filter-container {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -152,7 +149,6 @@
       background: rgba(255, 255, 255, 0.3);
       border-color: rgba(255, 255, 255, 0.6);
     }
-    /* ✅ CORREÇÃO (Bug 3): Painel de filtro com scroll interno */
     .panel-body {
       flex-grow: 1;
       overflow-y: auto;
@@ -163,9 +159,9 @@
       display: flex; align-items: center;
       padding: 6px 4px; font-size: 12px;
     }
-    .panel-item input { margin-right: 8px; }
+    .panel-item input[type="checkbox"] { margin-right: 8px; flex-shrink: 0; }
     .panel-item label { flex: 1; cursor: pointer; }
-    
+
     /* Painel de Pré-visualização */
     .preview-header {
       display: flex; justify-content: space-between; align-items: center;
@@ -188,13 +184,13 @@
     .btn-success { background: var(--success); color: white; }
     .btn-danger { background: var(--danger); color: white; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    
+
     .preview-container {
       flex: 1; overflow-y: auto;
       background: var(--card);
       border: 1px solid var(--border);
       margin-top: 16px;
-      min-height: 200px; /* Garante altura mínima */
+      min-height: 200px;
     }
     table { width: 100%; border-collapse: collapse; }
     th, td {
@@ -206,12 +202,12 @@
     }
     td:first-child { width: 40px; text-align: center; }
     td:last-child { width: 50%; }
-    td input[type="text"] { 
+    td input[type="text"] {
       width: 100%;
-      padding: 6px 8px; font-size: 11px; 
+      padding: 6px 8px; font-size: 11px;
       background: #fff;
     }
-    
+
     /* Botões link inline */
     .btn-link {
       background: none; border: none; color: var(--primary);
@@ -220,16 +216,44 @@
     }
     .btn-link:hover { color: var(--primary-dark, #1a5276); }
 
-    /* Aba de Exportar PDF */
+    /* Painel PDF (direita) */
+    .pdf-panel {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+    }
+    .pdf-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .pdf-panel-header h3 {
+      font-size: 16px; font-weight: 600;
+    }
     #pdf-list-container {
-      max-height: 300px;
+      flex: 1;
       overflow-y: auto;
-      background: var(--input-bg);
+      background: var(--card);
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 8px;
+      min-height: 200px;
     }
-    
+    .pdf-item {
+      display: flex; align-items: center;
+      padding: 6px 8px; font-size: 12px;
+      border-radius: 4px;
+      gap: 8px;
+    }
+    .pdf-item:hover { background: var(--bg); }
+    .pdf-item-name { flex: 1; }
+    .pdf-preview-text {
+      font-size: 11px; color: var(--text-light);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 300px;
+    }
+
     /* Status */
     .status {
       position: fixed; bottom: 20px; left: 20px; padding: 12px 20px;
@@ -250,15 +274,15 @@
   </div>
 
   <div class="content">
-    
+
     <div class="config-panel">
-    
+
       <div class="tab-buttons">
         <div class="tab-button active" onclick="openTab('agrupamento')">1. Agrupamento</div>
         <div class="tab-button" onclick="openTab('config-relatorio')">2. Config.</div>
         <div class="tab-button" onclick="openTab('exportar-pdf')">3. Exportar</div>
       </div>
-      
+
       <div class="config-scroll-area">
         <div class="tab-content active" id="tab-agrupamento">
           <div class="config-section">
@@ -270,7 +294,7 @@
               </select>
             </div>
           </div>
-          
+
           <div class="config-section">
             <h3>Agrupamento</h3>
             <div class="form-group">
@@ -287,7 +311,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="tab-content" id="tab-config-relatorio">
           <div class="config-section">
             <h3>Dados BOMS</h3>
@@ -312,7 +336,7 @@
               <select id="col5Select" onchange="saveState()"></select>
             </div>
           </div>
-          
+
           <div class="config-section">
             <h3>Cabeçalho (BOM)</h3>
             <div class="form-group">
@@ -333,10 +357,10 @@
             </div>
             <div class="form-group">
               <label for="versionInput">Versão</label>
-              <input type="text" id="versionInput" oninput="saveState()">
+              <input type="text" id="versionInput" placeholder="Ex: 1" onblur="onVersionBlur()" oninput="saveState()">
             </div>
           </div>
-          
+
           <div class="config-section">
             <h3>Opções (BOM)</h3>
             <div class="form-group">
@@ -352,7 +376,8 @@
             </div>
           </div>
         </div>
-        
+
+        <!-- Tab 3: só config de exportação; lista fica no painel direito -->
         <div class="tab-content" id="tab-exportar-pdf">
           <div class="config-section">
             <h3>Configurar Exportação</h3>
@@ -362,41 +387,34 @@
             </div>
             <div class="form-group">
               <label for="prefixInput">Prefixo do PDF</label>
-              <input type="text" id="prefixInput" oninput="saveState()">
+              <input type="text" id="prefixInput" placeholder="Ex: 2024-A-" oninput="saveState(); updatePdfPreviews()">
             </div>
           </div>
-          <div class="config-section">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-              <h3 style="margin:0;">Relatórios para Exportar</h3>
-              <div style="display:flex; gap:6px;">
-                <button type="button" class="btn-link" onclick="toggleAllPdfChecks(true)">Todos</button>
-                <span style="color:var(--border);">|</span>
-                <button type="button" class="btn-link" onclick="toggleAllPdfChecks(false)">Nenhum</button>
-              </div>
-            </div>
-            <div id="pdf-list-container">
-              (Carregando automaticamente...)
-            </div>
-          </div>
-          <div class="config-section">
-             <button class="btn btn-danger" id="exportPdfBtn" onclick="exportPdfs()" disabled>
+          <div class="config-section" style="margin-top: 8px;">
+            <p style="font-size: 11px; color: var(--text-light); margin-bottom: 12px;">
+              A lista de relatórios disponíveis está no painel à direita.<br>
+              Use Shift+clique para selecionar em lote.
+            </p>
+            <button class="btn btn-danger" id="exportPdfBtn" onclick="exportPdfs()" disabled style="width:100%;">
               Exportar Selecionados
             </button>
           </div>
         </div>
-        
+
       </div>
-      
+
       <div class="footer-config">
         <button class="btn btn-success" id="generateBtn" onclick="generateReports()" disabled>
           Gerar Relatórios
         </button>
       </div>
     </div>
-    
+
+    <!-- Painel direito -->
     <div class="results-panel">
-    
-      <div class="filter-panel">
+
+      <!-- Filtros (tabs 1 e 2) -->
+      <div class="filter-panel" id="filterPanel">
         <div class="filter-header">
           <h3>3. Painéis de Filtro</h3>
         </div>
@@ -415,8 +433,9 @@
           </div>
         </div>
       </div>
-      
-      <div class="preview-panel">
+
+      <!-- Preview (tabs 1 e 2) -->
+      <div class="preview-panel" id="previewPanel">
         <div class="preview-header">
           <h3>4. Pré-visualização</h3>
           <div class="find-replace">
@@ -440,22 +459,39 @@
           </table>
         </div>
       </div>
-      
+
+      <!-- Painel PDF (tab 3) — ocupa o painel direito completo -->
+      <div class="pdf-panel" id="pdf-panel">
+        <div class="pdf-panel-header">
+          <h3>Relatórios para Exportar</h3>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <span style="font-size:11px; color:var(--text-light);">Shift+clique para seleção em lote</span>
+            <button type="button" class="btn-link" onclick="toggleAllPdfChecks(true)">Todos</button>
+            <span style="color:var(--border);">|</span>
+            <button type="button" class="btn-link" onclick="toggleAllPdfChecks(false)">Nenhum</button>
+          </div>
+        </div>
+        <div id="pdf-list-container">
+          (Carregando automaticamente...)
+        </div>
+      </div>
+
     </div>
-    
+
   </div>
-  
+
   <div id="status" class="status"></div>
 
   <script>
     let allColumns = [];
     let currentConfig = {};
     let generatedCombinations = [];
-    // ✅ NOVO (V2.13): Flag para evitar recargas múltiplas de PDF
-    let isPdfListLoading = false; 
-    const STATE_KEY = 'BOM_SIDEBAR_STATE_V2_12'; // Mantém a mesma chave de estado
+    let isPdfListLoading = false;
+    let lastCheckedPdf = null;
+    const lastCheckedInPanel = {};
+    const STATE_KEY = 'BOM_SIDEBAR_STATE_V2_12';
 
-    // --- CHAVES DE CONFIGURAÇÃO (Cliente) ---
+    // --- CHAVES DE CONFIGURAÇÃO ---
     const CONFIG_KEYS = {
       SOURCE_SHEET: 'Aba Origem',
       GROUP_L1: 'Agrupar por Nível 1', GROUP_L2: 'Agrupar por Nível 2', GROUP_L3: 'Agrupar por Nível 3',
@@ -464,7 +500,7 @@
       SORT_BY: 'CLASSIFICAR POR', SORT_ORDER: 'ORDEM',
       DRIVE_FOLDER_ID: 'Pasta Drive ID', PDF_PREFIX: 'PDF Prefixo'
     };
-    
+
     const formFields = {
       'sourceSheetSelect': CONFIG_KEYS.SOURCE_SHEET,
       'groupL1Select': CONFIG_KEYS.GROUP_L1, 'groupL2Select': CONFIG_KEYS.GROUP_L2, 'groupL3Select': CONFIG_KEYS.GROUP_L3,
@@ -475,7 +511,9 @@
       'prefixInput': CONFIG_KEYS.PDF_PREFIX
     };
 
+    // =========================================================
     // 1. INICIALIZAÇÃO
+    // =========================================================
     window.addEventListener('load', () => {
       google.script.run
         .withSuccessHandler(onInitDataLoaded)
@@ -485,30 +523,34 @@
 
     async function onInitDataLoaded(data) {
       allColumns = data.allColumns || [];
-      currentConfig = data.currentConfig || {}; 
-      
-      const savedState = await loadState(); // Carrega o estado salvo
-      
+      currentConfig = data.currentConfig || {};
+
+      const savedState = await loadState();
+
       if (savedState && savedState.settings) {
         currentConfig = { ...currentConfig, ...savedState.settings };
       }
 
       // Popular Aba Origem
       const ssSelect = document.getElementById('sourceSheetSelect');
-      ssSelect.options.length = 1; 
+      ssSelect.options.length = 1;
       data.allSheets.forEach(sheetName => {
         const option = new Option(sheetName, sheetName);
         option.selected = (sheetName === currentConfig[CONFIG_KEYS.SOURCE_SHEET]);
         ssSelect.add(option);
       });
-      
+
       populateGroupDropdowns();
       populateReportConfig();
-      
-      // Carrega painéis e aplica estado salvo (se houver)
+
+      // Auto-detecta colunas se não houver configuração salva
+      if (!savedState || !savedState.settings || !savedState.settings[CONFIG_KEYS.COL_2]) {
+        autoDetectColumns(allColumns);
+      }
+
       await loadPanels(savedState);
     }
-    
+
     function onSourceSheetChange() {
       const newSource = document.getElementById('sourceSheetSelect').value;
       if (!newSource) return;
@@ -520,6 +562,7 @@
           allColumns = columns || [];
           populateGroupDropdowns();
           populateReportConfig();
+          autoDetectColumns(allColumns);  // Auto-detecta ao trocar aba
           saveState();
           loadPanels();
         })
@@ -527,14 +570,48 @@
         .getSheetColumnsByName(newSource);
     }
 
-    // Popula "1. Agrupamento"
+    /**
+     * Detecta colunas automaticamente por nome de cabeçalho.
+     * Preenche apenas selects que ainda não têm valor selecionado.
+     */
+    function autoDetectColumns(columns) {
+      const patterns = [
+        // [selectId, keywords, sobreescrever-se-vazio]
+        ['col1Select',   ['UNIT ID', 'UNIT_ID', 'FLOOR ID', 'ID'],    false],
+        ['col2Select',   ['DESC', 'DESCRIPTION'],                      false],
+        ['col3Select',   ['UPC'],                                       false],
+        ['col4Select',   ['UOM', 'UNIT OF MEASURE'],                   false],
+        ['col5Select',   ['QTY', 'QUANTITY', 'PROJECT'],               false],
+        ['sortBySelect', ['DESC', 'DESCRIPTION'],                      false],
+      ];
+
+      let anyChanged = false;
+      patterns.forEach(([id, keywords]) => {
+        const el = document.getElementById(id);
+        if (!el || el.value) return; // Não sobrescreve seleção existente
+
+        const match = columns.find(col => {
+          const upper = col.toUpperCase();
+          return keywords.some(kw => upper.includes(kw));
+        });
+        if (match) {
+          el.value = match;
+          currentConfig[formFields[id]] = match;
+          anyChanged = true;
+        }
+      });
+
+      if (anyChanged) saveState();
+    }
+
+    // Popula dropdowns de agrupamento
     function populateGroupDropdowns() {
       const selects = [
         { el: document.getElementById('groupL1Select'), key: CONFIG_KEYS.GROUP_L1 },
         { el: document.getElementById('groupL2Select'), key: CONFIG_KEYS.GROUP_L2 },
         { el: document.getElementById('groupL3Select'), key: CONFIG_KEYS.GROUP_L3 }
       ];
-      
+
       selects.forEach(s => {
         s.el.options.length = 1;
         allColumns.forEach(colName => {
@@ -544,19 +621,19 @@
         });
       });
     }
-    
-    // Popula "2. Config. Relatório" e "3. Exportar PDF"
+
+    // Popula "2. Config. Relatório"
     function populateReportConfig() {
       for (const [elementId, configKey] of Object.entries(formFields)) {
-        if (configKey.startsWith('Agrupar') || configKey === 'Aba Origem') continue; 
-        
+        if (configKey.startsWith('Agrupar') || configKey === 'Aba Origem') continue;
+
         const el = document.getElementById(elementId);
         if (!el) continue;
-        
+
         if (el.tagName === 'SELECT') {
           if (elementId.startsWith('col') || elementId === 'sortBySelect') {
-            el.options.length = 0; 
-            el.add(new Option('-- Selecione a Coluna --', '')); 
+            el.options.length = 0;
+            el.add(new Option('-- Selecione a Coluna --', ''));
             allColumns.forEach(colName => {
               const option = new Option(colName, colName);
               option.selected = (colName === currentConfig[configKey]);
@@ -571,32 +648,34 @@
       }
     }
 
-    // 2. CARREGAR PAINÉIS DE FILTRO (Automático)
+    // =========================================================
+    // 2. CARREGAR PAINÉIS DE FILTRO
+    // =========================================================
     function onGroupChange() {
-      saveState(); // Salva a mudança no dropdown
-      loadPanels(); // Carrega os painéis
+      saveState();
+      loadPanels();
     }
 
-    // ✅ CORREÇÃO (V2.13): Função 'async' para esperar os painéis
     async function loadPanels(savedState = null) {
       const levels = [
         { id: 'panel-L1', colName: document.getElementById('groupL1Select').value },
         { id: 'panel-L2', colName: document.getElementById('groupL2Select').value },
         { id: 'panel-L3', colName: document.getElementById('groupL3Select').value }
       ];
-      
+
       showStatus('Carregando valores únicos...', 'info');
       document.getElementById('previewBody').innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Carregando filtros...</td></tr>';
-      
+
       const panelPromises = levels.map(level => {
         const container = document.getElementById(level.id);
         container.innerHTML = '';
-        
+
         if (level.colName) {
-          container.innerHTML = `<div class="panel-header">${level.id.replace('panel-', 'NÍVEL ')}: ...</div>
-                                 <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Carregando...)</div></div>`;
-          
-          // Retorna uma promessa que resolve quando o painel está pronto
+          const placeholder = document.createElement('div');
+          placeholder.className = 'panel-header';
+          placeholder.textContent = `${level.id.replace('panel-', 'NÍVEL ')}: ...`;
+          container.appendChild(placeholder);
+
           const sheetName = document.getElementById('sourceSheetSelect').value;
           return new Promise((resolve, reject) => {
             google.script.run
@@ -604,32 +683,44 @@
                 buildPanel(level.id, level.colName, values);
                 resolve();
               })
-              .withFailureHandler(err => {
-                onError(err);
-                reject(err);
-              })
+              .withFailureHandler(err => { onError(err); reject(err); })
               .getUniqueValuesForColumn(level.colName, sheetName);
           });
         } else {
-          container.innerHTML = `<div class="panel-header" style="background: var(--disabled-text);">${level.id.replace('panel-', 'NÍVEL ')}</div>
-                                 <div class="panel-body"><div class="panel-item" style="color: var(--text-light);">(Não configurado)</div></div>`;
-          return Promise.resolve(); // Resolve imediatamente
+          const header = document.createElement('div');
+          header.className = 'panel-header';
+          header.style.background = 'var(--disabled-text)';
+          header.textContent = level.id.replace('panel-', 'NÍVEL ');
+          container.appendChild(header);
+
+          const body = document.createElement('div');
+          body.className = 'panel-body';
+          const msg = document.createElement('div');
+          msg.className = 'panel-item';
+          msg.style.color = 'var(--text-light)';
+          msg.textContent = '(Não configurado)';
+          body.appendChild(msg);
+          container.appendChild(body);
+          return Promise.resolve();
         }
       });
-      
-      // Espera todos os painéis carregarem
+
       await Promise.all(panelPromises);
-      
+
       if (savedState && savedState.filterState) {
         applyFilterState(savedState.filterState);
-        updatePreview(savedState); // Passa o estado salvo para a pré-visualização
+        updatePreview(savedState);
       } else {
-        updatePreview(); // Atualiza a pré-visualização normal
+        updatePreview();
       }
-      
+
       showStatus('Painéis carregados!', 'success');
     }
-    
+
+    /**
+     * Constrói painel de filtro com suporte a Shift+clique.
+     * Usa DOM seguro (sem innerHTML com dados externos).
+     */
     function buildPanel(panelId, colName, values) {
       const container = document.getElementById(panelId);
       container.innerHTML = '';
@@ -655,34 +746,56 @@
 
       if (values.length > 0) {
         values.forEach(val => {
+          const strVal = String(val);
           const item = document.createElement('div');
           item.className = 'panel-item';
-          item.innerHTML = `
-            <input type="checkbox" id="cb-${panelId}-${val}" value="${val}" onchange="onFilterChange()">
-            <label for="cb-${panelId}-${val}">${val}</label>
-          `;
+
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          const cbId = `cb-${panelId}-${strVal}`;
+          cb.id = cbId;
+          cb.value = strVal;
+          cb.addEventListener('click', (e) => handlePanelCheckClick(e, panelId, cb));
+
+          const label = document.createElement('label');
+          label.htmlFor = cbId;
+          label.textContent = strVal; // seguro — textContent
+
+          item.appendChild(cb);
+          item.appendChild(label);
           body.appendChild(item);
         });
       } else {
-        body.innerHTML = '<div class="panel-item">Nenhum valor encontrado.</div>';
+        const empty = document.createElement('div');
+        empty.className = 'panel-item';
+        empty.textContent = 'Nenhum valor encontrado.';
+        body.appendChild(empty);
       }
 
       container.appendChild(header);
       container.appendChild(body);
     }
-    
+
+    /** Shift+clique em checkboxes do painel de filtro */
+    function handlePanelCheckClick(e, panelId, cb) {
+      if (e.shiftKey && lastCheckedInPanel[panelId]) {
+        const panel = document.getElementById(panelId);
+        const allCbs = Array.from(panel.querySelectorAll('input[type="checkbox"]'));
+        const lastIdx = allCbs.indexOf(lastCheckedInPanel[panelId]);
+        const currIdx = allCbs.indexOf(cb);
+        const start = Math.min(lastIdx, currIdx);
+        const end   = Math.max(lastIdx, currIdx);
+        allCbs.slice(start, end + 1).forEach(c => c.checked = cb.checked);
+      }
+      lastCheckedInPanel[panelId] = cb;
+      onFilterChange();
+    }
+
     function togglePanelSelection(panelId) {
       const panel = document.getElementById(panelId);
       const checkboxes = panel.querySelectorAll('input[type="checkbox"]');
-
-      // Verifica se todos estão marcados
       const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-
-      // Se todos estão marcados, desmarca todos; senão, marca todos
-      checkboxes.forEach(cb => {
-        cb.checked = !allChecked;
-      });
-
+      checkboxes.forEach(cb => { cb.checked = !allChecked; });
       onFilterChange();
     }
 
@@ -691,17 +804,19 @@
       updatePreview();
     }
 
+    // =========================================================
     // 3. ATUALIZAR PRÉ-VISUALIZAÇÃO
+    // =========================================================
     function updatePreview(savedState = null) {
       const selectedGroups = {};
       const groupConfigs = [];
-      
+
       const levels = [
         { id: 'panel-L1', key: 'NÍVEL 1', colName: document.getElementById('groupL1Select').value },
         { id: 'panel-L2', key: 'NÍVEL 2', colName: document.getElementById('groupL2Select').value },
         { id: 'panel-L3', key: 'NÍVEL 3', colName: document.getElementById('groupL3Select').value }
       ];
-      
+
       levels.forEach(level => {
         if (level.colName) {
           groupConfigs.push(level.colName);
@@ -709,14 +824,12 @@
           document.querySelectorAll(`#${level.id} input[type="checkbox"]:checked`).forEach(cb => {
             checked.push(cb.value);
           });
-          if (checked.length > 0) {
-            selectedGroups[level.key] = checked;
-          }
+          if (checked.length > 0) selectedGroups[level.key] = checked;
         }
       });
 
       if (Object.keys(selectedGroups).length === 0) {
-        buildPreviewTable([]); 
+        buildPreviewTable([]);
         return;
       }
 
@@ -736,52 +849,77 @@
         .withFailureHandler(onError)
         .getCombinationsForPreview(selectedGroups, groupConfigs, sheetName);
     }
-    
+
     function buildPreviewTable(combinations) {
-      generatedCombinations = []; 
+      generatedCombinations = [];
       const tbody = document.getElementById('previewBody');
       tbody.innerHTML = '';
-      
+
       if (combinations.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Nenhuma combinação encontrada.</td></tr>';
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 3;
+        td.style.cssText = 'text-align: center; padding: 20px;';
+        td.textContent = 'Nenhuma combinação encontrada.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
         document.getElementById('generateBtn').disabled = true;
         return;
       }
-      
+
       combinations.forEach((combo, index) => {
         const displayCombo = combo.replace(/\|\|\|/g, '.');
-        generatedCombinations.push({
-          index: index,
-          combination: combo,
-          displayCombination: displayCombo
-        });
-        
+        generatedCombinations.push({ index, combination: combo, displayCombination: displayCombo });
+
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><input type="checkbox" class="preview-check" data-combination="${combo}" onchange="saveState()" checked></td>
-          <td>${displayCombo}</td>
-          <td><input type="text" class="kojo-suffix" data-combination="${combo}" oninput="saveState()" value="${displayCombo}"></td>
-        `;
+
+        // Checkbox
+        const tdCb = document.createElement('td');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'preview-check';
+        cb.dataset.combination = combo;
+        cb.checked = true;
+        cb.addEventListener('change', () => saveState());
+        tdCb.appendChild(cb);
+
+        // Combinação
+        const tdCombo = document.createElement('td');
+        tdCombo.textContent = displayCombo;
+
+        // Sufixo Kojo
+        const tdSuffix = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'kojo-suffix';
+        input.dataset.combination = combo;
+        input.value = displayCombo;
+        input.addEventListener('input', () => saveState());
+        tdSuffix.appendChild(input);
+
+        tr.appendChild(tdCb);
+        tr.appendChild(tdCombo);
+        tr.appendChild(tdSuffix);
         tbody.appendChild(tr);
       });
-      
+
       document.getElementById('generateBtn').disabled = false;
     }
-    
+
     function toggleAllPreview(checked) {
       document.querySelectorAll('.preview-check').forEach(cb => cb.checked = checked);
       saveState();
     }
-    
+
     function findAndReplaceKojo() {
       const findText = document.getElementById('findInput').value;
       const replaceText = document.getElementById('replaceInput').value;
-      
+
       if (!findText) {
-        showStatus("Por favor, insira um texto para 'Localizar'.", "error");
+        showStatus("Por favor, insira um texto para 'Localizar'.", 'error');
         return;
       }
-      
+
       let count = 0;
       document.querySelectorAll('.kojo-suffix').forEach(input => {
         const originalValue = input.value;
@@ -791,39 +929,40 @@
           count++;
         }
       });
-      
+
       showStatus(`${count} sufixo(s) atualizado(s)!`, 'success');
-      saveState(); 
+      saveState();
     }
 
+    // =========================================================
     // 4. GERAR RELATÓRIOS
+    // =========================================================
     function generateReports() {
       const selections = [];
       document.querySelectorAll('.preview-check:checked').forEach(cb => {
         const combination = cb.dataset.combination;
         const kojoSuffix = document.querySelector(`.kojo-suffix[data-combination="${combination}"]`).value;
-        
         selections.push({
           combination: combination,
           kojoSuffix: kojoSuffix || combination.replace(/\|\|\|/g, '.')
         });
       });
-      
+
       if (selections.length === 0) {
         showStatus('Nenhum relatório selecionado para gerar.', 'error');
         return;
       }
-      
+
       const reportSettings = getState().settings;
-      
+
       if (!reportSettings[CONFIG_KEYS.SOURCE_SHEET] || !reportSettings[CONFIG_KEYS.GROUP_L1] ||
-          !reportSettings[CONFIG_KEYS.COL_1] || !reportSettings[CONFIG_KEYS.COL_2] || 
+          !reportSettings[CONFIG_KEYS.COL_1] || !reportSettings[CONFIG_KEYS.COL_2] ||
           !reportSettings[CONFIG_KEYS.COL_5] || !reportSettings[CONFIG_KEYS.SORT_BY]) {
         showStatus('Erro: Verifique as configurações. Aba Origem, Nível 1, Colunas 1, 2, 5 e Classificar Por são obrigatórios.', 'error');
         openTab('config-relatorio');
         return;
       }
-      
+
       showStatus(`Gerando ${selections.length} relatório(s)...`, 'info');
       document.getElementById('generateBtn').disabled = true;
 
@@ -839,37 +978,72 @@
         .withFailureHandler(onError)
         .runProcessingFromHtml(selections, reportSettings);
     }
-    
+
+    // =========================================================
     // 5. EXPORTAR PDF
-    // ✅ CORREÇÃO (V2.13): Esta função agora é chamada pela openTab
+    // =========================================================
+
+    /** Carrega lista de relatórios no painel PDF (direita) */
     function loadPdfSheets() {
-      if (isPdfListLoading) return; // Evita múltiplas chamadas
+      if (isPdfListLoading) return;
       isPdfListLoading = true;
-      
-      showStatus('Carregando relatórios...', 'info');
+
+      const container = document.getElementById('pdf-list-container');
+      container.textContent = '(Carregando...)';
       document.getElementById('exportPdfBtn').disabled = true;
-      document.getElementById('pdf-list-container').innerHTML = '(Carregando...)';
-      
+      lastCheckedPdf = null;
+
       google.script.run
         .withSuccessHandler(sheetNames => {
-          const container = document.getElementById('pdf-list-container');
           container.innerHTML = '';
           if (!sheetNames || sheetNames.length === 0) {
-            container.innerHTML = 'Nenhum relatório encontrado para exportar.';
+            container.textContent = 'Nenhum relatório encontrado para exportar.';
             document.getElementById('exportPdfBtn').disabled = true;
             isPdfListLoading = false;
             return;
           }
-          
+
+          const prefix = document.getElementById('prefixInput').value || '';
+
           sheetNames.forEach(name => {
             const item = document.createElement('div');
-            item.className = 'panel-item';
-            item.innerHTML = `
-              <input type="checkbox" class="pdf-check" id="pdf-${name}" value="${name}" checked>
-              <label for="pdf-${name}">${name}</label>
-            `;
+            item.className = 'pdf-item';
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'pdf-check';
+            const cbId = `pdf-cb-${name}`;
+            cb.id = cbId;
+            cb.value = name;
+            cb.checked = true;
+            cb.addEventListener('click', (e) => {
+              // Shift+clique para seleção em lote
+              if (e.shiftKey && lastCheckedPdf) {
+                const allCbs = Array.from(container.querySelectorAll('.pdf-check'));
+                const lastIdx = allCbs.indexOf(lastCheckedPdf);
+                const currIdx = allCbs.indexOf(cb);
+                const start = Math.min(lastIdx, currIdx);
+                const end   = Math.max(lastIdx, currIdx);
+                allCbs.slice(start, end + 1).forEach(c => c.checked = cb.checked);
+              }
+              lastCheckedPdf = cb;
+            });
+
+            const label = document.createElement('label');
+            label.htmlFor = cbId;
+            label.className = 'pdf-item-name';
+            label.textContent = name; // seguro — textContent
+
+            const preview = document.createElement('span');
+            preview.className = 'pdf-preview-text';
+            preview.textContent = `→ ${prefix}${name}.pdf`;
+
+            item.appendChild(cb);
+            item.appendChild(label);
+            item.appendChild(preview);
             container.appendChild(item);
           });
+
           document.getElementById('exportPdfBtn').disabled = false;
           showStatus(`${sheetNames.length} relatórios carregados.`, 'success');
           isPdfListLoading = false;
@@ -880,7 +1054,16 @@
         })
         .getReportSheetNamesForHtml();
     }
-    
+
+    /** Atualiza preview de nome quando prefixo muda */
+    function updatePdfPreviews() {
+      const prefix = document.getElementById('prefixInput').value || '';
+      document.querySelectorAll('.pdf-check').forEach(cb => {
+        const preview = cb.closest('.pdf-item') && cb.closest('.pdf-item').querySelector('.pdf-preview-text');
+        if (preview) preview.textContent = `→ ${prefix}${cb.value}.pdf`;
+      });
+    }
+
     function toggleAllPdfChecks(checked) {
       document.querySelectorAll('.pdf-check').forEach(cb => cb.checked = checked);
     }
@@ -890,15 +1073,15 @@
       document.querySelectorAll('.pdf-check:checked').forEach(cb => {
         sheetNames.push(cb.value);
       });
-      
+
       if (sheetNames.length === 0) {
         showStatus('Nenhum relatório selecionado para exportar.', 'error');
         return;
       }
-      
+
       const folderInput = document.getElementById('folderInput').value;
       const prefix = document.getElementById('prefixInput').value;
-      
+
       showStatus(`Exportando ${sheetNames.length} PDF(s)...`, 'info');
       document.getElementById('exportPdfBtn').disabled = true;
 
@@ -914,8 +1097,22 @@
         .withFailureHandler(onError)
         .runPdfExportFromHtml(sheetNames, folderInput, prefix);
     }
-    
-    // 6. SALVAR/CARREGAR ESTADO
+
+    // =========================================================
+    // 6. VERSÃO — AUTO-FORMATAÇÃO
+    // =========================================================
+    function onVersionBlur() {
+      const el = document.getElementById('versionInput');
+      const val = el.value.trim();
+      if (val && /^\d+$/.test(val)) {
+        el.value = String(parseInt(val, 10)).padStart(2, '0');
+      }
+      saveState();
+    }
+
+    // =========================================================
+    // 7. SALVAR/CARREGAR ESTADO
+    // =========================================================
     function saveState() {
       try {
         const state = getState();
@@ -925,14 +1122,14 @@
         console.warn('Não foi possível salvar o estado:', e.message);
       }
     }
-    
+
     function getState() {
       const settings = {};
       for (const [elementId, configKey] of Object.entries(formFields)) {
         const el = document.getElementById(elementId);
         if (el) settings[configKey] = el.value;
       }
-      
+
       const filterState = {};
       document.querySelectorAll('.group-level').forEach(panel => {
         const panelId = panel.id;
@@ -942,7 +1139,7 @@
         });
         if (checked.length > 0) filterState[panelId] = checked;
       });
-      
+
       const kojoState = {};
       const previewState = [];
       document.querySelectorAll('.preview-check').forEach(cb => {
@@ -951,36 +1148,32 @@
         const kojoInput = document.querySelector(`.kojo-suffix[data-combination="${combo}"]`);
         if (kojoInput) kojoState[combo] = kojoInput.value;
       });
-      
+
       return { settings, filterState, kojoState, previewState };
     }
-    
+
     async function loadState() {
       try {
-        // Tenta carregar do servidor primeiro
         const serverState = await new Promise((resolve, reject) => {
           google.script.run
             .withSuccessHandler(resolve)
             .withFailureHandler(reject)
             .getUserSidebarState();
         });
-        
+
         if (serverState) {
-          localStorage.setItem(STATE_KEY, JSON.stringify(serverState)); // Sincroniza local
+          localStorage.setItem(STATE_KEY, JSON.stringify(serverState));
           return serverState;
         }
-        
-        // Se não houver no servidor, tenta no local
+
         const localStateJson = localStorage.getItem(STATE_KEY);
-        if (localStateJson) {
-          return JSON.parse(localStateJson);
-        }
+        if (localStateJson) return JSON.parse(localStateJson);
       } catch (e) {
         console.warn('Não foi possível carregar o estado.', e);
       }
       return null;
     }
-    
+
     function applyFilterState(filterState) {
       if (!filterState) return;
       for (const [panelId, checkedValues] of Object.entries(filterState)) {
@@ -993,14 +1186,12 @@
         }
       }
     }
-    
+
     function applyPreviewState(kojoState, previewState) {
       if (kojoState) {
         document.querySelectorAll('.kojo-suffix').forEach(input => {
           const combo = input.dataset.combination;
-          if (kojoState[combo]) {
-            input.value = kojoState[combo];
-          }
+          if (kojoState[combo]) input.value = kojoState[combo];
         });
       }
       if (previewState) {
@@ -1010,35 +1201,43 @@
         });
       }
     }
-    
-    // --- UTILITÁRIOS DO HTML ---
-    
-    // ✅ CORREÇÃO (V2.13): Carrega PDFs automaticamente
+
+    // =========================================================
+    // 8. UTILITÁRIOS
+    // =========================================================
+
+    /** Alterna entre abas e controla visibilidade do painel direito */
     function openTab(tabName) {
       document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
       document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
-      
+
       document.getElementById(`tab-${tabName}`).classList.add('active');
       document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add('active');
-      
-      if (tabName === 'exportar-pdf') {
+
+      const isPdfTab = tabName === 'exportar-pdf';
+      document.getElementById('filterPanel').style.display  = isPdfTab ? 'none' : '';
+      document.getElementById('previewPanel').style.display = isPdfTab ? 'none' : '';
+      const pdfPanel = document.getElementById('pdf-panel');
+      pdfPanel.style.display = isPdfTab ? 'flex' : 'none';
+
+      if (isPdfTab) {
+        isPdfListLoading = false; // Reset para permitir recarga
         loadPdfSheets();
       }
     }
-    
+
     function onError(error) {
       console.error(error);
       showStatus(`Erro: ${error.message}`, 'error');
       document.getElementById('generateBtn').disabled = false;
       document.getElementById('exportPdfBtn').disabled = false;
     }
-    
+
     function showStatus(msg, type) {
       const status = document.getElementById('status');
       status.textContent = msg;
       status.className = `status ${type}`;
       status.style.display = 'block';
-      
       const duration = (type === 'info') ? 2000 : 4000;
       setTimeout(() => status.style.display = 'none', duration);
     }
