@@ -1,13 +1,8 @@
 /**
  * SUPER BUSCA - FERRAMENTAS PLB SHEETS
- * Versão: Dropdown Híbrido (Nome ou Letra da Coluna)
+ * Versão: 2.0 - sort, cache, persistência de estado, config dinâmica
  */
 
-/**
- * Configuracao do Super Busca
- * Valores dinamicos obtidos de AppConfig (lib/Shared/Config.gs)
- * Use showConfigDialog() para alterar via interface
- */
 const SUPER_BUSCA_CONFIG = {
   get SOURCE_SHEET() {
     return AppConfig.get('SUPER_BUSCA_SOURCE_SHEET', '5.COST.LIST');
@@ -15,20 +10,29 @@ const SUPER_BUSCA_CONFIG = {
   get DEFAULT_COL_INDEX() {
     return AppConfig.get('SUPER_BUSCA_DEFAULT_COL', 6);
   },
-  MENU_TITLE: '🔍 Super Busca'
+  MENU_TITLE: '🔍 Super Busca',
+  CACHE_TTL: 300,
+  USER_STATE_KEY: 'SB_USER_STATE_V1'
+};
+
+// Cache por aba+coluna para evitar re-leitura da planilha a cada reload
+const SBCache = {
+  _c: CacheService.getScriptCache(),
+  get: (key) => {
+    try { const v = SBCache._c.get(key); return v ? JSON.parse(v) : null; } catch(e) { return null; }
+  },
+  put: (key, value) => {
+    try { SBCache._c.put(key, JSON.stringify(value), SUPER_BUSCA_CONFIG.CACHE_TTL); } catch(e) {}
+  }
 };
 
 // ============================================================================
-// FUNÇÕES PRINCIPAIS (PUBLICAS)
-// Estas funções são chamadas pelo menu ou pela sidebar HTML
+// FUNÇÕES PRINCIPAIS (PÚBLICAS)
 // ============================================================================
 
 /**
  * Abre a sidebar do Super Busca
- * Chamada pelo menu: '🔍 Super Busca' > '🚀 Abrir Painel'
- *
  * @public
- * @returns {void}
  */
 function abrirSuperBuscaSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('SuperBuscaSidebar.html')
@@ -38,75 +42,99 @@ function abrirSuperBuscaSidebar() {
 }
 
 /**
- * Retorna lista de nomes de todas as abas da planilha
- * Chamada pela sidebar para popular dropdown de abas
+ * Retorna todos os dados de inicialização do sidebar em uma única chamada:
+ * - defaults de config (AppConfig)
+ * - lista de abas
+ * - último estado salvo pelo usuário (aba + coluna)
  *
  * @public
- * @returns {string[]} Array com nomes das abas
+ * @returns {{ defaultSheet: string, defaultCol: number, sheets: string[], userState: Object|null }}
+ */
+function getSuperBuscaInitData() {
+  const defaultSheet = SUPER_BUSCA_CONFIG.SOURCE_SHEET;
+  const defaultCol   = Number(SUPER_BUSCA_CONFIG.DEFAULT_COL_INDEX);
+  const sheets       = SpreadsheetApp.getActiveSpreadsheet().getSheets().map(s => s.getName());
+
+  let userState = null;
+  try {
+    const saved = PropertiesService.getUserProperties().getProperty(SUPER_BUSCA_CONFIG.USER_STATE_KEY);
+    if (saved) userState = JSON.parse(saved);
+  } catch(e) {}
+
+  return { defaultSheet, defaultCol, sheets, userState };
+}
+
+/**
+ * Persiste a última aba + coluna escolhida pelo usuário
+ * Chamada automaticamente ao mudar aba ou coluna no sidebar
+ *
+ * @public
+ * @param {string} sheetName
+ * @param {number} colIndex
+ */
+function saveSuperBuscaState(sheetName, colIndex) {
+  try {
+    PropertiesService.getUserProperties().setProperty(
+      SUPER_BUSCA_CONFIG.USER_STATE_KEY,
+      JSON.stringify({ sheetName, colIndex: Number(colIndex) })
+    );
+    return { success: true };
+  } catch(e) {
+    return { success: false };
+  }
+}
+
+/**
+ * Retorna lista de nomes de todas as abas da planilha
+ * @public
+ * @returns {string[]}
  */
 function getSheetList() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheets().map(s => s.getName());
 }
 
 /**
- * Retorna lista de colunas com nome/indice para dropdown
- * Se a coluna tiver cabeçalho na linha 1, mostra o nome
- * Caso contrário, mostra "Coluna X" (letra da coluna)
+ * Retorna lista de colunas com nome e índice para o dropdown
  *
  * @public
- * @param {string} [sheetName] - Nome da aba (usa SOURCE_SHEET se omitido)
- * @returns {Array<{name: string, index: number}>} Lista de colunas
- *
- * @example
- * getColumnHeaders('MinhaPlanilha')
- * // [{ name: 'Descrição', index: 1 }, { name: 'Coluna B', index: 2 }]
+ * @param {string} [sheetName]
+ * @returns {Array<{name: string, index: number}>}
  */
 function getColumnHeaders(sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName || SUPER_BUSCA_CONFIG.SOURCE_SHEET);
   if (!sheet) return [];
-
   const lastCol = sheet.getLastColumn();
   if (lastCol < 1) return [];
-
-  // Pega valores da linha 1
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  
-  // Mapeia TODAS as colunas
-  const list = headers.map((h, i) => {
-    const colIndex = i + 1;
-    const text = String(h).trim();
-    const letter = indexToLetter(colIndex);
-    
-    // Lógica: Se tem texto, usa o texto. Se vazio, usa "Coluna [Letra]"
+  return headers.map((h, i) => {
+    const colIndex   = i + 1;
+    const text       = String(h).trim();
+    const letter     = indexToLetter(colIndex);
     const displayName = text ? text : `Coluna ${letter}`;
-    
     return { name: displayName, index: colIndex };
   });
-
-  return list;
 }
 
 /**
- * Busca valores únicos de uma coluna para popular lista de busca
- * Ignora a linha 1 (cabeçalho) e remove valores vazios e duplicados
+ * Busca valores únicos de uma coluna, ordenados alfabeticamente (numeric-aware)
+ * Usa cache de 5 minutos para evitar re-leitura em cada interação
  *
  * @public
- * @param {string} [sheetName] - Nome da aba (usa SOURCE_SHEET se omitido)
- * @param {number} [colIndex] - Indice da coluna 1-indexed (usa DEFAULT_COL_INDEX se omitido)
- * @returns {string[]} Lista de valores únicos ordenados ou array vazio em caso de erro
- *
- * @example
- * getDadosParaBusca('Materiais', 3)
- * // ['Item A', 'Item B', 'Item C']
+ * @param {string} [sheetName]
+ * @param {number} [colIndex]
+ * @returns {string[]}
  */
 function getDadosParaBusca(sheetName, colIndex) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-
     const targetSheetName = sheetName || SUPER_BUSCA_CONFIG.SOURCE_SHEET;
-    const targetCol = SharedUtils_toPositiveInteger(colIndex, SUPER_BUSCA_CONFIG.DEFAULT_COL_INDEX);
+    const targetCol       = SharedUtils_toPositiveInteger(colIndex, SUPER_BUSCA_CONFIG.DEFAULT_COL_INDEX);
 
+    const cacheKey = `sb_${targetSheetName}_${targetCol}`;
+    const cached   = SBCache.get(cacheKey);
+    if (cached) return cached;
+
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(targetSheetName);
     if (!sheet) {
       console.error(`[SuperBusca] Aba "${targetSheetName}" nao encontrada`);
@@ -116,10 +144,13 @@ function getDadosParaBusca(sheetName, colIndex) {
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return [];
 
-    const values = sheet.getRange(2, targetCol, lastRow - 1, 1).getDisplayValues();
+    const values    = sheet.getRange(2, targetCol, lastRow - 1, 1).getDisplayValues();
+    const listaLimpa = [...new Set(values.flat().filter(item => item !== ''))];
 
-    const listaLimpa = values.flat().filter(item => item !== "");
-    return [...new Set(listaLimpa)];
+    listaLimpa.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+
+    SBCache.put(cacheKey, listaLimpa);
+    return listaLimpa;
 
   } catch (error) {
     console.error(`[SuperBusca] Erro em getDadosParaBusca: ${error.message}`);
@@ -128,39 +159,28 @@ function getDadosParaBusca(sheetName, colIndex) {
 }
 
 /**
- * Insere itens selecionados na célula ativa da planilha
- * Os itens são inseridos verticalmente, um por linha, a partir da célula ativa
- * Após inserção, a célula ativa é movida para a próxima linha disponível
+ * Insere itens selecionados na célula ativa, verticalmente
+ * Retorna resposta padronizada — sidebar DEVE verificar result.success
  *
  * @public
- * @param {string[]} itens - Lista de itens a inserir
- * @returns {Object} Resposta padronizada { success: boolean, data?: { inserted: number }, error?: string }
- *
- * @example
- * // Na sidebar:
- * google.script.run.inserirItensSelecionados(['Item 1', 'Item 2', 'Item 3']);
+ * @param {string[]} itens
+ * @returns {{ success: boolean, data?: { inserted: number }, error?: string }}
  */
 function inserirItensSelecionados(itens) {
   try {
     if (!itens || itens.length === 0) {
       return SharedUtils_errorResponse('Nenhum item selecionado');
     }
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getActiveSheet();
+    const ss         = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet      = ss.getActiveSheet();
     const activeCell = sheet.getActiveCell();
+    const row        = activeCell.getRow();
+    const col        = activeCell.getColumn();
 
-    const row = activeCell.getRow();
-    const col = activeCell.getColumn();
-
-    const dadosParaInserir = itens.map(item => [item]);
-    sheet.getRange(row, col, dadosParaInserir.length, 1).setValues(dadosParaInserir);
-
-    const nextRow = row + dadosParaInserir.length;
-    sheet.getRange(nextRow, col).activate();
+    sheet.getRange(row, col, itens.length, 1).setValues(itens.map(item => [item]));
+    sheet.getRange(row + itens.length, col).activate();
 
     return SharedUtils_successResponse({ inserted: itens.length });
-
   } catch (error) {
     console.error(`[SuperBusca] Erro em inserirItensSelecionados: ${error.message}`);
     return SharedUtils_errorResponse(error);
@@ -168,8 +188,7 @@ function inserirItensSelecionados(itens) {
 }
 
 /**
- * Auxiliar: Converte 1 -> A, 2 -> B, 27 -> AA
- * Usa funcao centralizada de lib/Shared/Utils.gs
+ * Auxiliar: Converte índice numérico em letra de coluna (1→A, 27→AA)
  */
 function indexToLetter(column) {
   return SharedUtils_numberToColumnLetter(column);
