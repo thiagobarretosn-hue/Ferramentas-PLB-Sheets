@@ -1,6 +1,6 @@
 /**
  * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS + FIXADORES (BOM)
- * @version 3.0.0 - Arquitetura independente (sem aba Config)
+ * @version 3.1.0 - Correções: prefixo PDF, versão zero-pad, cache registry, empty-sheet guards
  *
  * V3.0: Cada ferramenta opera de forma independente:
  * - BomSidebar gerencia suas próprias configurações via PropertiesService
@@ -159,13 +159,23 @@ const CacheManager = {
   },
   put: (key, value, ttl = BOM_CONFIG.CACHE_TTL) => {
     CacheManager._cache.put(key, JSON.stringify(value), ttl);
+    // Registra a chave para que invalidateAll possa removê-la
+    try {
+      const regJson = CacheManager._cache.get('bom_cache_keys');
+      const keys = regJson ? JSON.parse(regJson) : [];
+      if (!keys.includes(key)) {
+        keys.push(key);
+        CacheManager._cache.put('bom_cache_keys', JSON.stringify(keys), 3600);
+      }
+    } catch (e) {}
   },
   invalidateAll: () => {
-    // Limpa todos os caches de valores únicos por coluna
     try {
-      const allKeys = CacheManager._cache.getAll(['unique_values']);
-      CacheManager._cache.removeAll(Object.keys(allKeys));
-    } catch (e) { /* ignora */ }
+      const regJson = CacheManager._cache.get('bom_cache_keys');
+      const keys = regJson ? JSON.parse(regJson) : [];
+      if (keys.length) CacheManager._cache.removeAll(keys);
+      CacheManager._cache.remove('bom_cache_keys');
+    } catch (e) {}
   }
 };
 
@@ -352,7 +362,12 @@ function processBomCore(combinationsToProcess, settings) {
 
   const dataMap = new Map();
   combinationsToProcess.forEach(item => dataMap.set(item.combination, []));
-  const allData = sourceSheet.getRange(2, 1, sourceSheet.getLastRow() - 1, sourceSheet.getLastColumn()).getValues();
+
+  const lastDataRow = sourceSheet.getLastRow();
+  if (lastDataRow < 2) {
+    return { success: false, message: `Aba "${settings[K.SOURCE_SHEET]}" não tem dados.` };
+  }
+  const allData = sourceSheet.getRange(2, 1, lastDataRow - 1, sourceSheet.getLastColumn()).getValues();
 
   for (const row of allData) {
     const rowCombination = groupIndices
@@ -374,7 +389,7 @@ function processBomCore(combinationsToProcess, settings) {
     const rawData = dataMap.get(combination);
     if (!rawData || rawData.length === 0) return;
 
-    const processedData = groupAndSumData(rawData, sortOrder); // Corrigido
+    const processedData = groupAndSumData(rawData, sortOrder);
 
     // ✅ MUDANÇA (V2.12): Nomeia a aba usando o kojoSuffix
     const sanitizedName = Utils.sanitizeSheetName(kojoSuffix);
@@ -398,7 +413,8 @@ function groupAndSumData(data, sortOrder) {
   const grouped = {};
 
   data.forEach(row => {
-    const key = `${row[0]}|${row[1]}|${row[2]}|${row[3]}`;
+    // Usa BOM_CONFIG.DELIMITER para consistência com as combinações de grupo
+    const key = [row[0], row[1], row[2], row[3]].join(BOM_CONFIG.DELIMITER);
     if (grouped[key]) {
       grouped[key][4] += row[4];
     } else {
@@ -433,7 +449,7 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
     bom: settings[K.BOM],
     kojoPrefix: settings[K.KOJO_PREFIX],
     engineer: settings[K.ENGINEER],
-    version: settings[K.VERSION]
+    version: Utils.formatVersion(settings[K.VERSION])  // ✅ FIX: aplica zero-pad na escrita
   };
   const headers = {
     h1: Utils.getColumnHeader(settings[K.COL_1]),
@@ -476,7 +492,7 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
 
 /**
  * Remove abas de relatório geradas
- * V3.0: Protege a aba ativa (fonte de dados) ao limpar
+ * V3.1: Usa aba fonte configurada (não aba ativa) como proteção
  *
  * @public
  * @menuitem '🔧 Relatórios Dinâmicos' > '🗑️ Limpar Relatórios'
@@ -485,18 +501,21 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
 function clearOldReports() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const activeSheetName = ss.getActiveSheet().getName();
+
+  // ✅ FIX: usa aba fonte configurada, não a aba ativa
+  const config = ConfigService.getAll();
+  const sourceSheetName = config[BOM_CONFIG.KEYS.SOURCE_SHEET] || ss.getActiveSheet().getName();
 
   const response = ui.alert(
     'Confirmação',
-    `Apagar TODAS as abas exceto "${activeSheetName}" (aba ativa)?`,
+    `Apagar TODAS as abas exceto "${sourceSheetName}" (aba fonte)?`,
     ui.ButtonSet.YES_NO
   );
   if (response !== ui.Button.YES) return;
 
   let deletedCount = 0;
   ss.getSheets().forEach(sheet => {
-    if (sheet.getName() !== activeSheetName) {
+    if (sheet.getName() !== sourceSheetName) {
       ss.deleteSheet(sheet);
       deletedCount++;
     }
@@ -653,8 +672,8 @@ function processarFixadoresSelecionados(selectedPipes) {
   const maxCol = sourceSheet.getLastColumn();
 
   selectedPipes.forEach(pipe => {
-    const fixConfig = pipe.isRiser ? BOM_CONFIG.FIXADORES.RISER : BOM_CONFIG.FIXADORES.LOOP;
-    const itemMap = pipe.isRiser ? fixConfig.clamps : fixConfig.hangs;
+    const pipeFixConfig = pipe.isRiser ? BOM_CONFIG.FIXADORES.RISER : BOM_CONFIG.FIXADORES.LOOP;
+    const itemMap = pipe.isRiser ? pipeFixConfig.clamps : pipeFixConfig.hangs;
     const fixadorItem = itemMap[pipe.diameter];
     if (!fixadorItem) return;
 
@@ -666,12 +685,12 @@ function processarFixadoresSelecionados(selectedPipes) {
     const linhaFixador = [...pipe.originalRow];
     linhaFixador[fixIdx.trade] = 'FIX';
     linhaFixador[fixIdx.desc] = fixadorItem;
-    linhaFixador[fixIdx.qty] = `=ROUNDUP(R[-1]C/${fixConfig.interval})`;
+    linhaFixador[fixIdx.qty] = `=ROUNDUP(R[-1]C/${pipeFixConfig.interval})`;
     linhasParaInserir.push(linhaFixador);
     const fixadorRow = insertRow;
 
     // Materiais
-    fixConfig.materials.forEach(mat => {
+    pipeFixConfig.materials.forEach(mat => {
       const linhaMat = [...pipe.originalRow];
       linhaMat[fixIdx.trade] = 'FIX';
       linhaMat[fixIdx.desc] = mat.desc;
@@ -744,7 +763,7 @@ function removerFixadoresSelecionados(selectedPipes) {
 
 
 // ============================================================================
-// EXPORTAÇÃO PDF (V2.12)
+// EXPORTAÇÃO PDF (V3.1)
 // ============================================================================
 
 /**
@@ -754,22 +773,23 @@ function removerFixadoresSelecionados(selectedPipes) {
  * @public
  * @param {string[]} sheetNames - Nomes das abas a exportar
  * @param {string} folderInput - ID da pasta Drive ou nome para criar
- * @param {string} prefix - Prefixo para nome dos arquivos (não usado atualmente)
+ * @param {string} prefix - Prefixo para nome dos arquivos PDF
  * @returns {{success: boolean, message?: string, exported?: number, folder?: string}}
  */
 function runPdfExportFromHtml(sheetNames, folderInput, prefix) {
   if (!sheetNames || sheetNames.length === 0) {
     return { success: false, message: 'Nenhuma aba selecionada' };
   }
-  const folder = getFolderFromInput(folderInput, folderInput); // Usa o input como ID e fallback de nome
+  const folder = getFolderFromInput(folderInput, folderInput);
   if (!folder) return { success: false, message: `Pasta não encontrada ou inválida: ${folderInput}` };
 
   sheetNames.forEach(sheetName => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (sheet) {
-      // Lê o nome da BOM KOJO da célula B3 (onde está "BOM KOJO:")
       const bomKojoName = getBomKojoNameFromSheet(sheet);
-      const fileName = bomKojoName || sheetName; // Fallback para o nome da sheet se não encontrar
+      const baseName = bomKojoName || sheetName;
+      // ✅ FIX: aplica prefixo do campo "Prefixo do PDF" ao nome do arquivo
+      const fileName = prefix ? `${prefix}${baseName}` : baseName;
       exportSheetToPdf(sheet, fileName, folder);
     }
   });
@@ -801,11 +821,13 @@ function exportPDFsWithFeedback() {
     return;
   }
 
+  const prefix = config[K.PDF_PREFIX] || '';
   sheetNames.forEach(sheetName => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (sheet) {
       const bomKojoName = getBomKojoNameFromSheet(sheet);
-      const fileName = bomKojoName || sheetName;
+      const baseName = bomKojoName || sheetName;
+      const fileName = prefix ? `${prefix}${baseName}` : baseName;
       exportSheetToPdf(sheet, fileName, folder);
     }
   });
@@ -972,7 +994,10 @@ function getCombinationsForPreview(selectedGroups, groupConfigs, sheetName) {
   const activeSelectionLevels = Object.keys(panelSelections).filter(level => panelSelections[level].size > 0);
   if (activeSelectionLevels.length === 0) return [];
 
-  const allData = sourceSheet.getRange(2, 1, sourceSheet.getLastRow() - 1, sourceSheet.getLastColumn()).getValues();
+  // ✅ FIX: guard contra aba vazia
+  const lastRow = sourceSheet.getLastRow();
+  if (lastRow < 2) return [];
+  const allData = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
   const existingCombinations = new Set();
 
   allData.forEach(row => {
@@ -1025,7 +1050,7 @@ function saveUserSidebarState(stateJson) {
 function getUserSidebarState() {
   try {
     const state = PropertiesService.getUserProperties().getProperty(STATE_PROPERTY_KEY);
-    return state ? JSON.parse(state) : null; // Des-serializa
+    return state ? JSON.parse(state) : null;
   } catch (e) {
     return null;
   }
@@ -1065,7 +1090,7 @@ function testSystem() {
     const config = ConfigService.getAll();
     const fixConfig = ConfigService.getFixConfig();
     const msg = [
-      `Versão do Script: 3.0 (Independente)`,
+      `Versão do Script: 3.1 (Correções PDF/Versão/Cache)`,
       `Aba Ativa: ${activeSheet.getName()}`,
       `Linhas na Aba Ativa: ${activeSheet.getLastRow() - 1}`,
       `Total de Abas: ${ss.getSheets().length}`,
@@ -1105,4 +1130,3 @@ function forceRefreshCache() {
   CacheManager.invalidateAll();
   SpreadsheetApp.getActiveSpreadsheet().toast('Cache limpo!', 'Sucesso', 3);
 }
-
