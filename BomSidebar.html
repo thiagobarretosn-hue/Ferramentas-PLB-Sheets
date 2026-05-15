@@ -265,7 +265,9 @@
     .pdf-sep-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
     .pdf-sep-row label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
     .pdf-sep-input { width: 50px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; text-align: center; }
-    .pdf-fr-row { display: flex; gap: 4px; margin-top: 4px; }
+    .pdf-block-sep-input { width: 40px; flex-shrink: 0; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; color: var(--text-light); }
+    .pdf-block-sep-input:focus { border-style: solid; color: var(--text); }
+    .pdf-fr-row { display: flex; gap: 4px; margin-bottom: 4px; align-items: center; }
     .pdf-fr-row input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
     .pdf-preview-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--text-light); word-break: break-all; margin-top: 6px; }
 
@@ -409,10 +411,8 @@
                 <input type="text" id="pdfSeparatorInput" class="pdf-sep-input" value="-" maxlength="5" oninput="onPdfConfigChange()">
               </div>
               <label style="font-size:12px; margin-top:8px; display:block;">Find &amp; Replace no nome</label>
-              <div class="pdf-fr-row">
-                <input type="text" id="pdfFindInput" placeholder="Localizar" oninput="onPdfConfigChange()">
-                <input type="text" id="pdfReplaceInput" placeholder="Substituir" oninput="onPdfConfigChange()">
-              </div>
+              <div id="pdfFindReplaceContainer"></div>
+              <button type="button" class="pdf-add-block-btn" style="margin-top:4px;" onclick="addFindReplaceRule()">+ Adicionar regra</button>
               <div class="pdf-preview-box" id="pdfBlockPreview">Prévia: (adicione blocos)</div>
             </div>
           </div>
@@ -1023,20 +1023,26 @@
     const PDF_BLOCK_TYPES = [
       ['text',       'Texto (fixo)'],
       ['kojo',       'Sufixo Kojo'],
+      ['sheet_name', 'Nome da Aba'],
       ['project',    'Projeto'],
       ['bom',        'BOM'],
+      ['engineer',   'Engenheiro'],
       ['version',    'Versão'],
-      ['sheet_name', 'Nome da Aba'],
+      ['today',      'Data Atual'],
     ];
 
-    const PDF_BLOCK_LABELS = { kojo: '[Sufixo Kojo]', project: '[Projeto]', bom: '[BOM]', version: '[Versão]', sheet_name: '[Nome Aba]' };
+    const PDF_BLOCK_LABELS = {
+      kojo: '[Sufixo Kojo]', project: '[Projeto]', bom: '[BOM]',
+      engineer: '[Engenheiro]', version: '[Versão]', sheet_name: '[Nome Aba]',
+      today: new Date().toISOString().slice(0, 10),
+    };
 
-    function addPdfBlock(type, value) {
-      _addPdfBlockRow(type || 'text', value || '');
+    function addPdfBlock(type, value, sep) {
+      _addPdfBlockRow(type || 'text', value || '', sep || '');
       onPdfConfigChange();
     }
 
-    function _addPdfBlockRow(type, value) {
+    function _addPdfBlockRow(type, value, sep) {
       const row = document.createElement('div');
       row.className = 'pdf-block-row';
 
@@ -1057,6 +1063,15 @@
       valueInput.style.display = (type === 'text') ? '' : 'none';
       valueInput.oninput = onPdfConfigChange;
 
+      const sepInput = document.createElement('input');
+      sepInput.type = 'text';
+      sepInput.className = 'pdf-block-sep-input';
+      sepInput.title = 'Sep. antes deste bloco (vazio = usar padrão)';
+      sepInput.placeholder = '…';
+      sepInput.maxLength = 5;
+      sepInput.value = sep || '';
+      sepInput.oninput = onPdfConfigChange;
+
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'pdf-block-remove';
@@ -1066,6 +1081,7 @@
 
       row.appendChild(typeSelect);
       row.appendChild(valueInput);
+      row.appendChild(sepInput);
       row.appendChild(removeBtn);
       document.getElementById('pdfBlocksContainer').appendChild(row);
     }
@@ -1075,32 +1091,81 @@
       if (valueInput) valueInput.style.display = (select.value === 'text') ? '' : 'none';
     }
 
+    /** Adiciona uma linha de find & replace */
+    function addFindReplaceRule(find, replace) {
+      _addFindReplaceRow(find || '', replace || '');
+      onPdfConfigChange();
+    }
+
+    function _addFindReplaceRow(find, replace) {
+      const row = document.createElement('div');
+      row.className = 'pdf-fr-row';
+
+      const fi = document.createElement('input');
+      fi.type = 'text';
+      fi.placeholder = 'Localizar';
+      fi.value = find;
+      fi.oninput = onPdfConfigChange;
+
+      const ri = document.createElement('input');
+      ri.type = 'text';
+      ri.placeholder = 'Substituir';
+      ri.value = replace;
+      ri.oninput = onPdfConfigChange;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'pdf-block-remove';
+      removeBtn.title = 'Remover regra';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = () => { row.remove(); onPdfConfigChange(); };
+
+      row.appendChild(fi);
+      row.appendChild(ri);
+      row.appendChild(removeBtn);
+      document.getElementById('pdfFindReplaceContainer').appendChild(row);
+    }
+
     function getPdfBlocksConfig() {
       const blocks = [];
       document.querySelectorAll('#pdfBlocksContainer .pdf-block-row').forEach(row => {
         const typeSelect = row.querySelector('.pdf-block-type-select');
         const valueInput = row.querySelector('.pdf-block-value-input');
+        const sepInput   = row.querySelector('.pdf-block-sep-input');
         const type = typeSelect ? typeSelect.value : 'text';
-        blocks.push({ type, value: (type === 'text' && valueInput) ? valueInput.value : '' });
+        blocks.push({
+          type,
+          value: (type === 'text' && valueInput) ? valueInput.value : '',
+          sep:   sepInput ? sepInput.value : '',
+        });
       });
+
+      const findReplaceRules = [];
+      document.querySelectorAll('#pdfFindReplaceContainer .pdf-fr-row').forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        if (inputs.length >= 2) findReplaceRules.push({ find: inputs[0].value, replace: inputs[1].value });
+      });
+
       return {
         blocks,
         separator: (document.getElementById('pdfSeparatorInput') || {}).value || '-',
-        find:      (document.getElementById('pdfFindInput')      || {}).value || '',
-        replace:   (document.getElementById('pdfReplaceInput')   || {}).value || '',
+        findReplaceRules,
       };
     }
 
     function setPdfBlocksConfig(config) {
       if (!config) return;
       document.getElementById('pdfBlocksContainer').innerHTML = '';
-      (config.blocks || []).forEach(b => _addPdfBlockRow(b.type || 'text', b.value || ''));
+      (config.blocks || []).forEach(b => _addPdfBlockRow(b.type || 'text', b.value || '', b.sep || ''));
+
       const sep = document.getElementById('pdfSeparatorInput');
-      const fi  = document.getElementById('pdfFindInput');
-      const ri  = document.getElementById('pdfReplaceInput');
       if (sep) sep.value = config.separator || '-';
-      if (fi)  fi.value  = config.find    || '';
-      if (ri)  ri.value  = config.replace || '';
+
+      document.getElementById('pdfFindReplaceContainer').innerHTML = '';
+      // Suporte a config antiga (find/replace único) e nova (array de regras)
+      const rules = config.findReplaceRules || (config.find ? [{ find: config.find, replace: config.replace || '' }] : []);
+      rules.forEach(r => _addFindReplaceRow(r.find || '', r.replace || ''));
+
       onPdfConfigChange();
     }
 
@@ -1109,31 +1174,48 @@
       if (!config || !config.blocks || config.blocks.length === 0) {
         return sheetData.kojo || sheetData.name;
       }
+      const todayStr = new Date().toISOString().slice(0, 10);
       const fields = {
         project: sheetData.project || '', bom: sheetData.bom || '',
-        kojo: sheetData.kojo || '', version: sheetData.version || '',
-        sheet_name: sheetData.name || '',
+        kojo: sheetData.kojo || '', engineer: sheetData.engineer || '',
+        version: sheetData.version || '', sheet_name: sheetData.name || '',
+        today: todayStr,
       };
-      const sep = config.separator || '-';
-      const parts = config.blocks
-        .map(b => b.type === 'text' ? (b.value || '') : (fields[b.type] || ''))
-        .filter(p => p !== '');
-      let name = parts.join(sep);
-      if (config.find) name = name.split(config.find).join(config.replace || '');
+      const globalSep = config.separator || '-';
+      const segments = [];
+      config.blocks.forEach(b => {
+        const val = b.type === 'text' ? (b.value || '') : (fields[b.type] || '');
+        if (!val) return;
+        if (segments.length > 0) {
+          segments.push(b.sep !== '' && b.sep !== undefined ? b.sep : globalSep);
+        }
+        segments.push(val);
+      });
+      let name = segments.join('');
+      (config.findReplaceRules || []).forEach(r => {
+        if (r.find) name = name.split(r.find).join(r.replace || '');
+      });
       return name || sheetData.name;
     }
 
     function onPdfConfigChange() {
       const config = getPdfBlocksConfig();
-      const parts = config.blocks.map(b =>
-        b.type === 'text' ? (b.value || '…') : (PDF_BLOCK_LABELS[b.type] || b.type)
-      ).filter(p => p !== '');
-      let preview = parts.join(config.separator || '-');
-      if (config.find && preview.includes(config.find)) {
-        preview = preview.split(config.find).join(config.replace || '');
-      }
+      const globalSep = config.separator || '-';
+      const segments = [];
+      config.blocks.forEach(b => {
+        const val = b.type === 'text' ? (b.value || '…') : (PDF_BLOCK_LABELS[b.type] || b.type);
+        if (!val) return;
+        if (segments.length > 0) {
+          segments.push(b.sep !== '' && b.sep !== undefined ? b.sep : globalSep);
+        }
+        segments.push(val);
+      });
+      let preview = segments.join('');
+      (config.findReplaceRules || []).forEach(r => {
+        if (r.find && preview.includes(r.find)) preview = preview.split(r.find).join(r.replace || '');
+      });
       const box = document.getElementById('pdfBlockPreview');
-      if (box) box.textContent = parts.length ? 'Prévia: ' + preview + '.pdf' : 'Prévia: (adicione blocos)';
+      if (box) box.textContent = segments.length ? 'Prévia: ' + preview + '.pdf' : 'Prévia: (adicione blocos)';
       updatePdfPreviews();
       saveState();
     }

@@ -780,6 +780,7 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
       return getBomKojoNameFromSheet(sheet) || sheet.getName();
     }
     const vals = sheet.getRange(1, 2, 6, 1).getValues();
+    const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     const fields = {
       project:    String(vals[0][0] || ''),
       bom:        String(vals[1][0] || ''),
@@ -787,13 +788,22 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
       engineer:   String(vals[3][0] || ''),
       version:    String(vals[4][0] || ''),
       sheet_name: sheet.getName(),
+      today:      todayStr,
     };
-    const sep = config.separator || '-';
-    const parts = config.blocks
-      .map(b => b.type === 'text' ? (b.value || '') : (fields[b.type] || ''))
-      .filter(p => p !== '');
-    let name = parts.join(sep);
-    if (config.find) name = name.split(config.find).join(config.replace || '');
+    const globalSep = config.separator || '-';
+    const segments = [];
+    config.blocks.forEach(b => {
+      const val = b.type === 'text' ? (b.value || '') : (fields[b.type] || '');
+      if (!val) return;
+      if (segments.length > 0) {
+        segments.push((b.sep !== '' && b.sep != null) ? b.sep : globalSep);
+      }
+      segments.push(val);
+    });
+    let name = segments.join('');
+    // Suporte a formato antigo (find/replace único) e novo (array de regras)
+    const rules = config.findReplaceRules || (config.find ? [{ find: config.find, replace: config.replace || '' }] : []);
+    rules.forEach(r => { if (r.find) name = name.split(r.find).join(r.replace || ''); });
     return name || sheet.getName();
   } catch (e) {
     Logger.log('_assemblePdfFilename error: ' + e.message);
