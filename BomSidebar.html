@@ -254,6 +254,21 @@
       max-width: 300px;
     }
 
+    /* Blocos de nome PDF */
+    .pdf-block-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+    .pdf-block-type-select { width: 110px; flex-shrink: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: white; }
+    .pdf-block-value-input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
+    .pdf-block-remove { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; flex-shrink: 0; }
+    .pdf-block-remove:hover { opacity: 0.7; }
+    .pdf-add-block-btn { width: 100%; margin-top: 5px; background: var(--header-bg); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .pdf-add-block-btn:hover { opacity: 0.85; }
+    .pdf-sep-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .pdf-sep-row label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
+    .pdf-sep-input { width: 50px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; text-align: center; }
+    .pdf-fr-row { display: flex; gap: 4px; margin-top: 4px; }
+    .pdf-fr-row input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
+    .pdf-preview-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--text-light); word-break: break-all; margin-top: 6px; }
+
     /* Status */
     .status {
       position: fixed; bottom: 20px; left: 20px; padding: 12px 20px;
@@ -386,8 +401,19 @@
               <input type="text" id="folderInput" oninput="saveState()">
             </div>
             <div class="form-group">
-              <label for="prefixInput">Prefixo do PDF</label>
-              <input type="text" id="prefixInput" placeholder="Ex: 2024-A-" oninput="saveState(); updatePdfPreviews()">
+              <label>Nome do PDF (blocos)</label>
+              <div id="pdfBlocksContainer"></div>
+              <button type="button" class="pdf-add-block-btn" onclick="addPdfBlock()">+ Adicionar bloco</button>
+              <div class="pdf-sep-row">
+                <label for="pdfSeparatorInput">Separador:</label>
+                <input type="text" id="pdfSeparatorInput" class="pdf-sep-input" value="-" maxlength="5" oninput="onPdfConfigChange()">
+              </div>
+              <label style="font-size:12px; margin-top:8px; display:block;">Find &amp; Replace no nome</label>
+              <div class="pdf-fr-row">
+                <input type="text" id="pdfFindInput" placeholder="Localizar" oninput="onPdfConfigChange()">
+                <input type="text" id="pdfReplaceInput" placeholder="Substituir" oninput="onPdfConfigChange()">
+              </div>
+              <div class="pdf-preview-box" id="pdfBlockPreview">Prévia: (adicione blocos)</div>
             </div>
           </div>
           <div class="config-section" style="margin-top: 8px;">
@@ -498,7 +524,8 @@
       COL_1: 'Coluna 1', COL_2: 'Coluna 2', COL_3: 'Coluna 3', COL_4: 'Coluna 4', COL_5: 'Coluna 5',
       PROJECT: 'Project', BOM: 'BOM', KOJO_PREFIX: 'KOJO Prefixo', ENGINEER: 'Engenheiro', VERSION: 'Versão',
       SORT_BY: 'CLASSIFICAR POR', SORT_ORDER: 'ORDEM',
-      DRIVE_FOLDER_ID: 'Pasta Drive ID', PDF_PREFIX: 'PDF Prefixo'
+      DRIVE_FOLDER_ID: 'Pasta Drive ID', PDF_PREFIX: 'PDF Prefixo',
+      PDF_BLOCKS: 'PDF Blocos Nome'
     };
 
     const formFields = {
@@ -507,8 +534,7 @@
       'col1Select': CONFIG_KEYS.COL_1, 'col2Select': CONFIG_KEYS.COL_2, 'col3Select': CONFIG_KEYS.COL_3, 'col4Select': CONFIG_KEYS.COL_4, 'col5Select': CONFIG_KEYS.COL_5,
       'projectInput': CONFIG_KEYS.PROJECT, 'bomInput': CONFIG_KEYS.BOM, 'kojoInput': CONFIG_KEYS.KOJO_PREFIX, 'engineerInput': CONFIG_KEYS.ENGINEER, 'versionInput': CONFIG_KEYS.VERSION,
       'sortBySelect': CONFIG_KEYS.SORT_BY, 'sortOrderSelect': CONFIG_KEYS.SORT_ORDER,
-      'folderInput': CONFIG_KEYS.DRIVE_FOLDER_ID,
-      'prefixInput': CONFIG_KEYS.PDF_PREFIX
+      'folderInput': CONFIG_KEYS.DRIVE_FOLDER_ID
     };
 
     // =========================================================
@@ -543,9 +569,14 @@
       populateGroupDropdowns();
       populateReportConfig();
 
-      // Auto-detecta colunas se não houver configuração salva
-      if (!savedState || !savedState.settings || !savedState.settings[CONFIG_KEYS.COL_2]) {
+      // Auto-detecta se não há config salva OU se a coluna salva não existe mais na aba atual
+      const savedCol2 = savedState && savedState.settings && savedState.settings[CONFIG_KEYS.COL_2];
+      if (!savedCol2 || !allColumns.includes(savedCol2)) {
         autoDetectColumns(allColumns);
+      }
+
+      if (savedState && savedState.pdfBlocks) {
+        setPdfBlocksConfig(savedState.pdfBlocks);
       }
 
       await loadPanels(savedState);
@@ -576,19 +607,20 @@
      */
     function autoDetectColumns(columns) {
       const patterns = [
-        // [selectId, keywords, sobreescrever-se-vazio]
-        ['col1Select',   ['UNIT ID', 'UNIT_ID', 'FLOOR ID', 'ID'],    false],
-        ['col2Select',   ['DESC', 'DESCRIPTION'],                      false],
-        ['col3Select',   ['UPC'],                                       false],
-        ['col4Select',   ['UOM', 'UNIT OF MEASURE'],                   false],
-        ['col5Select',   ['QTY', 'QUANTITY', 'PROJECT'],               false],
-        ['sortBySelect', ['DESC', 'DESCRIPTION'],                      false],
+        ['col1Select',   ['UNIT ID', 'UNIT_ID', 'FLOOR ID', 'ID']],
+        ['col2Select',   ['DESC', 'DESCRIPTION']],
+        ['col3Select',   ['UPC']],
+        ['col4Select',   ['UOM', 'UNIT OF MEASURE']],
+        ['col5Select',   ['QTY', 'QUANTITY', 'PROJECT']],
+        ['sortBySelect', ['DESC', 'DESCRIPTION']],
       ];
 
       let anyChanged = false;
       patterns.forEach(([id, keywords]) => {
         const el = document.getElementById(id);
-        if (!el || el.value) return; // Não sobrescreve seleção existente
+        if (!el) return;
+        // Mantém valor salvo apenas se ele ainda existe na lista de colunas atual
+        if (el.value && columns.includes(el.value)) return;
 
         const match = columns.find(col => {
           const upper = col.toUpperCase();
@@ -597,6 +629,11 @@
         if (match) {
           el.value = match;
           currentConfig[formFields[id]] = match;
+          anyChanged = true;
+        } else if (el.value) {
+          // Valor salvo não existe mais na aba — limpa para evitar BOM errada
+          el.value = '';
+          currentConfig[formFields[id]] = '';
           anyChanged = true;
         }
       });
@@ -673,7 +710,7 @@
         if (level.colName) {
           const placeholder = document.createElement('div');
           placeholder.className = 'panel-header';
-          placeholder.textContent = `${level.id.replace('panel-', 'NÍVEL ')}: ...`;
+          placeholder.textContent = `${level.id.replace('panel-L', 'NÍVEL ')}: ...`;
           container.appendChild(placeholder);
 
           const sheetName = document.getElementById('sourceSheetSelect').value;
@@ -731,7 +768,7 @@
 
       const headerTitle = document.createElement('span');
       headerTitle.className = 'panel-header-title';
-      headerTitle.textContent = `${panelId.replace('panel-', 'NÍVEL ')}: ${colName.split(' - ')[1] || ''}`;
+      headerTitle.textContent = `${panelId.replace('panel-L', 'NÍVEL ')}: ${colName.split(' - ')[1] || ''}`;
 
       const selectAllBtn = document.createElement('button');
       selectAllBtn.className = 'select-all-btn';
@@ -941,7 +978,7 @@
       const selections = [];
       document.querySelectorAll('.preview-check:checked').forEach(cb => {
         const combination = cb.dataset.combination;
-        const kojoSuffix = document.querySelector(`.kojo-suffix[data-combination="${combination}"]`).value;
+        const kojoSuffix = document.querySelector(`.kojo-suffix[data-combination="${CSS.escape(combination)}"]`).value;
         selections.push({
           combination: combination,
           kojoSuffix: kojoSuffix || combination.replace(/\|\|\|/g, '.')
@@ -980,10 +1017,132 @@
     }
 
     // =========================================================
-    // 5. EXPORTAR PDF
+    // 5. BLOCOS DE NOME PDF
     // =========================================================
 
-    /** Carrega lista de relatórios no painel PDF (direita) */
+    const PDF_BLOCK_TYPES = [
+      ['text',       'Texto (fixo)'],
+      ['kojo',       'Sufixo Kojo'],
+      ['project',    'Projeto'],
+      ['bom',        'BOM'],
+      ['version',    'Versão'],
+      ['sheet_name', 'Nome da Aba'],
+    ];
+
+    const PDF_BLOCK_LABELS = { kojo: '[Sufixo Kojo]', project: '[Projeto]', bom: '[BOM]', version: '[Versão]', sheet_name: '[Nome Aba]' };
+
+    function addPdfBlock(type, value) {
+      _addPdfBlockRow(type || 'text', value || '');
+      onPdfConfigChange();
+    }
+
+    function _addPdfBlockRow(type, value) {
+      const row = document.createElement('div');
+      row.className = 'pdf-block-row';
+
+      const typeSelect = document.createElement('select');
+      typeSelect.className = 'pdf-block-type-select';
+      PDF_BLOCK_TYPES.forEach(([val, label]) => {
+        const opt = new Option(label, val);
+        opt.selected = val === type;
+        typeSelect.appendChild(opt);
+      });
+      typeSelect.onchange = () => { onPdfBlockTypeChange(typeSelect); onPdfConfigChange(); };
+
+      const valueInput = document.createElement('input');
+      valueInput.type = 'text';
+      valueInput.className = 'pdf-block-value-input';
+      valueInput.placeholder = 'Texto fixo...';
+      valueInput.value = value;
+      valueInput.style.display = (type === 'text') ? '' : 'none';
+      valueInput.oninput = onPdfConfigChange;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'pdf-block-remove';
+      removeBtn.title = 'Remover bloco';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = () => { row.remove(); onPdfConfigChange(); };
+
+      row.appendChild(typeSelect);
+      row.appendChild(valueInput);
+      row.appendChild(removeBtn);
+      document.getElementById('pdfBlocksContainer').appendChild(row);
+    }
+
+    function onPdfBlockTypeChange(select) {
+      const valueInput = select.closest('.pdf-block-row').querySelector('.pdf-block-value-input');
+      if (valueInput) valueInput.style.display = (select.value === 'text') ? '' : 'none';
+    }
+
+    function getPdfBlocksConfig() {
+      const blocks = [];
+      document.querySelectorAll('#pdfBlocksContainer .pdf-block-row').forEach(row => {
+        const typeSelect = row.querySelector('.pdf-block-type-select');
+        const valueInput = row.querySelector('.pdf-block-value-input');
+        const type = typeSelect ? typeSelect.value : 'text';
+        blocks.push({ type, value: (type === 'text' && valueInput) ? valueInput.value : '' });
+      });
+      return {
+        blocks,
+        separator: (document.getElementById('pdfSeparatorInput') || {}).value || '-',
+        find:      (document.getElementById('pdfFindInput')      || {}).value || '',
+        replace:   (document.getElementById('pdfReplaceInput')   || {}).value || '',
+      };
+    }
+
+    function setPdfBlocksConfig(config) {
+      if (!config) return;
+      document.getElementById('pdfBlocksContainer').innerHTML = '';
+      (config.blocks || []).forEach(b => _addPdfBlockRow(b.type || 'text', b.value || ''));
+      const sep = document.getElementById('pdfSeparatorInput');
+      const fi  = document.getElementById('pdfFindInput');
+      const ri  = document.getElementById('pdfReplaceInput');
+      if (sep) sep.value = config.separator || '-';
+      if (fi)  fi.value  = config.find    || '';
+      if (ri)  ri.value  = config.replace || '';
+      onPdfConfigChange();
+    }
+
+    /** Monta o nome do PDF no cliente (mesma lógica do backend) */
+    function assemblePdfFilename(sheetData, config) {
+      if (!config || !config.blocks || config.blocks.length === 0) {
+        return sheetData.kojo || sheetData.name;
+      }
+      const fields = {
+        project: sheetData.project || '', bom: sheetData.bom || '',
+        kojo: sheetData.kojo || '', version: sheetData.version || '',
+        sheet_name: sheetData.name || '',
+      };
+      const sep = config.separator || '-';
+      const parts = config.blocks
+        .map(b => b.type === 'text' ? (b.value || '') : (fields[b.type] || ''))
+        .filter(p => p !== '');
+      let name = parts.join(sep);
+      if (config.find) name = name.split(config.find).join(config.replace || '');
+      return name || sheetData.name;
+    }
+
+    function onPdfConfigChange() {
+      const config = getPdfBlocksConfig();
+      const parts = config.blocks.map(b =>
+        b.type === 'text' ? (b.value || '…') : (PDF_BLOCK_LABELS[b.type] || b.type)
+      ).filter(p => p !== '');
+      let preview = parts.join(config.separator || '-');
+      if (config.find && preview.includes(config.find)) {
+        preview = preview.split(config.find).join(config.replace || '');
+      }
+      const box = document.getElementById('pdfBlockPreview');
+      if (box) box.textContent = parts.length ? 'Prévia: ' + preview + '.pdf' : 'Prévia: (adicione blocos)';
+      updatePdfPreviews();
+      saveState();
+    }
+
+    // =========================================================
+    // 6. EXPORTAR PDF
+    // =========================================================
+
+    /** Carrega lista de relatórios no painel PDF (direita) com dados de header */
     function loadPdfSheets() {
       if (isPdfListLoading) return;
       isPdfListLoading = true;
@@ -994,20 +1153,22 @@
       lastCheckedPdf = null;
 
       google.script.run
-        .withSuccessHandler(sheetNames => {
+        .withSuccessHandler(sheetDataArray => {
           container.innerHTML = '';
-          if (!sheetNames || sheetNames.length === 0) {
+          if (!sheetDataArray || sheetDataArray.length === 0) {
             container.textContent = 'Nenhum relatório encontrado para exportar.';
             document.getElementById('exportPdfBtn').disabled = true;
             isPdfListLoading = false;
             return;
           }
 
-          const prefix = document.getElementById('prefixInput').value || '';
+          const config = getPdfBlocksConfig();
 
-          sheetNames.forEach(name => {
+          sheetDataArray.forEach(sheetData => {
+            const name = sheetData.name;
             const item = document.createElement('div');
             item.className = 'pdf-item';
+            item.dataset.sheetData = JSON.stringify(sheetData);
 
             const cb = document.createElement('input');
             cb.type = 'checkbox';
@@ -1017,7 +1178,6 @@
             cb.value = name;
             cb.checked = true;
             cb.addEventListener('click', (e) => {
-              // Shift+clique para seleção em lote
               if (e.shiftKey && lastCheckedPdf) {
                 const allCbs = Array.from(container.querySelectorAll('.pdf-check'));
                 const lastIdx = allCbs.indexOf(lastCheckedPdf);
@@ -1032,11 +1192,11 @@
             const label = document.createElement('label');
             label.htmlFor = cbId;
             label.className = 'pdf-item-name';
-            label.textContent = name; // seguro — textContent
+            label.textContent = name;
 
             const preview = document.createElement('span');
             preview.className = 'pdf-preview-text';
-            preview.textContent = `→ ${prefix}${name}.pdf`;
+            preview.textContent = `→ ${assemblePdfFilename(sheetData, config)}.pdf`;
 
             item.appendChild(cb);
             item.appendChild(label);
@@ -1045,22 +1205,26 @@
           });
 
           document.getElementById('exportPdfBtn').disabled = false;
-          showStatus(`${sheetNames.length} relatórios carregados.`, 'success');
+          showStatus(`${sheetDataArray.length} relatórios carregados.`, 'success');
           isPdfListLoading = false;
         })
         .withFailureHandler(err => {
           onError(err);
           isPdfListLoading = false;
         })
-        .getReportSheetNamesForHtml();
+        .getReportSheetDataForHtml();
     }
 
-    /** Atualiza preview de nome quando prefixo muda */
+    /** Atualiza preview de nome nos itens da lista PDF */
     function updatePdfPreviews() {
-      const prefix = document.getElementById('prefixInput').value || '';
-      document.querySelectorAll('.pdf-check').forEach(cb => {
-        const preview = cb.closest('.pdf-item') && cb.closest('.pdf-item').querySelector('.pdf-preview-text');
-        if (preview) preview.textContent = `→ ${prefix}${cb.value}.pdf`;
+      const config = getPdfBlocksConfig();
+      const container = document.getElementById('pdf-list-container');
+      if (!container) return;
+      container.querySelectorAll('.pdf-item').forEach(item => {
+        const sdJson = item.dataset.sheetData;
+        if (!sdJson) return;
+        const preview = item.querySelector('.pdf-preview-text');
+        if (preview) preview.textContent = `→ ${assemblePdfFilename(JSON.parse(sdJson), config)}.pdf`;
       });
     }
 
@@ -1080,7 +1244,7 @@
       }
 
       const folderInput = document.getElementById('folderInput').value;
-      const prefix = document.getElementById('prefixInput').value;
+      const blocksConfigJson = JSON.stringify(getPdfBlocksConfig());
 
       showStatus(`Exportando ${sheetNames.length} PDF(s)...`, 'info');
       document.getElementById('exportPdfBtn').disabled = true;
@@ -1095,11 +1259,11 @@
           document.getElementById('exportPdfBtn').disabled = false;
         })
         .withFailureHandler(onError)
-        .runPdfExportFromHtml(sheetNames, folderInput, prefix);
+        .runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson);
     }
 
     // =========================================================
-    // 6. VERSÃO — AUTO-FORMATAÇÃO
+    // 7. VERSÃO — AUTO-FORMATAÇÃO
     // =========================================================
     function onVersionBlur() {
       const el = document.getElementById('versionInput');
@@ -1111,7 +1275,7 @@
     }
 
     // =========================================================
-    // 7. SALVAR/CARREGAR ESTADO
+    // 8. SALVAR/CARREGAR ESTADO
     // =========================================================
     function saveState() {
       try {
@@ -1145,11 +1309,13 @@
       document.querySelectorAll('.preview-check').forEach(cb => {
         const combo = cb.dataset.combination;
         if (cb.checked) previewState.push(combo);
-        const kojoInput = document.querySelector(`.kojo-suffix[data-combination="${combo}"]`);
+        const kojoInput = document.querySelector(`.kojo-suffix[data-combination="${CSS.escape(combo)}"]`);
         if (kojoInput) kojoState[combo] = kojoInput.value;
       });
 
-      return { settings, filterState, kojoState, previewState };
+      const pdfBlocks = getPdfBlocksConfig();
+
+      return { settings, filterState, kojoState, previewState, pdfBlocks };
     }
 
     async function loadState() {
@@ -1203,7 +1369,7 @@
     }
 
     // =========================================================
-    // 8. UTILITÁRIOS
+    // 9. UTILITÁRIOS
     // =========================================================
 
     /** Alterna entre abas e controla visibilidade do painel direito */

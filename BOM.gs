@@ -33,6 +33,7 @@ const BOM_CONFIG = {
     DRIVE_FOLDER_ID: 'Pasta Drive ID',
     DRIVE_FOLDER_NAME: 'Pasta Nome',
     PDF_PREFIX: 'PDF Prefixo',
+    PDF_BLOCKS: 'PDF Blocos Nome',
     SORT_BY: 'CLASSIFICAR POR',
     SORT_ORDER: 'ORDEM',
 
@@ -467,8 +468,8 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
     ['ENG.:', reportConfig.engineer], ['VERSION:', reportConfig.version], ['LAST UPDATE:', lastUpdate]
   ];
 
-  sheet.getRange(1, 1, headerValues.length, 2).setValues(headerValues);
   sheet.getRange(1, 2, headerValues.length, 1).setNumberFormat('@STRING@');
+  sheet.getRange(1, 1, headerValues.length, 2).setValues(headerValues);
   for (let r = 1; r <= headerValues.length; r++) {
     sheet.getRange(r, 2, 1, 4).merge();
   }
@@ -767,29 +768,61 @@ function removerFixadoresSelecionados(selectedPipes) {
 // ============================================================================
 
 /**
+ * Monta o nome do arquivo PDF a partir de blocos configurados no sidebar.
+ * @param {Sheet} sheet - Aba do relatório
+ * @param {string} blocksConfigJson - JSON com {blocks, separator, find, replace}
+ * @returns {string} Nome do arquivo (sem .pdf)
+ */
+function _assemblePdfFilename(sheet, blocksConfigJson) {
+  try {
+    const config = blocksConfigJson ? JSON.parse(blocksConfigJson) : null;
+    if (!config || !config.blocks || config.blocks.length === 0) {
+      return getBomKojoNameFromSheet(sheet) || sheet.getName();
+    }
+    const vals = sheet.getRange(1, 2, 6, 1).getValues();
+    const fields = {
+      project:    String(vals[0][0] || ''),
+      bom:        String(vals[1][0] || ''),
+      kojo:       String(vals[2][0] || ''),
+      engineer:   String(vals[3][0] || ''),
+      version:    String(vals[4][0] || ''),
+      sheet_name: sheet.getName(),
+    };
+    const sep = config.separator || '-';
+    const parts = config.blocks
+      .map(b => b.type === 'text' ? (b.value || '') : (fields[b.type] || ''))
+      .filter(p => p !== '');
+    let name = parts.join(sep);
+    if (config.find) name = name.split(config.find).join(config.replace || '');
+    return name || sheet.getName();
+  } catch (e) {
+    Logger.log('_assemblePdfFilename error: ' + e.message);
+    return getBomKojoNameFromSheet(sheet) || sheet.getName();
+  }
+}
+
+/**
  * Exporta abas selecionadas para PDF via sidebar HTML
  * Chamada pela sidebar BomSidebar.html
  *
  * @public
  * @param {string[]} sheetNames - Nomes das abas a exportar
  * @param {string} folderInput - ID da pasta Drive ou nome para criar
- * @param {string} prefix - Prefixo para nome dos arquivos PDF
+ * @param {string} blocksConfigJson - JSON com blocos do nome ({blocks, separator, find, replace})
  * @returns {{success: boolean, message?: string, exported?: number, folder?: string}}
  */
-function runPdfExportFromHtml(sheetNames, folderInput, prefix) {
+function runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson) {
   if (!sheetNames || sheetNames.length === 0) {
     return { success: false, message: 'Nenhuma aba selecionada' };
   }
   const folder = getFolderFromInput(folderInput, folderInput);
   if (!folder) return { success: false, message: `Pasta não encontrada ou inválida: ${folderInput}` };
 
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   sheetNames.forEach(sheetName => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    const sheet = ss.getSheetByName(sheetName);
     if (sheet) {
-      const bomKojoName = getBomKojoNameFromSheet(sheet);
-      const baseName = bomKojoName || sheetName;
-      // ✅ FIX: aplica prefixo do campo "Prefixo do PDF" ao nome do arquivo
-      const fileName = prefix ? `${prefix}${baseName}` : baseName;
+      const fileName = _assemblePdfFilename(sheet, blocksConfigJson);
       exportSheetToPdf(sheet, fileName, folder);
     }
   });
@@ -1116,6 +1149,32 @@ function getReportSheetNames() {
 
 function getReportSheetNamesForHtml() {
   return getReportSheetNames();
+}
+
+/**
+ * Retorna dados de header de cada aba de relatório para montar preview de nome PDF.
+ * @public
+ * @returns {Array<{name, project, bom, kojo, engineer, version}>}
+ */
+function getReportSheetDataForHtml() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return getReportSheetNames().map(name => {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return { name, project: '', bom: '', kojo: '', engineer: '', version: '' };
+    try {
+      const vals = sheet.getRange(1, 2, 6, 1).getValues();
+      return {
+        name,
+        project:  String(vals[0][0] || ''),
+        bom:      String(vals[1][0] || ''),
+        kojo:     String(vals[2][0] || ''),
+        engineer: String(vals[3][0] || ''),
+        version:  String(vals[4][0] || ''),
+      };
+    } catch (e) {
+      return { name, project: '', bom: '', kojo: '', engineer: '', version: '' };
+    }
+  });
 }
 
 /**
