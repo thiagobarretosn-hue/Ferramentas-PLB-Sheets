@@ -256,10 +256,10 @@
     /* Blocos de nome PDF */
     .pdf-block-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 5px; }
     .pdf-block-card-header { display: flex; align-items: center; gap: 4px; }
-    .pdf-block-type-select { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: white; }
-    .pdf-block-sep-group { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
-    .pdf-block-sep-label { font-size: 10px; color: var(--text-light); white-space: nowrap; }
-    .pdf-block-sep-input { width: 34px; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; color: var(--text-light); }
+    .pdf-block-type-select { flex: 1; min-width: 80px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: white; }
+    .pdf-block-sep-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+    .pdf-block-sep-label { font-size: 10px; color: var(--text-light); }
+    .pdf-block-sep-input { width: 36px; font-size: 11px; padding: 2px 4px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; color: var(--text-light); }
     .pdf-block-sep-input:focus { border-style: solid; color: var(--text); outline: none; }
     .pdf-block-value-input { display: block; width: 100%; margin-top: 5px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
     .pdf-block-remove { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 0 3px; line-height: 1; flex-shrink: 0; }
@@ -583,6 +583,13 @@
         autoDetectColumns(allColumns);
       }
 
+      // Atualiza labels dos blocos Nível 1/2/3 com os nomes das colunas configuradas
+      _updatePdfGroupLabels({
+        l1: currentConfig[CONFIG_KEYS.GROUP_L1] || '',
+        l2: currentConfig[CONFIG_KEYS.GROUP_L2] || '',
+        l3: currentConfig[CONFIG_KEYS.GROUP_L3] || '',
+      });
+
       if (savedState && savedState.pdfBlocks) {
         setPdfBlocksConfig(savedState.pdfBlocks);
       }
@@ -699,6 +706,11 @@
     function onGroupChange() {
       saveState();
       loadPanels();
+      _updatePdfGroupLabels({
+        l1: document.getElementById('groupL1Select').value,
+        l2: document.getElementById('groupL2Select').value,
+        l3: document.getElementById('groupL3Select').value,
+      });
     }
 
     async function loadPanels(savedState = null) {
@@ -1028,7 +1040,7 @@
     // 5. BLOCOS DE NOME PDF
     // =========================================================
 
-    const PDF_BLOCK_TYPES = [
+    let PDF_BLOCK_TYPES = [
       ['text',       'Texto (fixo)'],
       ['kojo',       'Sufixo Kojo'],
       ['sheet_name', 'Nome da Aba'],
@@ -1036,14 +1048,37 @@
       ['bom',        'BOM'],
       ['engineer',   'Engenheiro'],
       ['version',    'Versão'],
-      ['today',      'Data Atual'],
+      ['l1',         'Nível 1'],
+      ['l2',         'Nível 2'],
+      ['l3',         'Nível 3'],
     ];
 
     const PDF_BLOCK_LABELS = {
       kojo: '[Sufixo Kojo]', project: '[Projeto]', bom: '[BOM]',
       engineer: '[Engenheiro]', version: '[Versão]', sheet_name: '[Nome Aba]',
-      today: new Date().toISOString().slice(0, 10),
+      l1: '[Nível 1]', l2: '[Nível 2]', l3: '[Nível 3]',
     };
+
+    function _updatePdfGroupLabels(gc) {
+      PDF_BLOCK_TYPES.forEach(entry => {
+        if (entry[0] === 'l1') entry[1] = gc.l1 ? 'Nível 1 (' + gc.l1 + ')' : 'Nível 1';
+        if (entry[0] === 'l2') entry[1] = gc.l2 ? 'Nível 2 (' + gc.l2 + ')' : 'Nível 2';
+        if (entry[0] === 'l3') entry[1] = gc.l3 ? 'Nível 3 (' + gc.l3 + ')' : 'Nível 3';
+      });
+      PDF_BLOCK_LABELS.l1 = gc.l1 ? '[' + gc.l1 + ']' : '[Nível 1]';
+      PDF_BLOCK_LABELS.l2 = gc.l2 ? '[' + gc.l2 + ']' : '[Nível 2]';
+      PDF_BLOCK_LABELS.l3 = gc.l3 ? '[' + gc.l3 + ']' : '[Nível 3]';
+      // Atualiza selects já renderizados
+      document.querySelectorAll('#pdfBlocksContainer .pdf-block-type-select').forEach(sel => {
+        const cur = sel.value;
+        sel.innerHTML = '';
+        PDF_BLOCK_TYPES.forEach(([val, label]) => {
+          const opt = new Option(label, val);
+          opt.selected = val === cur;
+          sel.appendChild(opt);
+        });
+      });
+    }
 
     function addPdfBlock(type, value, sep) {
       _addPdfBlockRow(type || 'text', value || '', sep || '');
@@ -1054,7 +1089,7 @@
       const card = document.createElement('div');
       card.className = 'pdf-block-card';
 
-      // Linha superior: tipo + sep + remover
+      // Linha 1: tipo (largura total) + botão remover
       const header = document.createElement('div');
       header.className = 'pdf-block-card-header';
 
@@ -1067,8 +1102,30 @@
       });
       typeSelect.onchange = () => { onPdfBlockTypeChange(typeSelect); onPdfConfigChange(); };
 
-      const sepGroup = document.createElement('div');
-      sepGroup.className = 'pdf-block-sep-group';
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'pdf-block-remove';
+      removeBtn.title = 'Remover bloco';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = () => { card.remove(); onPdfConfigChange(); };
+
+      header.appendChild(typeSelect);
+      header.appendChild(removeBtn);
+      card.appendChild(header);
+
+      // Linha 2: valor (só para tipo "text")
+      const valueInput = document.createElement('input');
+      valueInput.type = 'text';
+      valueInput.className = 'pdf-block-value-input';
+      valueInput.placeholder = 'Texto fixo...';
+      valueInput.value = value || '';
+      valueInput.style.display = (type === 'text') ? 'block' : 'none';
+      valueInput.oninput = onPdfConfigChange;
+      card.appendChild(valueInput);
+
+      // Linha 3: separador (pequeno, discreto)
+      const sepRow = document.createElement('div');
+      sepRow.className = 'pdf-block-sep-row';
       const sepLabel = document.createElement('span');
       sepLabel.className = 'pdf-block-sep-label';
       sepLabel.textContent = 'sep:';
@@ -1080,30 +1137,9 @@
       sepInput.maxLength = 5;
       sepInput.value = sep || '';
       sepInput.oninput = onPdfConfigChange;
-      sepGroup.appendChild(sepLabel);
-      sepGroup.appendChild(sepInput);
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'pdf-block-remove';
-      removeBtn.title = 'Remover bloco';
-      removeBtn.textContent = '✕';
-      removeBtn.onclick = () => { card.remove(); onPdfConfigChange(); };
-
-      header.appendChild(typeSelect);
-      header.appendChild(sepGroup);
-      header.appendChild(removeBtn);
-      card.appendChild(header);
-
-      // Linha de valor: só aparece para tipo "text"
-      const valueInput = document.createElement('input');
-      valueInput.type = 'text';
-      valueInput.className = 'pdf-block-value-input';
-      valueInput.placeholder = 'Texto fixo...';
-      valueInput.value = value || '';
-      valueInput.style.display = (type === 'text') ? 'block' : 'none';
-      valueInput.oninput = onPdfConfigChange;
-      card.appendChild(valueInput);
+      sepRow.appendChild(sepLabel);
+      sepRow.appendChild(sepInput);
+      card.appendChild(sepRow);
 
       document.getElementById('pdfBlocksContainer').appendChild(card);
     }
@@ -1203,12 +1239,11 @@
       if (!config || !config.blocks || config.blocks.length === 0) {
         return sheetData.kojo || sheetData.name;
       }
-      const todayStr = new Date().toISOString().slice(0, 10);
       const fields = {
         project: sheetData.project || '', bom: sheetData.bom || '',
         kojo: sheetData.kojo || '', engineer: sheetData.engineer || '',
         version: sheetData.version || '', sheet_name: sheetData.name || '',
-        today: todayStr,
+        l1: sheetData.l1 || '', l2: sheetData.l2 || '', l3: sheetData.l3 || '',
       };
       const globalSep = config.separator || '-';
       const segments = [];

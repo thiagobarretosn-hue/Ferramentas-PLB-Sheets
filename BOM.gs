@@ -403,6 +403,14 @@ function processBomCore(combinationsToProcess, settings) {
     }
 
     createAndFormatReport(targetSheet, kojoSuffix, processedData, settings);
+
+    // Persiste os valores individuais de cada nível para uso no nome do PDF
+    const levelValues = combination.split(BOM_CONFIG.DELIMITER);
+    PropertiesService.getDocumentProperties().setProperty(
+      'BOM_META_' + sanitizedName,
+      JSON.stringify({ l1: levelValues[0] || '', l2: levelValues[1] || '', l3: levelValues[2] || '' })
+    );
+
     createdCount++;
   });
 
@@ -780,7 +788,8 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
       return getBomKojoNameFromSheet(sheet) || sheet.getName();
     }
     const vals = sheet.getRange(1, 2, 6, 1).getValues();
-    const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const metaJson = PropertiesService.getDocumentProperties().getProperty('BOM_META_' + sheet.getName());
+    const meta = metaJson ? JSON.parse(metaJson) : {};
     const fields = {
       project:    String(vals[0][0] || ''),
       bom:        String(vals[1][0] || ''),
@@ -788,7 +797,9 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
       engineer:   String(vals[3][0] || ''),
       version:    String(vals[4][0] || ''),
       sheet_name: sheet.getName(),
-      today:      todayStr,
+      l1:         meta.l1 || '',
+      l2:         meta.l2 || '',
+      l3:         meta.l3 || '',
     };
     const globalSep = config.separator || '-';
     const segments = [];
@@ -1164,25 +1175,41 @@ function getReportSheetNamesForHtml() {
 /**
  * Retorna dados de header de cada aba de relatório para montar preview de nome PDF.
  * @public
- * @returns {Array<{name, project, bom, kojo, engineer, version}>}
+ * @returns {Array<{name, project, bom, kojo, engineer, version, l1, l2, l3}>}
  */
 function getReportSheetDataForHtml() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const docProps = PropertiesService.getDocumentProperties();
   return getReportSheetNames().map(name => {
     const sheet = ss.getSheetByName(name);
-    if (!sheet) return { name, project: '', bom: '', kojo: '', engineer: '', version: '' };
+    const metaJson = docProps.getProperty('BOM_META_' + name);
+    if (!sheet) {
+      const meta = metaJson ? JSON.parse(metaJson) : {};
+      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: meta.l1 || '', l2: meta.l2 || '', l3: meta.l3 || '' };
+    }
     try {
       const vals = sheet.getRange(1, 2, 6, 1).getValues();
+      const kojo = String(vals[2][0] || '');
+      let l1 = '', l2 = '', l3 = '';
+      if (metaJson) {
+        const meta = JSON.parse(metaJson);
+        l1 = meta.l1 || ''; l2 = meta.l2 || ''; l3 = meta.l3 || '';
+      } else {
+        // Fallback para BOMs existentes: infere do kojo (funciona se não foi editado manualmente)
+        const parts = kojo.split('.');
+        l1 = (parts[0] || '').trim(); l2 = (parts[1] || '').trim(); l3 = (parts[2] || '').trim();
+      }
       return {
         name,
         project:  String(vals[0][0] || ''),
         bom:      String(vals[1][0] || ''),
-        kojo:     String(vals[2][0] || ''),
+        kojo,
         engineer: String(vals[3][0] || ''),
         version:  String(vals[4][0] || ''),
+        l1, l2, l3,
       };
     } catch (e) {
-      return { name, project: '', bom: '', kojo: '', engineer: '', version: '' };
+      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: '', l2: '', l3: '' };
     }
   });
 }
