@@ -254,18 +254,24 @@
     }
 
     /* Blocos de nome PDF */
-    .pdf-block-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
-    .pdf-block-type-select { width: 110px; flex-shrink: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: white; }
-    .pdf-block-value-input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
-    .pdf-block-remove { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; flex-shrink: 0; }
+    .pdf-block-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 5px; }
+    .pdf-block-card-header { display: flex; align-items: center; gap: 4px; }
+    .pdf-block-type-select { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: white; }
+    .pdf-block-sep-group { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+    .pdf-block-sep-label { font-size: 10px; color: var(--text-light); white-space: nowrap; }
+    .pdf-block-sep-input { width: 34px; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; color: var(--text-light); }
+    .pdf-block-sep-input:focus { border-style: solid; color: var(--text); outline: none; }
+    .pdf-block-value-input { display: block; width: 100%; margin-top: 5px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
+    .pdf-block-remove { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 0 3px; line-height: 1; flex-shrink: 0; }
     .pdf-block-remove:hover { opacity: 0.7; }
-    .pdf-add-block-btn { width: 100%; margin-top: 5px; background: var(--header-bg); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .pdf-block-actions { display: flex; gap: 5px; margin-top: 5px; }
+    .pdf-add-block-btn { flex: 1; background: var(--header-bg); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
     .pdf-add-block-btn:hover { opacity: 0.85; }
+    .pdf-clear-btn { background: none; color: var(--danger); border: 1px solid var(--danger); padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
+    .pdf-clear-btn:hover { background: var(--danger); color: white; }
     .pdf-sep-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
     .pdf-sep-row label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
     .pdf-sep-input { width: 50px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; text-align: center; }
-    .pdf-block-sep-input { width: 40px; flex-shrink: 0; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; color: var(--text-light); }
-    .pdf-block-sep-input:focus { border-style: solid; color: var(--text); }
     .pdf-fr-row { display: flex; gap: 4px; margin-bottom: 4px; align-items: center; }
     .pdf-fr-row input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
     .pdf-preview-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--text-light); word-break: break-all; margin-top: 6px; }
@@ -404,7 +410,10 @@
             <div class="form-group">
               <label>Nome do PDF (blocos)</label>
               <div id="pdfBlocksContainer"></div>
-              <button type="button" class="pdf-add-block-btn" onclick="addPdfBlock()">+ Adicionar bloco</button>
+              <div class="pdf-block-actions">
+                <button type="button" class="pdf-add-block-btn" onclick="addPdfBlock()">+ Adicionar bloco</button>
+                <button type="button" class="pdf-clear-btn" onclick="clearAllPdfBlocks()">Limpar</button>
+              </div>
               <div class="pdf-sep-row">
                 <label for="pdfSeparatorInput">Separador:</label>
                 <input type="text" id="pdfSeparatorInput" class="pdf-sep-input" value="-" maxlength="5" oninput="onPdfConfigChange()">
@@ -1042,8 +1051,12 @@
     }
 
     function _addPdfBlockRow(type, value, sep) {
-      const row = document.createElement('div');
-      row.className = 'pdf-block-row';
+      const card = document.createElement('div');
+      card.className = 'pdf-block-card';
+
+      // Linha superior: tipo + sep + remover
+      const header = document.createElement('div');
+      header.className = 'pdf-block-card-header';
 
       const typeSelect = document.createElement('select');
       typeSelect.className = 'pdf-block-type-select';
@@ -1054,40 +1067,57 @@
       });
       typeSelect.onchange = () => { onPdfBlockTypeChange(typeSelect); onPdfConfigChange(); };
 
-      const valueInput = document.createElement('input');
-      valueInput.type = 'text';
-      valueInput.className = 'pdf-block-value-input';
-      valueInput.placeholder = 'Texto fixo...';
-      valueInput.value = value;
-      valueInput.style.display = (type === 'text') ? '' : 'none';
-      valueInput.oninput = onPdfConfigChange;
-
+      const sepGroup = document.createElement('div');
+      sepGroup.className = 'pdf-block-sep-group';
+      const sepLabel = document.createElement('span');
+      sepLabel.className = 'pdf-block-sep-label';
+      sepLabel.textContent = 'sep:';
       const sepInput = document.createElement('input');
       sepInput.type = 'text';
       sepInput.className = 'pdf-block-sep-input';
-      sepInput.title = 'Sep. antes deste bloco (vazio = usar padrão)';
-      sepInput.placeholder = '…';
+      sepInput.title = 'Separador antes deste bloco (vazio = usar padrão global)';
+      sepInput.placeholder = '↔';
       sepInput.maxLength = 5;
       sepInput.value = sep || '';
       sepInput.oninput = onPdfConfigChange;
+      sepGroup.appendChild(sepLabel);
+      sepGroup.appendChild(sepInput);
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'pdf-block-remove';
       removeBtn.title = 'Remover bloco';
       removeBtn.textContent = '✕';
-      removeBtn.onclick = () => { row.remove(); onPdfConfigChange(); };
+      removeBtn.onclick = () => { card.remove(); onPdfConfigChange(); };
 
-      row.appendChild(typeSelect);
-      row.appendChild(valueInput);
-      row.appendChild(sepInput);
-      row.appendChild(removeBtn);
-      document.getElementById('pdfBlocksContainer').appendChild(row);
+      header.appendChild(typeSelect);
+      header.appendChild(sepGroup);
+      header.appendChild(removeBtn);
+      card.appendChild(header);
+
+      // Linha de valor: só aparece para tipo "text"
+      const valueInput = document.createElement('input');
+      valueInput.type = 'text';
+      valueInput.className = 'pdf-block-value-input';
+      valueInput.placeholder = 'Texto fixo...';
+      valueInput.value = value || '';
+      valueInput.style.display = (type === 'text') ? 'block' : 'none';
+      valueInput.oninput = onPdfConfigChange;
+      card.appendChild(valueInput);
+
+      document.getElementById('pdfBlocksContainer').appendChild(card);
     }
 
     function onPdfBlockTypeChange(select) {
-      const valueInput = select.closest('.pdf-block-row').querySelector('.pdf-block-value-input');
-      if (valueInput) valueInput.style.display = (select.value === 'text') ? '' : 'none';
+      const card = select.closest('.pdf-block-card');
+      const valueInput = card && card.querySelector('.pdf-block-value-input');
+      if (valueInput) valueInput.style.display = (select.value === 'text') ? 'block' : 'none';
+    }
+
+    function clearAllPdfBlocks() {
+      document.getElementById('pdfBlocksContainer').innerHTML = '';
+      document.getElementById('pdfFindReplaceContainer').innerHTML = '';
+      onPdfConfigChange();
     }
 
     /** Adiciona uma linha de find & replace */
@@ -1127,10 +1157,10 @@
 
     function getPdfBlocksConfig() {
       const blocks = [];
-      document.querySelectorAll('#pdfBlocksContainer .pdf-block-row').forEach(row => {
-        const typeSelect = row.querySelector('.pdf-block-type-select');
-        const valueInput = row.querySelector('.pdf-block-value-input');
-        const sepInput   = row.querySelector('.pdf-block-sep-input');
+      document.querySelectorAll('#pdfBlocksContainer .pdf-block-card').forEach(card => {
+        const typeSelect = card.querySelector('.pdf-block-type-select');
+        const valueInput = card.querySelector('.pdf-block-value-input');
+        const sepInput   = card.querySelector('.pdf-block-sep-input');
         const type = typeSelect ? typeSelect.value : 'text';
         blocks.push({
           type,
