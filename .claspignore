@@ -1,0 +1,7 @@
+.git/**
+.claude/**
+docs/**
+CLAUDE.md
+README.md
+*.code-workspace
+Código.js
