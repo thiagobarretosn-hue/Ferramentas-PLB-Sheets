@@ -267,6 +267,8 @@ function _req_writeHeader(sheet, settings, combination, groupCols) {
     })
     .join(' | ');
 
+  sheet.getRange(1, 1, 7, 6).setNumberFormat('@STRING@');
+
   const labels = [['PROJECT:'], ['REQUEST:'], ['BOM KOJO:'], ['ENG.:'], ['VERSION:'], ['LAST UPDATE:'], ['GENERATED FROM:']];
   sheet.getRange(1, 1, 7, 1).setValues(labels);
 
@@ -289,8 +291,6 @@ function _req_writeHeader(sheet, settings, combination, groupCols) {
   for (let r = 1; r <= 7; r++) {
     sheet.getRange(r, 2, 1, 3).merge();
   }
-
-  sheet.getRange(1, 1, 7, 6).setNumberFormat('@STRING@');
   sheet.getRange(1, 1, 7, 6).applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
 }
 

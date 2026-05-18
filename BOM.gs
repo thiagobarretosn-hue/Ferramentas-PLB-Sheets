@@ -839,6 +839,21 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
  * @param {string} blocksConfigJson - JSON com blocos do nome ({blocks, separator, find, replace})
  * @returns {{success: boolean, message?: string, exported?: number, folder?: string}}
  */
+const _EXPORT_PROGRESS_KEY = 'PDF_EXPORT_PROGRESS_V1';
+
+function getExportProgress() {
+  const raw = CacheService.getUserCache().get(_EXPORT_PROGRESS_KEY);
+  return raw ? JSON.parse(raw) : { status: 'idle' };
+}
+
+function _setExportProgress(done, total, current, status) {
+  CacheService.getUserCache().put(
+    _EXPORT_PROGRESS_KEY,
+    JSON.stringify({ status: status || 'running', done, total, current: current || '' }),
+    600
+  );
+}
+
 function runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson) {
   if (!sheetNames || sheetNames.length === 0) {
     return { success: false, message: 'Nenhuma aba selecionada' };
@@ -846,15 +861,30 @@ function runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson) {
   const folder = getFolderFromInput(folderInput, folderInput);
   if (!folder) return { success: false, message: `Pasta não encontrada ou inválida: ${folderInput}` };
 
+  const total = sheetNames.length;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  sheetNames.forEach(sheetName => {
+  const errors = [];
+  let exported = 0;
+
+  _setExportProgress(0, total, '', 'running');
+
+  sheetNames.forEach((sheetName, i) => {
+    _setExportProgress(i, total, sheetName, 'running');
     const sheet = ss.getSheetByName(sheetName);
     if (sheet) {
-      const fileName = _assemblePdfFilename(sheet, blocksConfigJson);
-      exportSheetToPdf(sheet, fileName, folder);
+      try {
+        const fileName = _assemblePdfFilename(sheet, blocksConfigJson);
+        exportSheetToPdf(sheet, fileName, folder);
+        exported++;
+      } catch(e) {
+        errors.push(sheetName);
+        Logger.log(`Erro ao exportar "${sheetName}": ${e.message}`);
+      }
     }
   });
-  return { success: true, exported: sheetNames.length, folder: folder.getName() };
+
+  _setExportProgress(total, total, '', 'done');
+  return { success: true, exported, folder: folder.getName(), errors };
 }
 
 /**
@@ -917,20 +947,28 @@ function getBomKojoNameFromSheet(sheet) {
   return null;
 }
 
+function _extractDriveFolderId(input) {
+  if (!input || typeof input !== 'string') return null;
+  // ?id= ou &id= (ex: https://drive.google.com/open?id=XXX)
+  const idParam = input.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idParam) return idParam[1];
+  // /folders/ID
+  const folderPath = input.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderPath) return folderPath[1];
+  // ID puro (só alfanum + - _)
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
 function getFolderFromInput(folderInput, folderName) {
   try {
     if (folderInput) {
-      try {
-        const folderById = DriveApp.getFolderById(folderInput);
-        if (folderById) return folderById;
-      } catch (e) { /* Não é um ID */ }
-
-      const match = folderInput.match(/folders\/([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) {
-         try {
-           const folderById = DriveApp.getFolderById(match[1]);
-           if (folderById) return folderById;
-         } catch(e) { /* Link inválido */ }
+      const extractedId = _extractDriveFolderId(folderInput);
+      if (extractedId) {
+        try {
+          const f = DriveApp.getFolderById(extractedId);
+          if (f) return f;
+        } catch(e) { /* ID inválido */ }
       }
     }
 
@@ -963,6 +1001,8 @@ function exportSheetToPdf(sheet, pdfName, folder) {
         muteHttpExceptions: true
       });
       if (response.getResponseCode() === 200) {
+        const existing = folder.getFilesByName(`${pdfName}.pdf`);
+        while (existing.hasNext()) existing.next().setTrashed(true);
         folder.createFile(response.getBlob().setName(`${pdfName}.pdf`));
         return;
       }

@@ -278,6 +278,26 @@
     .pdf-fr-regex-toggle { display: flex; align-items: center; gap: 2px; font-size: 10px; color: var(--text-light); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
     .pdf-fr-regex-toggle input { width: 12px; height: 12px; cursor: pointer; accent-color: var(--primary); }
     .pdf-fr-regex-toggle.active { color: var(--primary); font-weight: 600; }
+    .pdf-fr-header-row { display: flex; gap: 4px; padding: 2px 0; margin-bottom: 2px; }
+    .pdf-fr-header-row span { font-size: 10px; color: var(--text-light); }
+    .pdf-fr-header-row .fh-find { flex: 1; min-width: 60px; }
+    .pdf-fr-header-row .fh-replace { flex: 1; min-width: 60px; }
+    .pdf-fr-header-row .fh-regex { flex-shrink: 0; width: 46px; text-align: center; }
+    .pdf-fr-header-row .fh-del { flex-shrink: 0; width: 22px; }
+    .import-rules-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center; }
+    .import-rules-overlay.open { display: flex; }
+    .import-rules-box { background: #fff; border-radius: 8px; padding: 16px; width: 92%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    .import-rules-box h4 { margin: 0 0 6px; font-size: 13px; color: var(--primary-dark); }
+    .import-rules-box p { margin: 0 0 8px; font-size: 11px; color: var(--text-light); line-height: 1.5; }
+    .import-rules-box textarea { width: 100%; box-sizing: border-box; font-size: 11px; font-family: monospace; border: 1px solid var(--border); border-radius: 4px; padding: 6px; resize: vertical; }
+    .import-rules-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+    .import-rules-actions button { font-size: 12px; padding: 5px 12px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); background: #f5f5f5; }
+    .import-rules-actions .btn-import { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .export-progress-box { margin: 8px 0 4px; }
+    .export-progress-label-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-light); margin-bottom: 3px; }
+    .export-progress-track { background: #e0e6ec; border-radius: 6px; height: 10px; overflow: hidden; }
+    .export-progress-fill { background: var(--primary); height: 100%; width: 0; transition: width 0.4s ease; border-radius: 6px; }
+    .export-progress-current { font-size: 10px; color: var(--text-light); font-family: monospace; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pdf-preview-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--text-light); word-break: break-all; margin-top: 6px; }
 
     /* Status */
@@ -423,8 +443,18 @@
                 <input type="text" id="pdfSeparatorInput" class="pdf-sep-input" value="-" maxlength="5" oninput="onPdfConfigChange()">
               </div>
               <label style="font-size:12px; margin-top:8px; display:block;">Find &amp; Replace no nome</label>
+              <div class="pdf-fr-header-row">
+                <span class="fh-find">Localizar</span>
+                <span class="fh-replace">Substituir</span>
+                <span class="fh-regex">Regex</span>
+                <span class="fh-del"></span>
+              </div>
               <div id="pdfFindReplaceContainer"></div>
-              <button type="button" class="pdf-add-block-btn" style="margin-top:4px;" onclick="addFindReplaceRule()">+ Adicionar regra</button>
+              <div style="display:flex; gap:4px; margin-top:4px; flex-wrap:wrap;">
+                <button type="button" class="pdf-add-block-btn" onclick="addFindReplaceRule()">+ Adicionar regra</button>
+                <button type="button" class="pdf-add-block-btn" style="background:#f0f4ff;color:var(--primary);border-color:var(--primary);" onclick="openImportRulesDialog()">📥 Importar CSV</button>
+                <button type="button" class="pdf-add-block-btn" style="background:#fff8e1;color:#b8860b;border-color:#e6c000;" onclick="exportConfigPrompt()">📤 Exportar Prompt</button>
+              </div>
               <div class="pdf-preview-box" id="pdfBlockPreview">Prévia: (adicione blocos)</div>
             </div>
           </div>
@@ -436,6 +466,16 @@
             <button class="btn btn-danger" id="exportPdfBtn" onclick="exportPdfs()" disabled style="width:100%;">
               Exportar Selecionados
             </button>
+            <div id="exportProgressBox" class="export-progress-box" style="display:none;">
+              <div class="export-progress-label-row">
+                <span id="exportProgressLabel">Exportando...</span>
+                <span id="exportProgressCount"></span>
+              </div>
+              <div class="export-progress-track">
+                <div class="export-progress-fill" id="exportProgressFill"></div>
+              </div>
+              <div class="export-progress-current" id="exportProgressCurrent"></div>
+            </div>
           </div>
         </div>
 
@@ -1196,7 +1236,6 @@
       };
       if (isRegex) fi.classList.add('regex-active');
       regexLabel.appendChild(regexCb);
-      regexLabel.appendChild(document.createTextNode('.*'));
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
@@ -1414,6 +1453,44 @@
       document.querySelectorAll('.pdf-check').forEach(cb => cb.checked = checked);
     }
 
+    let _exportPollTimer = null;
+
+    function _stopExportProgress() {
+      clearInterval(_exportPollTimer);
+      _exportPollTimer = null;
+      document.getElementById('exportProgressBox').style.display = 'none';
+    }
+
+    function _startExportProgressPolling() {
+      const box   = document.getElementById('exportProgressBox');
+      const fill  = document.getElementById('exportProgressFill');
+      const label = document.getElementById('exportProgressLabel');
+      const count = document.getElementById('exportProgressCount');
+      const cur   = document.getElementById('exportProgressCurrent');
+
+      box.style.display = 'block';
+      fill.style.width  = '0%';
+      label.textContent = 'Preparando...';
+      count.textContent = '';
+      cur.textContent   = '';
+
+      clearInterval(_exportPollTimer);
+      _exportPollTimer = setInterval(() => {
+        google.script.run
+          .withSuccessHandler(p => {
+            if (!p || p.status === 'idle') return;
+            const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+            fill.style.width  = pct + '%';
+            label.textContent = p.status === 'done' ? '✅ Concluído!' : 'Exportando...';
+            count.textContent = `${p.done} / ${p.total}`;
+            cur.textContent   = p.current || '';
+            if (p.status === 'done') clearInterval(_exportPollTimer);
+          })
+          .withFailureHandler(() => {})
+          .getExportProgress();
+      }, 1000);
+    }
+
     function exportPdfs() {
       const sheetNames = [];
       document.querySelectorAll('.pdf-check:checked').forEach(cb => {
@@ -1425,22 +1502,26 @@
         return;
       }
 
-      const folderInput = document.getElementById('folderInput').value;
+      const folderInput    = document.getElementById('folderInput').value;
       const blocksConfigJson = JSON.stringify(getPdfBlocksConfig());
 
-      showStatus(`Exportando ${sheetNames.length} PDF(s)...`, 'info');
       document.getElementById('exportPdfBtn').disabled = true;
+      _startExportProgressPolling();
 
       google.script.run
         .withSuccessHandler(result => {
+          _stopExportProgress();
           if (result.success) {
-            showStatus(`✅ ${result.exported} PDFs exportados para a pasta "${result.folder}".`, 'success');
+            const warn = result.errors && result.errors.length
+              ? ` (${result.errors.length} erro(s): ${result.errors.join(', ')})`
+              : '';
+            showStatus(`✅ ${result.exported} PDFs exportados para "${result.folder}".${warn}`, 'success');
           } else {
             onError(new Error(result.message));
           }
           document.getElementById('exportPdfBtn').disabled = false;
         })
-        .withFailureHandler(onError)
+        .withFailureHandler(err => { _stopExportProgress(); onError(err); })
         .runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson);
     }
 
@@ -1589,6 +1670,201 @@
       const duration = (type === 'info') ? 2000 : 4000;
       setTimeout(() => status.style.display = 'none', duration);
     }
+    // ── Export Config Prompt ──────────────────────────────────────────
+    function exportConfigPrompt() {
+      const config    = getPdfBlocksConfig();
+      const globalSep = config.separator || '-';
+
+      const BLOCK_LABELS = {
+        text: 'Texto fixo', sheet_name: 'Nome da Aba', kojo: 'Sufixo Kojo',
+        project: 'Projeto', bom: 'BOM', engineer: 'Engenheiro', version: 'Versão',
+        l1: 'Nível 1', l2: 'Nível 2', l3: 'Nível 3',
+      };
+
+      // ── Blocos ────────────────────────────────────────────────────
+      let blocksLines = '';
+      config.blocks.forEach((b, i) => {
+        const lbl = BLOCK_LABELS[b.type] || b.type;
+        const val = b.type === 'text' ? `"${b.value}"` : `<${lbl}>`;
+        const hasSep = b.sep !== '' && b.sep !== undefined;
+        const sep = hasSep ? `"${b.sep}"` : `"${globalSep}" (global)`;
+        blocksLines += `  ${i + 1}. [${lbl}] = ${val}   sep-após: ${sep}\n`;
+      });
+      if (!blocksLines) {
+        blocksLines = '  (nenhum bloco configurado — o nome base é o próprio nome da aba)\n';
+      }
+
+      // ── Regras actuais ────────────────────────────────────────────
+      const hasRules = config.findReplaceRules && config.findReplaceRules.some(r => r.find);
+      let rulesCSV = 'localizar;substituir;regex\n';
+      if (hasRules) {
+        config.findReplaceRules.forEach(r => {
+          if (r.find) rulesCSV += `${r.find};${r.replace || ''};${r.regex ? 'true' : 'false'}\n`;
+        });
+      } else {
+        rulesCSV += '(sem regras)\n';
+      }
+
+      // ── Lista de abas — SEM extensão .pdf ─────────────────────────
+      const sheetItems = [];
+      document.querySelectorAll('.pdf-item').forEach(item => {
+        try {
+          const sd = JSON.parse(item.dataset.sheetData || '{}');
+          if (sd.name) sheetItems.push({ name: sd.name, preview: assemblePdfFilename(sd, config) });
+        } catch(e) {}
+      });
+      const sheetList = sheetItems.length
+        ? sheetItems.map(s => `  ${s.name} → ${s.preview}`).join('\n')
+        : '  (carregue os relatórios na aba "3. Exportar" antes de gerar o prompt)';
+
+      const prompt =
+`# BOM PDF — Gerador de Regras (para IA)
+
+═══════════════════════════════════════════
+COMO A FERRAMENTA FUNCIONA
+═══════════════════════════════════════════
+1. BLOCOS são concatenados para formar o NOME BASE do arquivo.
+2. REGRAS Find & Replace são aplicadas ao NOME BASE.
+3. A extensão ".pdf" é adicionada automaticamente pelo sistema APÓS as regras.
+
+⚠️  CRÍTICO: as regras operam sobre o NOME BASE sem ".pdf".
+    NUNCA inclua ".pdf" nos campos "localizar" ou "substituir".
+
+Separador global entre blocos: "${globalSep}"
+
+═══════════════════════════════════════════
+BLOCOS ATUAIS (montam o nome base em ordem)
+═══════════════════════════════════════════
+${blocksLines.trimEnd()}
+
+Exemplo de montagem com os blocos acima:
+  [bloco1]${globalSep}[bloco2]${globalSep}[bloco3] → nome_base_resultante
+
+═══════════════════════════════════════════
+REGRAS FIND & REPLACE ATUAIS
+═══════════════════════════════════════════
+\`\`\`csv
+${rulesCSV.trimEnd()}
+\`\`\`
+
+═══════════════════════════════════════════
+NOME BASE ATUAL DE CADA ABA (sem .pdf)
+═══════════════════════════════════════════
+Formato: [nome da aba] → [nome base atual após blocos + regras]
+\`\`\`
+${sheetList}
+\`\`\`
+
+═══════════════════════════════════════════
+✏️  SUBSTITUA ESTA SEÇÃO — mapeamento desejado
+    (apague os exemplos abaixo e cole o real)
+═══════════════════════════════════════════
+Formato: [nome da aba] → [nome base desejado SEM .pdf]
+\`\`\`
+101 → P-FIN-F1-101_HG1 BF BOM PLB FINISHES 1ST FLOOR-101
+201 → P-FIN-F2-201_HG1 BF BOM PLB FINISHES 2ND FLOOR-201
+HW.101 → P-FIN-HW-F1-101_HG1 BF BOM PLB FINISHES HW 1ST FLOOR-101
+\`\`\`
+
+═══════════════════════════════════════════
+INSTRUÇÕES PARA A IA
+═══════════════════════════════════════════
+Analise os nomes base ATUAIS e os DESEJADOS e gere regras Find & Replace.
+
+Regras do jogo:
+- Compare coluna por coluna: "nome base atual" vs "nome desejado"
+- ⚠️  NUNCA inclua ".pdf" em nenhum campo do CSV
+- Use regex=true quando 1 regra cobre N abas com padrão variável
+- Use regex=false para substituições literais fixas
+- Grupos de captura: (\\d+) no localizar → $1 no substituir
+- Ordene: mais específicas primeiro (HW antes de numérico puro)
+- Não gere regras que não mudam nada
+- Se o nome base atual já for o desejado, não inclua regra para ele
+
+Retorne SOMENTE o bloco CSV abaixo, sem nenhum texto adicional:
+\`\`\`csv
+localizar;substituir;regex
+\`\`\`
+
+Para importar na ferramenta: botão "📥 Importar CSV" → Find & Replace.`;
+
+      document.getElementById('exportPromptText').value = prompt;
+      document.getElementById('promptCopyBtn').textContent = '📋 Copiar';
+      document.getElementById('exportPromptOverlay').classList.add('open');
+    }
+
+    function closePromptModal() {
+      document.getElementById('exportPromptOverlay').classList.remove('open');
+    }
+
+    function copyPromptToClipboard() {
+      const ta = document.getElementById('exportPromptText');
+      ta.select();
+      document.execCommand('copy');
+      document.getElementById('promptCopyBtn').textContent = '✅ Copiado!';
+      setTimeout(() => { document.getElementById('promptCopyBtn').textContent = '📋 Copiar'; }, 2000);
+    }
+
+    // ── Import Rules CSV ──────────────────────────────────────────────
+    function openImportRulesDialog() {
+      document.getElementById('importRulesText').value = '';
+      document.getElementById('importRulesOverlay').classList.add('open');
+      document.getElementById('importRulesText').focus();
+    }
+
+    function closeImportRulesDialog() {
+      document.getElementById('importRulesOverlay').classList.remove('open');
+    }
+
+    function importRulesFromText() {
+      const text = document.getElementById('importRulesText').value.trim();
+      if (!text) { closeImportRulesDialog(); return; }
+      let added = 0;
+      text.split('\n').forEach(line => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const sep = line.includes(';') ? ';' : ',';
+        const parts = line.split(sep);
+        if (parts.length < 1) return;
+        const find    = parts[0].trim();
+        const replace = (parts[1] || '').trim();
+        const isRegex = /^(true|1|sim|yes)$/i.test((parts[2] || '').trim());
+        if (find) { _addFindReplaceRow(find, replace, isRegex); added++; }
+      });
+      if (added > 0) onPdfConfigChange();
+      closeImportRulesDialog();
+    }
   </script>
+
+  <!-- Modal exportar prompt -->
+  <div id="exportPromptOverlay" class="import-rules-overlay" onclick="if(event.target===this)closePromptModal()">
+    <div class="import-rules-box" style="max-width:460px;">
+      <h4>📤 Prompt para IA</h4>
+      <p>Preencha a seção <strong>✏️ SUBSTITUA AQUI</strong> com o mapeamento correto e cole no chat. A IA retorna um CSV pronto para importar.</p>
+      <textarea id="exportPromptText" rows="14" readonly style="font-size:10px; font-family:monospace;"></textarea>
+      <div class="import-rules-actions">
+        <button type="button" onclick="closePromptModal()">Fechar</button>
+        <button type="button" class="btn-import" id="promptCopyBtn" onclick="copyPromptToClipboard()">📋 Copiar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal import de regras -->
+  <div id="importRulesOverlay" class="import-rules-overlay" onclick="if(event.target===this)closeImportRulesDialog()">
+    <div class="import-rules-box">
+      <h4>📥 Importar regras (CSV)</h4>
+      <p>Uma regra por linha:<br>
+        <code>localizar;substituir;regex</code><br>
+        Regex: <code>true</code> ou <code>false</code> (padrão: false)<br>
+        Exemplo:<br>
+        <code>FINISHES 4TH FLOOR-HW\.1(\d+);FINISHES HW 1ST FLOOR-1$1;true</code>
+      </p>
+      <textarea id="importRulesText" rows="9" placeholder="cole as regras aqui..."></textarea>
+      <div class="import-rules-actions">
+        <button type="button" onclick="closeImportRulesDialog()">Cancelar</button>
+        <button type="button" class="btn-import" onclick="importRulesFromText()">Importar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
