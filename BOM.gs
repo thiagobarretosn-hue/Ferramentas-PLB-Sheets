@@ -814,7 +814,14 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
     let name = segments.join('');
     // Suporte a formato antigo (find/replace único) e novo (array de regras)
     const rules = config.findReplaceRules || (config.find ? [{ find: config.find, replace: config.replace || '' }] : []);
-    rules.forEach(r => { if (r.find) name = name.split(r.find).join(r.replace || ''); });
+    rules.forEach(r => {
+      if (!r.find) return;
+      if (r.regex) {
+        try { name = name.replace(new RegExp(r.find, 'g'), r.replace || ''); } catch(e) {}
+      } else {
+        name = name.split(r.find).join(r.replace || '');
+      }
+    });
     return name || sheet.getName();
   } catch (e) {
     Logger.log('_assemblePdfFilename error: ' + e.message);

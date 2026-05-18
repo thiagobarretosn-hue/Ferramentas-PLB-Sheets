@@ -272,8 +272,12 @@
     .pdf-sep-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
     .pdf-sep-row label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
     .pdf-sep-input { width: 50px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; text-align: center; }
-    .pdf-fr-row { display: flex; gap: 4px; margin-bottom: 4px; align-items: center; }
-    .pdf-fr-row input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
+    .pdf-fr-row { display: flex; gap: 4px; margin-bottom: 4px; align-items: center; flex-wrap: wrap; }
+    .pdf-fr-row input[type="text"] { flex: 1; min-width: 60px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
+    .pdf-fr-row input[type="text"].regex-active { border-color: var(--primary); background: #f0f4ff; }
+    .pdf-fr-regex-toggle { display: flex; align-items: center; gap: 2px; font-size: 10px; color: var(--text-light); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+    .pdf-fr-regex-toggle input { width: 12px; height: 12px; cursor: pointer; accent-color: var(--primary); }
+    .pdf-fr-regex-toggle.active { color: var(--primary); font-weight: 600; }
     .pdf-preview-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--text-light); word-break: break-all; margin-top: 6px; }
 
     /* Status */
@@ -1162,7 +1166,7 @@
       onPdfConfigChange();
     }
 
-    function _addFindReplaceRow(find, replace) {
+    function _addFindReplaceRow(find, replace, isRegex) {
       const row = document.createElement('div');
       row.className = 'pdf-fr-row';
 
@@ -1174,9 +1178,25 @@
 
       const ri = document.createElement('input');
       ri.type = 'text';
-      ri.placeholder = 'Substituir';
+      ri.placeholder = 'Substituir ($1, $2...)';
       ri.value = replace;
       ri.oninput = onPdfConfigChange;
+
+      // Toggle regex
+      const regexLabel = document.createElement('label');
+      regexLabel.className = 'pdf-fr-regex-toggle' + (isRegex ? ' active' : '');
+      regexLabel.title = 'Tratar como expressão regular (suporta $1, $2 no substituir)';
+      const regexCb = document.createElement('input');
+      regexCb.type = 'checkbox';
+      regexCb.checked = !!isRegex;
+      regexCb.onchange = () => {
+        regexLabel.classList.toggle('active', regexCb.checked);
+        fi.classList.toggle('regex-active', regexCb.checked);
+        onPdfConfigChange();
+      };
+      if (isRegex) fi.classList.add('regex-active');
+      regexLabel.appendChild(regexCb);
+      regexLabel.appendChild(document.createTextNode('.*'));
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
@@ -1187,6 +1207,7 @@
 
       row.appendChild(fi);
       row.appendChild(ri);
+      row.appendChild(regexLabel);
       row.appendChild(removeBtn);
       document.getElementById('pdfFindReplaceContainer').appendChild(row);
     }
@@ -1207,8 +1228,13 @@
 
       const findReplaceRules = [];
       document.querySelectorAll('#pdfFindReplaceContainer .pdf-fr-row').forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        if (inputs.length >= 2) findReplaceRules.push({ find: inputs[0].value, replace: inputs[1].value });
+        const textInputs = row.querySelectorAll('input[type="text"]');
+        const regexCb    = row.querySelector('input[type="checkbox"]');
+        if (textInputs.length >= 2) findReplaceRules.push({
+          find:    textInputs[0].value,
+          replace: textInputs[1].value,
+          regex:   regexCb ? regexCb.checked : false,
+        });
       });
 
       return {
@@ -1229,7 +1255,7 @@
       document.getElementById('pdfFindReplaceContainer').innerHTML = '';
       // Suporte a config antiga (find/replace único) e nova (array de regras)
       const rules = config.findReplaceRules || (config.find ? [{ find: config.find, replace: config.replace || '' }] : []);
-      rules.forEach(r => _addFindReplaceRow(r.find || '', r.replace || ''));
+      rules.forEach(r => _addFindReplaceRow(r.find || '', r.replace || '', !!r.regex));
 
       onPdfConfigChange();
     }
@@ -1257,7 +1283,12 @@
       });
       let name = segments.join('');
       (config.findReplaceRules || []).forEach(r => {
-        if (r.find) name = name.split(r.find).join(r.replace || '');
+        if (!r.find) return;
+        if (r.regex) {
+          try { name = name.replace(new RegExp(r.find, 'g'), r.replace || ''); } catch(e) {}
+        } else {
+          name = name.split(r.find).join(r.replace || '');
+        }
       });
       return name || sheetData.name;
     }
@@ -1276,7 +1307,12 @@
       });
       let preview = segments.join('');
       (config.findReplaceRules || []).forEach(r => {
-        if (r.find && preview.includes(r.find)) preview = preview.split(r.find).join(r.replace || '');
+        if (!r.find) return;
+        if (r.regex) {
+          try { preview = preview.replace(new RegExp(r.find, 'g'), r.replace || ''); } catch(e) {}
+        } else if (preview.includes(r.find)) {
+          preview = preview.split(r.find).join(r.replace || '');
+        }
       });
       const box = document.getElementById('pdfBlockPreview');
       if (box) box.textContent = segments.length ? 'Prévia: ' + preview + '.pdf' : 'Prévia: (adicione blocos)';
