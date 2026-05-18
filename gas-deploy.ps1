@@ -92,19 +92,43 @@ function Select-Account {
 function Get-AccessToken([string]$authFile) {
     $data  = Get-Content $authFile -Raw | ConvertFrom-Json
     $creds = if ($data.PSObject.Properties['tokens']) { $data.tokens.default } else { $data.token }
-    $resp  = Invoke-RestMethod "https://oauth2.googleapis.com/token" -Method Post -Body @{
+
+    # Reusar access_token em cache se ainda valido (com 5 min de margem)
+    $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    if ($creds.access_token -and $creds.expiry_date -and ($creds.expiry_date - $nowMs) -gt 300000) {
+        return $creds.access_token
+    }
+
+    # Renovar via refresh_token (permanente, nao expira por tempo)
+    $resp = Invoke-RestMethod "https://oauth2.googleapis.com/token" -Method Post -Body @{
         client_id     = $creds.client_id
         client_secret = $creds.client_secret
         refresh_token = $creds.refresh_token
         grant_type    = "refresh_token"
     }
+
+    # Persistir novo access_token + validade no arquivo (evita refresh desnecessario)
+    $expiryMs = $nowMs + ([long]$resp.expires_in * 1000)
+    if ($creds.PSObject.Properties['access_token']) {
+        $creds.access_token = $resp.access_token
+    } else {
+        $creds | Add-Member -NotePropertyName 'access_token' -NotePropertyValue $resp.access_token -Force
+    }
+    if ($creds.PSObject.Properties['expiry_date']) {
+        $creds.expiry_date = $expiryMs
+    } else {
+        $creds | Add-Member -NotePropertyName 'expiry_date' -NotePropertyValue $expiryMs -Force
+    }
+    $data | ConvertTo-Json -Depth 10 | Set-Content $authFile -Encoding UTF8
+
     # Cachear email para exibicao no menu
     try {
-        $userinfo  = Invoke-RestMethod "https://www.googleapis.com/oauth2/v3/userinfo" `
+        $userinfo = Invoke-RestMethod "https://www.googleapis.com/oauth2/v3/userinfo" `
             -Headers @{ Authorization = "Bearer $($resp.access_token)" } -TimeoutSec 5
         $cacheFile = $authFile -replace '\.json$', '-email.txt'
         $userinfo.email | Set-Content $cacheFile -Encoding UTF8
     } catch {}
+
     return $resp.access_token
 }
 
@@ -261,6 +285,9 @@ function Action-Push {
         if ($errMsg -match 'invalid_rapt|invalid_grant|reauth') {
             Write-Host ""
             Write-Host "  >> Sessao expirada pelo Google Workspace." -ForegroundColor Yellow
+            Write-Host "  >> Use opcao [2] Autenticar para fazer login novamente." -ForegroundColor Yellow
+        } elseif ($errMsg -match '400') {
+            Write-Host "  >> Credenciais revogadas (refresh token invalido)." -ForegroundColor Yellow
             Write-Host "  >> Use opcao [2] Autenticar para fazer login novamente." -ForegroundColor Yellow
         } elseif ($errMsg -match '401') {
             Write-Host "  >> Token expirado. Use opcao [2] Autenticar." -ForegroundColor Yellow
