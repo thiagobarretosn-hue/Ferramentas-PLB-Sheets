@@ -79,12 +79,8 @@
   <label>REQUEST (descrição)</label>
   <input type="text" id="inp-request" placeholder="ex: RISERS 6th Floor" />
 
-  <label>KOJO PREFIX</label>
-  <input type="text" id="inp-kojo-prefix" placeholder="ex: MTN.PLB.RGH.JS.B1067" />
-
-  <label>BOM KOJO Suffix (nome da aba gerada)</label>
-  <input type="text" id="inp-kojo-suffix" placeholder="ex: CA.RSR.F6" />
-  <div class="kojo-full" id="kojo-preview"></div>
+  <label>BOM KOJO</label>
+  <input type="text" id="inp-kojo-suffix" placeholder="ex: VBS.PLB.RGH.JS.0.RSR.F2" />
 
   <label>ENG.</label>
   <input type="text" id="inp-engineer" />
@@ -150,7 +146,6 @@
     document.getElementById('btn-save-config').addEventListener('click', onSaveConfig);
     document.getElementById('btn-add-rule').addEventListener('click', function() { addRuleRow('', ''); });
     document.getElementById('btn-generate').addEventListener('click', onGenerate);
-    document.getElementById('inp-kojo-prefix').addEventListener('input', updateKojoPreview);
     document.getElementById('inp-kojo-suffix').addEventListener('input', updateKojoPreview);
     document.getElementById('sel-source-sheet').addEventListener('change', onSourceSheetChange);
   }
@@ -225,7 +220,6 @@
   function populateHeaderFields(config) {
     document.getElementById('inp-project').value      = config.project       || '';
     document.getElementById('inp-version').value      = config.version       || '01';
-    document.getElementById('inp-kojo-prefix').value  = config.kojoPrefix    || '';
     document.getElementById('inp-engineer').value     = config.engineer      || '';
     document.getElementById('inp-request').value      = config.request       || '';
     document.getElementById('inp-kojo-suffix').value  = config.kojoSuffix    || '';
@@ -309,7 +303,7 @@
       groupL2:        document.getElementById('sel-group-l2').value,
       groupL3:        document.getElementById('sel-group-l3').value,
       project:        document.getElementById('inp-project').value,
-      kojoPrefix:     document.getElementById('inp-kojo-prefix').value,
+      kojoPrefix:     '',
       engineer:       document.getElementById('inp-engineer').value,
       version:        document.getElementById('inp-version').value,
       request:        document.getElementById('inp-request').value,
@@ -411,12 +405,7 @@
   /* ============================================================
      KOJO PREVIEW
   ============================================================ */
-  function updateKojoPreview() {
-    var prefix = document.getElementById('inp-kojo-prefix').value.trim();
-    var suffix = document.getElementById('inp-kojo-suffix').value.trim();
-    var full = prefix && suffix ? prefix + '.' + suffix : (prefix || suffix || '');
-    document.getElementById('kojo-preview').textContent = full ? '→ ' + full : '';
-  }
+  function updateKojoPreview() { /* prefix removido — BOM KOJO é campo único */ }
 
   /* ============================================================
      GENERATE

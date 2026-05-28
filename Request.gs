@@ -184,6 +184,14 @@ function getRequestInitData() {
     }
   }
 
+  // ENG: se vazio, herda do BOM config (campo 'Engenheiro')
+  if (!config.engineer) {
+    try {
+      const bomSaved = PropertiesService.getDocumentProperties().getProperty('BOM_SETTINGS_V3');
+      if (bomSaved) config.engineer = (JSON.parse(bomSaved)['Engenheiro'] || '');
+    } catch(e) {}
+  }
+
   return { allSheets: allSheets, allColumns: allColumns, config: config, autoMatch: autoMatch };
 }
 
@@ -255,9 +263,7 @@ function saveRequestConfig(config) {
 function _req_writeHeader(sheet, settings, combination, groupCols) {
   const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
   const lastUpdate = Utilities.formatDate(new Date(), tz, 'MM/dd/yyyy');
-  const kojoFull = settings.kojoPrefix
-    ? settings.kojoPrefix + '.' + (settings.kojoSuffix || '')
-    : (settings.kojoSuffix || '');
+  const kojoFull = settings.kojoSuffix || '';
 
   const generatedFrom = groupCols
     .filter(Boolean)
