@@ -435,7 +435,7 @@
 
           <div class="config-section">
             <h3>Filtros de Exclusão</h3>
-            <p class="excl-note">Linhas que baterem qualquer regra são removidas do relatório.</p>
+            <p class="excl-note">Selecione os valores que quer <strong>manter</strong>. Valores desmarcados são excluídos do relatório.</p>
             <div id="exclFiltersContainer"></div>
             <button type="button" class="btn-add-excl" onclick="addExclFilter()">+ Filtro</button>
           </div>
@@ -1603,7 +1603,8 @@
             lbl.className = 'excl-check-item';
             const cb = document.createElement('input');
             cb.type = 'checkbox'; cb.value = v;
-            if (checkedVals && checkedVals.includes(String(v))) cb.checked = true;
+            // Padrão: TUDO marcado (= manter tudo). Desmarca só o que o estado salvo manda
+            cb.checked = !checkedVals || checkedVals.includes(String(v));
             cb.addEventListener('change', saveState);
             lbl.appendChild(cb);
             lbl.appendChild(document.createTextNode(' ' + v));

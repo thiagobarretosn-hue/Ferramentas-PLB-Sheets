@@ -373,18 +373,18 @@ function processBomCore(combinationsToProcess, settings) {
   }
   const allData = sourceSheet.getRange(2, 1, lastDataRow - 1, sourceSheet.getLastColumn()).getValues();
 
-  // Regras de exclusão: [{col: "H - PHASE", vals: ["Finish"]}]
+  // Filtros de exclusão: vals = valores PERMITIDOS (check = manter, uncheck = excluir)
   const exclRules = (settings[K.EXCL_FILTERS] || [])
     .filter(f => f.col && Array.isArray(f.vals) && f.vals.length > 0)
     .map(f => ({
       colIdx: Utils.getColumnIndex(f.col) - 1,
-      vals: new Set(f.vals.map(v => String(v).trim().toLowerCase()))
+      allowed: new Set(f.vals.map(v => String(v).trim().toLowerCase()))
     }))
     .filter(r => r.colIdx >= 0);
 
   for (const row of allData) {
     if (exclRules.length > 0 && exclRules.some(r =>
-      r.vals.has(String(row[r.colIdx] ?? '').trim().toLowerCase())
+      !r.allowed.has(String(row[r.colIdx] ?? '').trim().toLowerCase())
     )) continue;
 
     const rowCombination = groupIndices
