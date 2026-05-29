@@ -244,7 +244,9 @@ function getRequestItemCount(groupCols, groupVals, sheetName) {
   let count = 0;
   data.forEach(function(row) {
     const matches = groupIndices.every(function(colIdx, i) {
-      return String(row[colIdx - 1] || '').trim() === String(groupVals[i] || '').trim();
+      const rowVal = String(row[colIdx - 1] || '').trim();
+      const accepted = Array.isArray(groupVals[i]) ? groupVals[i] : [groupVals[i]];
+      return accepted.some(function(v) { return String(v || '').trim() === rowVal; });
     });
     if (matches) count++;
   });
@@ -269,7 +271,9 @@ function _req_writeHeader(sheet, settings, combination, groupCols) {
     .filter(Boolean)
     .map(function(col, i) {
       const label = col.replace(/^[A-Z]+ - /, '');
-      return label + ': ' + (combination.parts[i] || '');
+      const part  = combination.parts[i];
+      const val   = Array.isArray(part) ? part.join(', ') : (part || '');
+      return label + ': ' + val;
     })
     .join(' | ');
 
@@ -370,7 +374,9 @@ function processRequestCore(combination, settings) {
     const grouped = {};
     data.forEach(function(row) {
       const matches = groupIndices.every(function(colIdx, i) {
-        return String(row[colIdx - 1] || '').trim() === String(groupVals[i] || '').trim();
+        const rowVal = String(row[colIdx - 1] || '').trim();
+        const accepted = Array.isArray(groupVals[i]) ? groupVals[i] : [groupVals[i]];
+        return accepted.some(function(v) { return String(v || '').trim() === rowVal; });
       });
       if (!matches) return;
 

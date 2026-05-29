@@ -30,6 +30,9 @@
     table.rules input[type="text"] { margin: 0; padding: 2px 4px; font-size: 11px; }
     .rules-note { font-size: 10px; color: #7f8c8d; margin-bottom: 4px; font-style: italic; }
     .fallback-note { font-size: 10px; color: #7f8c8d; margin-top: 4px; }
+    .check-group { max-height: 110px; overflow-y: auto; border: 1px solid #bdc3c7; border-radius: 3px; padding: 4px 8px; margin-bottom: 6px; background: #fafafa; }
+    .check-item { display: block; font-size: 11px; padding: 2px 0; cursor: pointer; }
+    .check-item input[type="checkbox"] { width: auto; margin: 0 5px 0 0; cursor: pointer; }
     #status { padding: 8px 14px; font-size: 11px; min-height: 24px; }
     .status-ok { color: #27ae60; }
     .status-err { color: #e74c3c; }
@@ -328,10 +331,7 @@
   function collectCurrentGroupVals() {
     var config = state.config;
     var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
-    return groups.map(function(_, i) {
-      var sel = document.getElementById('sel-gval-' + i);
-      return sel ? sel.value : '';
-    });
+    return groups.map(function(_, i) { return getCheckedVals(i); });
   }
 
   /* ============================================================
@@ -352,42 +352,51 @@
 
     groups.forEach(function(groupCol, i) {
       var label = groupCol.replace(/^[A-Z]+ - /, '');
-      var selId = 'sel-gval-' + i;
+      var grpId = 'sel-gval-' + i;
       var div = document.createElement('div');
-      div.innerHTML = '<label>' + escHtml(label) + '</label><select id="' + selId + '"><option>Carregando...</option></select>';
+      div.innerHTML = '<label>' + escHtml(label) + '</label>'
+        + '<div id="' + grpId + '" class="check-group"><span class="loading">Carregando...</span></div>';
       container.appendChild(div);
 
       google.script.run
         .withSuccessHandler((function(id, idx) {
           return function(vals) {
-            var sel = document.getElementById(id);
-            var savedVal = String(lastGroupVals[idx] || '');
-            sel.innerHTML = '<option value="">-- Selecione --</option>';
+            var grp = document.getElementById(id);
+            var saved = lastGroupVals[idx];
+            var savedArr = Array.isArray(saved) ? saved : (saved ? [String(saved)] : []);
+            grp.innerHTML = '';
             vals.forEach(function(v) {
-              var opt = document.createElement('option');
-              opt.value = v; opt.textContent = v;
-              if (v === savedVal) opt.selected = true;
-              sel.appendChild(opt);
+              var lbl = document.createElement('label');
+              lbl.className = 'check-item';
+              var cb = document.createElement('input');
+              cb.type = 'checkbox'; cb.value = v;
+              if (savedArr.indexOf(String(v)) !== -1) cb.checked = true;
+              cb.addEventListener('change', updateComboPreview);
+              lbl.appendChild(cb);
+              lbl.appendChild(document.createTextNode(' ' + v));
+              grp.appendChild(lbl);
             });
-            sel.addEventListener('change', updateComboPreview);
             loaded++;
             if (loaded === groups.length) updateComboPreview();
           };
-        })(selId, i))
+        })(grpId, i))
         .withFailureHandler(onError)
         .getRequestUniqueValues(groupCol, config.sourceSheet);
     });
   }
 
+  function getCheckedVals(i) {
+    var grp = document.getElementById('sel-gval-' + i);
+    if (!grp) return [];
+    return Array.prototype.slice.call(grp.querySelectorAll('input:checked')).map(function(cb) { return cb.value; });
+  }
+
   function updateComboPreview() {
     var config = state.config;
     var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
-    var vals = groups.map(function(_, i) {
-      var sel = document.getElementById('sel-gval-' + i);
-      return sel ? sel.value : '';
-    });
+    var vals = groups.map(function(_, i) { return getCheckedVals(i); });
 
-    if (vals.some(function(v) { return !v; })) {
+    if (vals.some(function(v) { return v.length === 0; })) {
       document.getElementById('combo-preview').style.display = 'none';
       return;
     }
@@ -413,19 +422,17 @@
   function onGenerate() {
     var config = state.config;
     var groups = [config.groupL1, config.groupL2, config.groupL3].filter(Boolean);
-    var vals = groups.map(function(_, i) {
-      var sel = document.getElementById('sel-gval-' + i);
-      return sel ? sel.value : '';
-    });
+    var vals = groups.map(function(_, i) { return getCheckedVals(i); });
 
     if (!config.sourceSheet)
       return showStatus('⚠️ Configure e salve a Aba Fonte antes de gerar.', 'err');
-    if (groups.length > 0 && vals.some(function(v) { return !v; }))
-      return showStatus('⚠️ Selecione um valor para cada nível de grupo.', 'err');
+    if (groups.length > 0 && vals.some(function(v) { return v.length === 0; }))
+      return showStatus('⚠️ Selecione pelo menos um valor para cada nível de grupo.', 'err');
     if (!document.getElementById('inp-kojo-suffix').value.trim())
-      return showStatus('⚠️ Informe o BOM KOJO Suffix.', 'err');
+      return showStatus('⚠️ Informe o BOM KOJO.', 'err');
 
-    var combination = { parts: vals, label: vals.join(' | ') };
+    var label = vals.map(function(v) { return v.join(', '); }).join(' | ');
+    var combination = { parts: vals, label: label };
     var rules = collectRules();
     var settings = Object.assign({}, config, {
       request:        document.getElementById('inp-request').value,
