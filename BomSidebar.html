@@ -293,6 +293,7 @@
     .excl-check-item input[type="checkbox"] { width: auto; margin: 0 5px 0 0; cursor: pointer; }
     .excl-loading { font-size: 10px; color: #7f8c8d; font-style: italic; }
     .btn-add-excl { font-size: 11px; color: var(--primary); background: none; border: 1px solid var(--primary); border-radius: 4px; padding: 3px 8px; cursor: pointer; margin-top: 2px; }
+    .generate-btn-wrap { padding: 12px 0 4px; }
     .excl-note { font-size: 10px; color: var(--text-light); margin-bottom: 6px; }
     .import-rules-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center; }
     .import-rules-overlay.open { display: flex; }
@@ -366,6 +367,11 @@
               <select id="groupL3Select" onchange="onGroupChange()"><option value="">-- Nenhum --</option></select>
             </div>
           </div>
+          <div class="generate-btn-wrap">
+            <button type="button" class="btn btn-success" id="generateBtn" onclick="generateReports()" disabled>
+              Gerar Relatórios
+            </button>
+          </div>
         </div>
 
         <div class="tab-content" id="tab-config-relatorio">
@@ -431,7 +437,6 @@
               </select>
             </div>
           </div>
-        </div>
 
           <div class="config-section">
             <h3>Filtros de Exclusão</h3>
@@ -439,6 +444,7 @@
             <div id="exclFiltersContainer"></div>
             <button type="button" class="btn-add-excl" onclick="addExclFilter()">+ Filtro</button>
           </div>
+        </div>
 
         <!-- Tab 3: só config de exportação; lista fica no painel direito -->
         <div class="tab-content" id="tab-exportar-pdf">
@@ -498,11 +504,6 @@
 
       </div>
 
-      <div class="footer-config">
-        <button class="btn btn-success" id="generateBtn" onclick="generateReports()" disabled>
-          Gerar Relatórios
-        </button>
-      </div>
     </div>
 
     <!-- Painel direito -->
