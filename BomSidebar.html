@@ -284,10 +284,14 @@
     .pdf-fr-header-row .fh-replace { flex: 1; min-width: 60px; }
     .pdf-fr-header-row .fh-regex { flex-shrink: 0; width: 46px; text-align: center; }
     .pdf-fr-header-row .fh-del { flex-shrink: 0; width: 22px; }
-    .excl-filter-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-    .excl-filter-row select { flex: 1; min-width: 0; margin-bottom: 0; font-size: 11px; }
-    .excl-filter-row input[type="text"] { flex: 1; min-width: 0; margin-bottom: 0; font-size: 11px; }
-    .excl-filter-row button { flex-shrink: 0; background: none; border: none; cursor: pointer; color: #e74c3c; font-size: 14px; padding: 0 2px; }
+    .excl-filter-block { border: 1px solid var(--border); border-radius: 4px; padding: 6px; margin-bottom: 6px; background: #fafafa; }
+    .excl-filter-header { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .excl-filter-header select { flex: 1; min-width: 0; margin-bottom: 0; font-size: 11px; }
+    .excl-filter-header button { flex-shrink: 0; background: none; border: none; cursor: pointer; color: #e74c3c; font-size: 15px; padding: 0 2px; line-height: 1; }
+    .excl-vals-checks { max-height: 100px; overflow-y: auto; padding: 2px 4px; }
+    .excl-check-item { display: block; font-size: 11px; padding: 2px 0; cursor: pointer; }
+    .excl-check-item input[type="checkbox"] { width: auto; margin: 0 5px 0 0; cursor: pointer; }
+    .excl-loading { font-size: 10px; color: #7f8c8d; font-style: italic; }
     .btn-add-excl { font-size: 11px; color: var(--primary); background: none; border: 1px solid var(--primary); border-radius: 4px; padding: 3px 8px; cursor: pointer; margin-top: 2px; }
     .excl-note { font-size: 10px; color: var(--text-light); margin-bottom: 6px; }
     .import-rules-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center; }
@@ -1578,41 +1582,80 @@
       return opts;
     }
 
+    function _getSourceSheet() {
+      const el = document.getElementById('sourceSheetSelect');
+      return el ? el.value : '';
+    }
+
+    function _loadExclVals(block, col, checkedVals) {
+      const checksDiv = block.querySelector('.excl-vals-checks');
+      if (!col) { checksDiv.innerHTML = ''; return; }
+      checksDiv.innerHTML = '<span class="excl-loading">Carregando...</span>';
+      google.script.run
+        .withSuccessHandler(vals => {
+          checksDiv.innerHTML = '';
+          if (!vals || vals.length === 0) {
+            checksDiv.innerHTML = '<span class="excl-loading">Nenhum valor encontrado</span>';
+            return;
+          }
+          vals.forEach(v => {
+            const lbl = document.createElement('label');
+            lbl.className = 'excl-check-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.value = v;
+            if (checkedVals && checkedVals.includes(String(v))) cb.checked = true;
+            cb.addEventListener('change', saveState);
+            lbl.appendChild(cb);
+            lbl.appendChild(document.createTextNode(' ' + v));
+            checksDiv.appendChild(lbl);
+          });
+        })
+        .withFailureHandler(() => {
+          checksDiv.innerHTML = '<span class="excl-loading">Erro ao carregar valores</span>';
+        })
+        .getUniqueValuesForColumn(col, _getSourceSheet());
+    }
+
     function addExclFilter(col, vals) {
       const container = document.getElementById('exclFiltersContainer');
-      const row = document.createElement('div');
-      row.className = 'excl-filter-row';
+      const block = document.createElement('div');
+      block.className = 'excl-filter-block';
+
+      const header = document.createElement('div');
+      header.className = 'excl-filter-header';
 
       const sel = document.createElement('select');
-      const cols = _getColumnOptions();
-      if (cols.length === 0) sel.innerHTML = '<option value="">Salve a config primeiro</option>';
-      else cols.forEach(c => {
+      sel.innerHTML = '<option value="">— Selecione a coluna —</option>';
+      _getColumnOptions().forEach(c => {
         const o = document.createElement('option');
         o.value = c; o.textContent = c;
         if (c === col) o.selected = true;
         sel.appendChild(o);
       });
-      sel.onchange = saveState;
 
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.placeholder = 'valores a excluir, separados por vírgula';
-      inp.value = vals ? vals.join(', ') : '';
-      inp.oninput = saveState;
+      const checksDiv = document.createElement('div');
+      checksDiv.className = 'excl-vals-checks';
+
+      sel.onchange = () => { _loadExclVals(block, sel.value, null); saveState(); };
 
       const rm = document.createElement('button');
       rm.type = 'button'; rm.textContent = '✕';
-      rm.onclick = () => { row.remove(); saveState(); };
+      rm.onclick = () => { block.remove(); saveState(); };
 
-      row.appendChild(sel); row.appendChild(inp); row.appendChild(rm);
-      container.appendChild(row);
+      header.appendChild(sel);
+      header.appendChild(rm);
+      block.appendChild(header);
+      block.appendChild(checksDiv);
+      container.appendChild(block);
+
+      if (col) _loadExclVals(block, col, vals);
     }
 
     function getExclFilters() {
       const filters = [];
-      document.querySelectorAll('#exclFiltersContainer .excl-filter-row').forEach(row => {
-        const col  = row.querySelector('select').value;
-        const vStr = row.querySelector('input[type="text"]').value;
-        const vals = vStr.split(',').map(v => v.trim()).filter(Boolean);
+      document.querySelectorAll('#exclFiltersContainer .excl-filter-block').forEach(block => {
+        const col  = block.querySelector('select').value;
+        const vals = Array.from(block.querySelectorAll('.excl-vals-checks input:checked')).map(cb => cb.value);
         if (col && vals.length > 0) filters.push({ col, vals });
       });
       return filters;
