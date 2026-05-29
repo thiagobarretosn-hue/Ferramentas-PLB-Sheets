@@ -43,6 +43,8 @@ const BOM_CONFIG = {
     FIX_QTY: 'Fixador: Coluna Quantidade',
     FIX_UOM: 'Fixador: Coluna UOM',
     FIX_TRADE: 'Fixador: Coluna Trade (FIX)',
+
+    EXCL_FILTERS: 'Filtros de Exclusão',
   },
   // Valores padrão para quando nenhuma configuração existe
   DEFAULTS: {
@@ -58,6 +60,7 @@ const BOM_CONFIG = {
     'Fixador: Coluna Quantidade': 'L - QTT',
     'Fixador: Coluna UOM': 'M - UOM',
     'Fixador: Coluna Trade (FIX)': 'G - TRADE',
+    'Filtros de Exclusão': [],
   },
   COLORS: {
     HEADER_BG: '#2c3e50',
@@ -370,7 +373,20 @@ function processBomCore(combinationsToProcess, settings) {
   }
   const allData = sourceSheet.getRange(2, 1, lastDataRow - 1, sourceSheet.getLastColumn()).getValues();
 
+  // Regras de exclusão: [{col: "H - PHASE", vals: ["Finish"]}]
+  const exclRules = (settings[K.EXCL_FILTERS] || [])
+    .filter(f => f.col && Array.isArray(f.vals) && f.vals.length > 0)
+    .map(f => ({
+      colIdx: Utils.getColumnIndex(f.col) - 1,
+      vals: new Set(f.vals.map(v => String(v).trim().toLowerCase()))
+    }))
+    .filter(r => r.colIdx >= 0);
+
   for (const row of allData) {
+    if (exclRules.length > 0 && exclRules.some(r =>
+      r.vals.has(String(row[r.colIdx] ?? '').trim().toLowerCase())
+    )) continue;
+
     const rowCombination = groupIndices
       .map(index => String(row[index - 1] ?? '').trim())
       .join(BOM_CONFIG.DELIMITER);
@@ -784,36 +800,37 @@ function removerFixadoresSelecionados(selectedPipes) {
 function _assemblePdfFilename(sheet, blocksConfigJson) {
   try {
     const config = blocksConfigJson ? JSON.parse(blocksConfigJson) : null;
+    let name;
     if (!config || !config.blocks || config.blocks.length === 0) {
-      return getBomKojoNameFromSheet(sheet) || sheet.getName();
+      name = getBomKojoNameFromSheet(sheet) || sheet.getName();
+    } else {
+      const vals = sheet.getRange(1, 2, 6, 1).getValues();
+      const metaJson = PropertiesService.getDocumentProperties().getProperty('BOM_META_' + sheet.getName());
+      const meta = metaJson ? JSON.parse(metaJson) : {};
+      const fields = {
+        project:    String(vals[0][0] || ''),
+        bom:        String(vals[1][0] || ''),
+        kojo:       String(vals[2][0] || ''),
+        engineer:   String(vals[3][0] || ''),
+        version:    String(vals[4][0] || ''),
+        sheet_name: sheet.getName(),
+        l1:         meta.l1 || '',
+        l2:         meta.l2 || '',
+        l3:         meta.l3 || '',
+      };
+      const globalSep = config.separator || '-';
+      const segments = [];
+      config.blocks.forEach(b => {
+        const val = b.type === 'text' ? (b.value || '') : (fields[b.type] || '');
+        if (!val) return;
+        if (segments.length > 0) {
+          segments.push((b.sep !== '' && b.sep != null) ? b.sep : globalSep);
+        }
+        segments.push(val);
+      });
+      name = segments.join('');
     }
-    const vals = sheet.getRange(1, 2, 6, 1).getValues();
-    const metaJson = PropertiesService.getDocumentProperties().getProperty('BOM_META_' + sheet.getName());
-    const meta = metaJson ? JSON.parse(metaJson) : {};
-    const fields = {
-      project:    String(vals[0][0] || ''),
-      bom:        String(vals[1][0] || ''),
-      kojo:       String(vals[2][0] || ''),
-      engineer:   String(vals[3][0] || ''),
-      version:    String(vals[4][0] || ''),
-      sheet_name: sheet.getName(),
-      l1:         meta.l1 || '',
-      l2:         meta.l2 || '',
-      l3:         meta.l3 || '',
-    };
-    const globalSep = config.separator || '-';
-    const segments = [];
-    config.blocks.forEach(b => {
-      const val = b.type === 'text' ? (b.value || '') : (fields[b.type] || '');
-      if (!val) return;
-      if (segments.length > 0) {
-        segments.push((b.sep !== '' && b.sep != null) ? b.sep : globalSep);
-      }
-      segments.push(val);
-    });
-    let name = segments.join('');
-    // Suporte a formato antigo (find/replace único) e novo (array de regras)
-    const rules = config.findReplaceRules || (config.find ? [{ find: config.find, replace: config.replace || '' }] : []);
+    const rules = config ? (config.findReplaceRules || (config.find ? [{ find: config.find, replace: config.replace || '' }] : [])) : [];
     rules.forEach(r => {
       if (!r.find) return;
       if (r.regex) {

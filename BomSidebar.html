@@ -284,6 +284,12 @@
     .pdf-fr-header-row .fh-replace { flex: 1; min-width: 60px; }
     .pdf-fr-header-row .fh-regex { flex-shrink: 0; width: 46px; text-align: center; }
     .pdf-fr-header-row .fh-del { flex-shrink: 0; width: 22px; }
+    .excl-filter-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .excl-filter-row select { flex: 1; min-width: 0; margin-bottom: 0; font-size: 11px; }
+    .excl-filter-row input[type="text"] { flex: 1; min-width: 0; margin-bottom: 0; font-size: 11px; }
+    .excl-filter-row button { flex-shrink: 0; background: none; border: none; cursor: pointer; color: #e74c3c; font-size: 14px; padding: 0 2px; }
+    .btn-add-excl { font-size: 11px; color: var(--primary); background: none; border: 1px solid var(--primary); border-radius: 4px; padding: 3px 8px; cursor: pointer; margin-top: 2px; }
+    .excl-note { font-size: 10px; color: var(--text-light); margin-bottom: 6px; }
     .import-rules-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center; }
     .import-rules-overlay.open { display: flex; }
     .import-rules-box { background: #fff; border-radius: 8px; padding: 16px; width: 92%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
@@ -422,6 +428,13 @@
             </div>
           </div>
         </div>
+
+          <div class="config-section">
+            <h3>Filtros de Exclusão</h3>
+            <p class="excl-note">Linhas que baterem qualquer regra são removidas do relatório.</p>
+            <div id="exclFiltersContainer"></div>
+            <button type="button" class="btn-add-excl" onclick="addExclFilter()">+ Filtro</button>
+          </div>
 
         <!-- Tab 3: só config de exportação; lista fica no painel direito -->
         <div class="tab-content" id="tab-exportar-pdf">
@@ -636,6 +649,12 @@
 
       if (savedState && savedState.pdfBlocks) {
         setPdfBlocksConfig(savedState.pdfBlocks);
+      }
+
+      // Restaura filtros de exclusão
+      if (savedState && savedState.settings && Array.isArray(savedState.settings['Filtros de Exclusão'])) {
+        document.getElementById('exclFiltersContainer').innerHTML = '';
+        savedState.settings['Filtros de Exclusão'].forEach(f => addExclFilter(f.col, f.vals));
       }
 
       await loadPanels(savedState);
@@ -1301,27 +1320,29 @@
 
     /** Monta o nome do PDF no cliente (mesma lógica do backend) */
     function assemblePdfFilename(sheetData, config) {
+      let name;
       if (!config || !config.blocks || config.blocks.length === 0) {
-        return sheetData.kojo || sheetData.name;
+        name = sheetData.kojo || sheetData.name;
+      } else {
+        const fields = {
+          project: sheetData.project || '', bom: sheetData.bom || '',
+          kojo: sheetData.kojo || '', engineer: sheetData.engineer || '',
+          version: sheetData.version || '', sheet_name: sheetData.name || '',
+          l1: sheetData.l1 || '', l2: sheetData.l2 || '', l3: sheetData.l3 || '',
+        };
+        const globalSep = config.separator || '-';
+        const segments = [];
+        config.blocks.forEach(b => {
+          const val = b.type === 'text' ? (b.value || '') : (fields[b.type] || '');
+          if (!val) return;
+          if (segments.length > 0) {
+            segments.push(b.sep !== '' && b.sep !== undefined ? b.sep : globalSep);
+          }
+          segments.push(val);
+        });
+        name = segments.join('');
       }
-      const fields = {
-        project: sheetData.project || '', bom: sheetData.bom || '',
-        kojo: sheetData.kojo || '', engineer: sheetData.engineer || '',
-        version: sheetData.version || '', sheet_name: sheetData.name || '',
-        l1: sheetData.l1 || '', l2: sheetData.l2 || '', l3: sheetData.l3 || '',
-      };
-      const globalSep = config.separator || '-';
-      const segments = [];
-      config.blocks.forEach(b => {
-        const val = b.type === 'text' ? (b.value || '') : (fields[b.type] || '');
-        if (!val) return;
-        if (segments.length > 0) {
-          segments.push(b.sep !== '' && b.sep !== undefined ? b.sep : globalSep);
-        }
-        segments.push(val);
-      });
-      let name = segments.join('');
-      (config.findReplaceRules || []).forEach(r => {
+      ((config && config.findReplaceRules) || []).forEach(r => {
         if (!r.find) return;
         if (r.regex) {
           try { name = name.replace(new RegExp(r.find, 'g'), r.replace || ''); } catch(e) {}
@@ -1354,7 +1375,8 @@
         }
       });
       const box = document.getElementById('pdfBlockPreview');
-      if (box) box.textContent = segments.length ? 'Prévia: ' + preview + '.pdf' : 'Prévia: (adicione blocos)';
+      const hasFR = (config.findReplaceRules || []).some(r => r.find);
+      if (box) box.textContent = segments.length ? 'Prévia: ' + preview + '.pdf' : hasFR ? 'F&R ativo (veja lista →)' : 'Prévia: (adicione blocos)';
       updatePdfPreviews();
       saveState();
     }
@@ -1550,12 +1572,59 @@
       }
     }
 
+    function _getColumnOptions() {
+      const opts = [];
+      document.querySelectorAll('#col1Select option').forEach(o => { if (o.value) opts.push(o.value); });
+      return opts;
+    }
+
+    function addExclFilter(col, vals) {
+      const container = document.getElementById('exclFiltersContainer');
+      const row = document.createElement('div');
+      row.className = 'excl-filter-row';
+
+      const sel = document.createElement('select');
+      const cols = _getColumnOptions();
+      if (cols.length === 0) sel.innerHTML = '<option value="">Salve a config primeiro</option>';
+      else cols.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        if (c === col) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = saveState;
+
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.placeholder = 'valores a excluir, separados por vírgula';
+      inp.value = vals ? vals.join(', ') : '';
+      inp.oninput = saveState;
+
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.textContent = '✕';
+      rm.onclick = () => { row.remove(); saveState(); };
+
+      row.appendChild(sel); row.appendChild(inp); row.appendChild(rm);
+      container.appendChild(row);
+    }
+
+    function getExclFilters() {
+      const filters = [];
+      document.querySelectorAll('#exclFiltersContainer .excl-filter-row').forEach(row => {
+        const col  = row.querySelector('select').value;
+        const vStr = row.querySelector('input[type="text"]').value;
+        const vals = vStr.split(',').map(v => v.trim()).filter(Boolean);
+        if (col && vals.length > 0) filters.push({ col, vals });
+      });
+      return filters;
+    }
+
     function getState() {
       const settings = {};
       for (const [elementId, configKey] of Object.entries(formFields)) {
         const el = document.getElementById(elementId);
         if (el) settings[configKey] = el.value;
       }
+      settings['Filtros de Exclusão'] = getExclFilters();
 
       const filterState = {};
       document.querySelectorAll('.group-level').forEach(panel => {
@@ -1713,9 +1782,11 @@
           if (sd.name) sheetItems.push({ name: sd.name, preview: assemblePdfFilename(sd, config) });
         } catch(e) {}
       });
-      const sheetList = sheetItems.length
-        ? sheetItems.map(s => `  ${s.name} → ${s.preview}`).join('\n')
-        : '  (carregue os relatórios na aba "3. Exportar" antes de gerar o prompt)';
+      if (!sheetItems.length) {
+        showStatus('Carregue os relatórios na aba "3. Exportar" antes de gerar o prompt.', 'error');
+        return;
+      }
+      const sheetList = sheetItems.map(s => `  ${s.name} → ${s.preview}`).join('\n');
 
       const prompt =
 `# BOM PDF — Gerador de Regras (para IA)
@@ -1756,37 +1827,46 @@ ${sheetList}
 \`\`\`
 
 ═══════════════════════════════════════════
-✏️  SUBSTITUA ESTA SEÇÃO — mapeamento desejado
-    (apague os exemplos abaixo e cole o real)
+✏️  O QUE VOCÊ QUER — descreva ou mapeie
 ═══════════════════════════════════════════
+
+OPÇÃO A — Descrição por padrão (recomendado para muitas abas):
+Use linguagem natural. A IA infere as regex para cobrir todos os casos.
+Exemplos:
+  Abas com número puro (201, 202, 301...): prefixar com "HG1.PLB.FIN.JS.BF.UNT." e manter o número
+  Abas com ponto+número (HW.201, HW.301...): prefixar com "HG1.PLB.FIN.JS.HW." e manter só o número após o ponto
+  Abas especiais (5.COST.LIST, RISER...): manter o nome como está
+
+OPÇÃO B — Mapeamento explícito (para casos únicos ou exceções):
 Formato: [nome da aba] → [nome base desejado SEM .pdf]
 \`\`\`
-101 → P-FIN-F1-101_HG1 BF BOM PLB FINISHES 1ST FLOOR-101
-201 → P-FIN-F2-201_HG1 BF BOM PLB FINISHES 2ND FLOOR-201
-HW.101 → P-FIN-HW-F1-101_HG1 BF BOM PLB FINISHES HW 1ST FLOOR-101
+201 → HG1.PLB.FIN.JS.BF.UNT.201
+HW.201 → HG1.PLB.FIN.JS.HW.201
 \`\`\`
 
 ═══════════════════════════════════════════
 INSTRUÇÕES PARA A IA
 ═══════════════════════════════════════════
-Analise os nomes base ATUAIS e os DESEJADOS e gere regras Find & Replace.
+Analise os nomes base ATUAIS listados acima e o que o usuário descreveu/mapeou.
+Gere o conjunto MÍNIMO de regras Find & Replace que transformem TODOS os nomes.
 
 Regras do jogo:
-- Compare coluna por coluna: "nome base atual" vs "nome desejado"
 - ⚠️  NUNCA inclua ".pdf" em nenhum campo do CSV
-- Use regex=true quando 1 regra cobre N abas com padrão variável
+- OPÇÃO A usada: infira padrões e gere regex que cubram todas as abas descritas
+- OPÇÃO B usada: gere regras que produzam exatamente os nomes mapeados
+- Use regex=true quando 1 regra cobre N abas com padrão variável (ex: todos os numéricos)
 - Use regex=false para substituições literais fixas
 - Grupos de captura: (\\d+) no localizar → $1 no substituir
-- Ordene: mais específicas primeiro (HW antes de numérico puro)
-- Não gere regras que não mudam nada
-- Se o nome base atual já for o desejado, não inclua regra para ele
+- Ordene: mais específicas primeiro (ex: HW\\. antes de \\d+$)
+- Não gere regras para nomes que já estão corretos (nome base atual = desejado)
+- Cubra 100% das abas listadas em "NOME BASE ATUAL DE CADA ABA"
 
 Retorne SOMENTE o bloco CSV abaixo, sem nenhum texto adicional:
 \`\`\`csv
 localizar;substituir;regex
 \`\`\`
 
-Para importar na ferramenta: botão "📥 Importar CSV" → Find & Replace.`;
+Para importar: botão "📥 Importar CSV" → regras entram e o preview atualiza.`;
 
       document.getElementById('exportPromptText').value = prompt;
       document.getElementById('promptCopyBtn').textContent = '📋 Copiar';
@@ -1825,11 +1905,10 @@ Para importar na ferramenta: botão "📥 Importar CSV" → Find & Replace.`;
         if (!line || line.startsWith('#')) return;
         const sep = line.includes(';') ? ';' : ',';
         const parts = line.split(sep);
-        if (parts.length < 1) return;
         const find    = parts[0].trim();
         const replace = (parts[1] || '').trim();
         const isRegex = /^(true|1|sim|yes)$/i.test((parts[2] || '').trim());
-        if (find) { _addFindReplaceRow(find, replace, isRegex); added++; }
+        if (find && find.toLowerCase() !== 'localizar') { _addFindReplaceRow(find, replace, isRegex); added++; }
       });
       if (added > 0) onPdfConfigChange();
       closeImportRulesDialog();
@@ -1840,8 +1919,8 @@ Para importar na ferramenta: botão "📥 Importar CSV" → Find & Replace.`;
   <div id="exportPromptOverlay" class="import-rules-overlay" onclick="if(event.target===this)closePromptModal()">
     <div class="import-rules-box" style="max-width:460px;">
       <h4>📤 Prompt para IA</h4>
-      <p>Preencha a seção <strong>✏️ SUBSTITUA AQUI</strong> com o mapeamento correto e cole no chat. A IA retorna um CSV pronto para importar.</p>
-      <textarea id="exportPromptText" rows="14" readonly style="font-size:10px; font-family:monospace;"></textarea>
+      <p>Descreva o padrão desejado (OPÇÃO A) ou mapeie aba por aba (OPÇÃO B) na seção <strong>✏️ O QUE VOCÊ QUER</strong> e cole no chat. A IA retorna um CSV pronto para importar.</p>
+      <textarea id="exportPromptText" rows="20" readonly style="font-size:10px; font-family:monospace;"></textarea>
       <div class="import-rules-actions">
         <button type="button" onclick="closePromptModal()">Fechar</button>
         <button type="button" class="btn-import" id="promptCopyBtn" onclick="copyPromptToClipboard()">📋 Copiar</button>
