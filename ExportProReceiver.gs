@@ -75,7 +75,7 @@ function doPost(e) {
 
   } catch(err) {
     return ContentService
-      .createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+      .createTextOutput(JSON.stringify({ status: 'error', message: err.message || String(err) }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
