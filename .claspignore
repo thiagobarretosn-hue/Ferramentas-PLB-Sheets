@@ -5,3 +5,5 @@ CLAUDE.md
 README.md
 *.code-workspace
 Código.js
+**/*.js
+**/*.html.html

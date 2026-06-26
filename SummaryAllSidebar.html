@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Summary All</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      background: #f8fafc;
+      color: #1e293b;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #1F4E79, #2563eb);
+      color: #fff;
+      padding: 10px 14px 8px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .header p  { font-size: 11px; opacity: .8; margin-top: 2px; }
+
+    /* ── Tab Nav ─────────────────────────────────────── */
+    .tab-nav {
+      display: flex;
+      background: #fff;
+      border-bottom: 2px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 9px 4px 7px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: #1F4E79; border-bottom-color: #1F4E79; }
+    .tab-btn:hover:not(.active) { color: #334155; }
+
+    /* ── Content ─────────────────────────────────────── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 10px 0;
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Section label ──────────────────────────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin: 4px 0 6px;
+    }
+
+    /* ── Abas tab ────────────────────────────────────── */
+    .aba-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .link-btn {
+      background: none;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .link-btn:hover { background: #f1f5f9; }
+
+    .info-banner {
+      background: #fef9c3;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #854d0e;
+      margin-bottom: 8px;
+    }
+
+    .sheet-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+    .sheet-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .1s;
+      user-select: none;
+    }
+    .sheet-row:hover { background: #f8fafc; }
+    .sheet-row input[type="checkbox"] { cursor: pointer; width: 15px; height: 15px; accent-color: #1F4E79; }
+    .sheet-name { flex: 1; font-size: 12px; font-weight: 500; }
+    .sheet-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: #e2e8f0;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .sheet-star { font-size: 12px; min-width: 16px; text-align: center; }
+
+    .no-sheets { color: #94a3b8; font-size: 12px; text-align: center; padding: 20px; }
+
+    /* ── Colunas tab ─────────────────────────────────── */
+    .hdr-source {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #166534;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .lp-agrupar  { background: #eef2ff; color: #3730a3; }
+    .lp-somar    { background: #ecfdf5; color: #065f46; }
+    .lp-contar   { background: #f0fdf4; color: #14532d; }
+    .lp-copy     { background: #f9fafb; color: #374151; border: 1px solid #e5e7eb; }
+    .ld-agrupar  { background: #6366f1; }
+    .ld-somar    { background: #10b981; }
+    .ld-contar   { background: #2E7D32; }
+    .ld-copy     { background: #9ca3af; }
+    .lp-sort     { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+
+    .col-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-left: 3px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 7px 9px;
+      margin-bottom: 5px;
+    }
+    .col-card.is-agrupar { border-left-color: #6366f1; background: #fafafe; }
+    .col-card.is-somar   { border-left-color: #10b981; background: #f9fffb; }
+    .col-card.is-contar  { border-left-color: #2E7D32; background: #f0fdf4; }
+    .col-card.is-copy    { border-left-color: #cbd5e1; background: #fcfcfd; }
+
+    .col-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+    .col-idx    { font-size: 10px; font-weight: 600; color: #94a3b8; min-width: 20px; }
+    .col-name   { font-size: 12px; font-weight: 600; color: #1e293b; flex: 1; word-break: break-word; line-height: 1.3; }
+    .col-empty  { color: #94a3b8; font-style: italic; font-weight: 400; }
+
+    .col-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    .col-select {
+      flex: 1;
+      min-width: 130px;
+      padding: 4px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: inherit;
+      background: #fff;
+      color: #1e293b;
+    }
+
+    .sort-group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .sort-check { width: 14px; height: 14px; cursor: pointer; accent-color: #854d0e; }
+    .sort-label { font-size: 10px; color: #854d0e; font-weight: 600; cursor: pointer; }
+    .sort-priority {
+      font-size: 10px;
+      font-weight: 700;
+      color: #fff;
+      background: #854d0e;
+      border-radius: 50%;
+      width: 17px;
+      height: 17px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dir-btn {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border: 1px solid #fbbf24;
+      border-radius: 4px;
+      background: #fef9c3;
+      color: #854d0e;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .dir-btn:hover { background: #fef08a; }
+
+    /* ── Destino tab ─────────────────────────────────── */
+    .dest-option {
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .dest-option.selected { border-color: #1F4E79; background: #eff6ff; }
+
+    .dest-option-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .dest-option-header input[type="radio"] {
+      width: 15px; height: 15px;
+      accent-color: #1F4E79;
+      cursor: pointer;
+    }
+    .dest-option-header label { cursor: pointer; }
+    .dest-desc { font-size: 11px; color: #64748b; margin-top: 4px; margin-left: 23px; }
+    .dest-fields { margin-top: 10px; margin-left: 23px; display: none; flex-direction: column; gap: 8px; }
+    .dest-option.selected .dest-fields { display: flex; }
+
+    .field-group { display: flex; flex-direction: column; gap: 3px; }
+    .field-label { font-size: 11px; font-weight: 500; color: #475569; }
+
+    .field-input, .field-select {
+      padding: 5px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: inherit;
+      background: #fff;
+      color: #1e293b;
+      width: 100%;
+    }
+    .field-input:focus, .field-select:focus {
+      outline: none;
+      border-color: #1F4E79;
+      box-shadow: 0 0 0 2px #bfdbfe;
+    }
+
+    .dest-preview {
+      font-size: 11px;
+      color: #1d4ed8;
+      font-weight: 600;
+      background: #dbeafe;
+      border-radius: 4px;
+      padding: 4px 8px;
+      word-break: break-all;
+    }
+    .dest-preview.warn { background: #fef9c3; color: #854d0e; }
+
+    .cell-row { display: flex; gap: 8px; }
+    .cell-row .field-group:first-child { flex: 1; }
+    .cell-row .field-group:last-child  { width: 75px; }
+
+    .dest-warn-box {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 5px;
+      padding: 5px 8px;
+      font-size: 11px;
+      color: #9a3412;
+    }
+
+    /* ── Footer ─────────────────────────────────────── */
+    .footer {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #status {
+      font-size: 11px;
+      min-height: 14px;
+      color: #475569;
+      text-align: center;
+    }
+    #status.ok   { color: #166534; }
+    #status.err  { color: #b91c1c; }
+    #status.busy { color: #1F4E79; }
+
+    .footer-btns { display: flex; gap: 8px; }
+
+    .btn {
+      flex: 1;
+      padding: 8px 6px;
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .42; cursor: not-allowed; }
+
+    .btn-save {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      flex: 0 0 auto;
+      width: 90px;
+    }
+    .btn-save:hover:not(:disabled) { background: #e2e8f0; }
+
+    .btn-run {
+      background: linear-gradient(135deg, #1F4E79, #2563eb);
+      color: #fff;
+    }
+    .btn-run:hover:not(:disabled) { opacity: .9; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📊 Summary All</h1>
+  <p>Consolidação e agrupamento de abas</p>
+</div>
+
+<nav class="tab-nav">
+  <button type="button" class="tab-btn active" data-tab="abas">📂 Abas</button>
+  <button type="button" class="tab-btn" data-tab="colunas">⚙ Colunas</button>
+  <button type="button" class="tab-btn" data-tab="destino">📍 Destino</button>
+</nav>
+
+<div class="content">
+
+  <!-- TAB: ABAS -->
+  <div class="tab-pane active" id="pane-abas">
+    <div class="section-label">Selecionar abas de origem</div>
+    <div class="aba-actions">
+      <button type="button" class="link-btn" id="btn-todas">Selecionar todas</button>
+      <button type="button" class="link-btn" id="btn-nenhuma">Limpar</button>
+    </div>
+    <div id="info-banner" class="info-banner" style="display:none"></div>
+    <div class="sheet-list" id="sheet-list"></div>
+  </div>
+
+  <!-- TAB: COLUNAS -->
+  <div class="tab-pane" id="pane-colunas">
+    <div class="hdr-source">
+      <span>📄</span>
+      <span id="hdr-source-text">Cabeçalho: —</span>
+    </div>
+    <div class="legend">
+      <span class="legend-pill lp-agrupar"><span class="legend-dot ld-agrupar"></span>Agrupar</span>
+      <span class="legend-pill lp-somar"><span class="legend-dot ld-somar"></span>Somar</span>
+      <span class="legend-pill lp-contar"><span class="legend-dot ld-contar"></span>Contar</span>
+      <span class="legend-pill lp-copy"><span class="legend-dot ld-copy"></span>Copiar 1º</span>
+      <span class="legend-pill lp-sort">🔡 Ordenar</span>
+    </div>
+    <div id="col-cards"></div>
+  </div>
+
+  <!-- TAB: DESTINO -->
+  <div class="tab-pane" id="pane-destino">
+    <div class="section-label">Onde salvar o resultado</div>
+
+    <!-- Opção 1: Nova aba -->
+    <div class="dest-option selected" id="dest-new">
+      <div class="dest-option-header">
+        <input type="radio" name="destMode" value="new" checked id="radio-new">
+        <label for="radio-new">🆕 Nova aba</label>
+      </div>
+      <div class="dest-desc">Cria (ou recria) uma aba com nome = 1ª aba selecionada + sufixo</div>
+      <div class="dest-fields">
+        <div class="field-group">
+          <label class="field-label" for="dest-suffix">Sufixo do nome</label>
+          <input class="field-input" type="text" id="dest-suffix" placeholder="_SUMMARY" maxlength="50">
+        </div>
+        <div class="field-group">
+          <div class="field-label">Prévia</div>
+          <div class="dest-preview" id="dest-preview">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opção 2: Aba existente -->
+    <div class="dest-option" id="dest-existing">
+      <div class="dest-option-header">
+        <input type="radio" name="destMode" value="existing" id="radio-existing">
+        <label for="radio-existing">📌 Aba existente</label>
+      </div>
+      <div class="dest-desc">Escreve em uma aba já existente, a partir de uma célula específica</div>
+      <div class="dest-fields">
+        <div class="cell-row">
+          <div class="field-group">
+            <label class="field-label" for="dest-sheet">Aba de destino</label>
+            <select class="field-select" id="dest-sheet"></select>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="dest-cell">Célula</label>
+            <input class="field-input" type="text" id="dest-cell" placeholder="A1" maxlength="8">
+          </div>
+        </div>
+        <div class="dest-warn-box">
+          ⚠ O conteúdo existente a partir da célula indicada será substituído
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- .content -->
+
+<div class="footer">
+  <div id="status"></div>
+  <div class="footer-btns">
+    <button type="button" class="btn btn-save" id="btn-save">💾 Salvar</button>
+    <button type="button" class="btn btn-run"  id="btn-run">▶ Gerar Summary</button>
+  </div>
+</div>
+
+<script>
+const PAGE_DATA = <?!= data ?>;
+
+/* ── CONSTANTES ──────────────────────────────────────────────────────── */
+const ACTIONS      = ['Agrupar', 'Copiar 1º registro', 'Somar valores', 'Contar registros'];
+const SORT_ALLOWED = { 'Agrupar': true, 'Copiar 1º registro': true };
+
+/* ── ESTADO ──────────────────────────────────────────────────────────── */
+const st = {
+  sheets:     [],    // [{name, rows, checked}]
+  headers:    [],    // string[]
+  columns:    [],    // [{ci, acao, ordem, dir}]
+  destMode:   'new',
+  destSuffix: '_SUMMARY',
+  destSheet:  '',
+  destCell:   'A1',
+  _prevFirst: null,  // rastreia mudança de primeira aba selecionada
+};
+
+/* ── BOOTSTRAP ───────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  _initState();
+  _bindTabs();
+  _bindAbas();
+  _bindDestino();
+  _bindFooter();
+  _renderAll();
+});
+
+function _initState() {
+  var cfg = PAGE_DATA.config;
+  var sel = {};
+  (cfg.selectedSheets || []).forEach(function(n) { sel[n] = true; });
+  var anySelected = Object.keys(sel).length > 0;
+
+  st.headers  = PAGE_DATA.headers || [];
+  st.columns  = (cfg.columns || []).map(function(c) { return { ci: c.ci, acao: c.acao, ordem: c.ordem, dir: c.dir }; });
+  st.destMode  = cfg.destMode  || 'new';
+  st.destSuffix = (cfg.destSuffix !== undefined) ? cfg.destSuffix : '_SUMMARY';
+  st.destSheet  = cfg.destSheet || '';
+  st.destCell   = cfg.destCell  || 'A1';
+
+  st.sheets = (PAGE_DATA.allSheets || []).map(function(s) {
+    return { name: s.name, rows: s.rows, checked: anySelected ? !!sel[s.name] : true };
+  });
+}
+
+/* ── TABS ────────────────────────────────────────────────────────────── */
+function _bindTabs() {
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+/* ── ABA SELECTION ───────────────────────────────────────────────────── */
+function _bindAbas() {
+  document.getElementById('btn-todas').addEventListener('click', function() {
+    st.sheets.forEach(function(s) { s.checked = true; });
+    _renderAbas();
+    _afterSelectionChange();
+  });
+  document.getElementById('btn-nenhuma').addEventListener('click', function() {
+    st.sheets.forEach(function(s) { s.checked = false; });
+    _renderAbas();
+    _afterSelectionChange();
+  });
+}
+
+function _renderAbas() {
+  var list     = document.getElementById('sheet-list');
+  var selected = _selectedSheets();
+  var firstName = selected.length > 0 ? selected[0].name : null;
+
+  if (st.sheets.length === 0) {
+    list.innerHTML = '<div class="no-sheets">Nenhuma aba disponível</div>';
+    return;
+  }
+
+  list.innerHTML = st.sheets.map(function(s, i) {
+    var isFirst  = s.checked && s.name === firstName;
+    var rowLabel = s.rows === 1 ? '1 linha' : s.rows + ' linhas';
+    return (
+      '<div class="sheet-row" data-idx="' + i + '">' +
+        '<input type="checkbox" id="sc-' + i + '"' + (s.checked ? ' checked' : '') + '>' +
+        '<span class="sheet-star">' + (isFirst ? '⭐' : '') + '</span>' +
+        '<label class="sheet-name" for="sc-' + i + '">' + _esc(s.name) + '</label>' +
+        '<span class="sheet-badge">' + rowLabel + '</span>' +
+      '</div>'
+    );
+  }).join('');
+
+  list.querySelectorAll('.sheet-row').forEach(function(row) {
+    var cb  = row.querySelector('input[type="checkbox"]');
+    var idx = parseInt(row.dataset.idx, 10);
+
+    row.addEventListener('click', function(e) {
+      if (e.target === cb || e.target.tagName === 'LABEL') return; // handled below
+      cb.checked = !cb.checked;
+      st.sheets[idx].checked = cb.checked;
+      _renderAbas();
+      _afterSelectionChange();
+    });
+
+    cb.addEventListener('change', function() {
+      st.sheets[idx].checked = cb.checked;
+      _renderAbas();
+      _afterSelectionChange();
+    });
+  });
+}
+
+function _afterSelectionChange() {
+  var selected  = _selectedSheets();
+  var firstName = selected.length > 0 ? selected[0].name : null;
+
+  // Banner
+  var banner = document.getElementById('info-banner');
+  if (selected.length === 0) {
+    banner.style.display = 'block';
+    banner.textContent = '⚠ Selecione ao menos uma aba de origem.';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // Atualizar prévia do destino
+  _updateDestPreview();
+
+  // Habilitar botões
+  var ok = selected.length > 0;
+  document.getElementById('btn-run').disabled  = !ok;
+  document.getElementById('btn-save').disabled = !ok;
+
+  // Se primeira aba mudou → buscar novos headers
+  if (firstName !== st._prevFirst) {
+    st._prevFirst = firstName;
+    if (firstName) {
+      _setStatus('Lendo cabeçalho de "' + firstName + '"...', 'busy');
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (r && r.success) {
+            _applyNewHeaders(r.headers || [], firstName);
+            _setStatus('', '');
+          } else {
+            _setStatus('Erro ao ler cabeçalho', 'err');
+          }
+        })
+        .withFailureHandler(function(e) { _setStatus('Erro: ' + (e.message || e), 'err'); })
+        .getHeadersForFirstSheet(firstName);
+    } else {
+      document.getElementById('hdr-source-text').textContent = 'Cabeçalho: —';
+    }
+  }
+}
+
+function _applyNewHeaders(newHeaders, fromSheet) {
+  st.headers = newHeaders;
+  var n = Math.max(st.columns.length, newHeaders.length, 11);
+  while (st.columns.length < n) {
+    st.columns.push({ ci: st.columns.length, acao: 'Copiar 1º registro', ordem: '', dir: 'ASC' });
+  }
+  document.getElementById('hdr-source-text').textContent = 'Cabeçalho de: ' + fromSheet;
+  _renderColunas();
+}
+
+/* ── COLUNAS ─────────────────────────────────────────────────────────── */
+function _renderColunas() {
+  var container = document.getElementById('col-cards');
+
+  if (st.columns.length === 0) {
+    container.innerHTML = '<div class="no-sheets">Selecione abas para configurar colunas</div>';
+    return;
+  }
+
+  container.innerHTML = st.columns.map(function(col) {
+    var name     = st.headers[col.ci] ? _esc(String(st.headers[col.ci])) : '';
+    var isEmpty  = !name;
+    var acao     = col.acao || 'Copiar 1º registro';
+    var cardCls  = 'col-card ' + _acaoClass(acao);
+    var hasSort  = !!SORT_ALLOWED[acao] && col.ordem !== '';
+    var sortAllowed = !!SORT_ALLOWED[acao];
+    var dirLabel = (col.dir || 'ASC') === 'ASC' ? '↑ ASC' : '↓ DESC';
+    var letter   = _colLetter(col.ci);
+
+    return (
+      '<div class="' + cardCls + '" data-ci="' + col.ci + '">' +
+        '<div class="col-header">' +
+          '<span class="col-idx">' + letter + '</span>' +
+          '<span class="col-name' + (isEmpty ? ' col-empty' : '') + '">' +
+            (isEmpty ? '(coluna ' + letter + ')' : name) +
+          '</span>' +
+        '</div>' +
+        '<div class="col-controls">' +
+          '<select class="col-select js-acao">' +
+            ACTIONS.map(function(a) {
+              return '<option' + (a === acao ? ' selected' : '') + '>' + a + '</option>';
+            }).join('') +
+          '</select>' +
+          '<div class="sort-group">' +
+            '<input type="checkbox" class="sort-check js-sort-chk"' +
+              (sortAllowed ? '' : ' disabled') +
+              (hasSort ? ' checked' : '') + '>' +
+            '<span class="sort-label">🔡</span>' +
+            (hasSort ? '<span class="sort-priority">' + col.ordem + '</span>' : '') +
+            (hasSort ? '<button type="button" class="dir-btn js-dir">' + dirLabel + '</button>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  container.querySelectorAll('.col-card').forEach(function(card) {
+    var ci  = parseInt(card.dataset.ci, 10);
+    var col = st.columns[ci];
+    var acaoSel = card.querySelector('.js-acao');
+    var sortChk = card.querySelector('.js-sort-chk');
+    var dirBtn  = card.querySelector('.js-dir');
+
+    acaoSel.addEventListener('change', function() {
+      col.acao = acaoSel.value;
+      if (!SORT_ALLOWED[col.acao] && col.ordem !== '') {
+        _compactPriorities(parseInt(col.ordem, 10));
+        col.ordem = '';
+      }
+      _renderColunas();
+    });
+
+    if (sortChk) {
+      sortChk.addEventListener('change', function(e) {
+        e.stopPropagation();
+        if (sortChk.checked) {
+          col.ordem = String(_nextPriority());
+        } else {
+          if (col.ordem !== '') _compactPriorities(parseInt(col.ordem, 10));
+          col.ordem = '';
+        }
+        _renderColunas();
+      });
+    }
+
+    if (dirBtn) {
+      dirBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        col.dir = (col.dir || 'ASC') === 'ASC' ? 'DESC' : 'ASC';
+        _renderColunas();
+      });
+    }
+  });
+}
+
+function _acaoClass(acao) {
+  if (acao === 'Agrupar')           return 'is-agrupar';
+  if (acao === 'Somar valores')     return 'is-somar';
+  if (acao === 'Contar registros')  return 'is-contar';
+  return 'is-copy';
+}
+
+function _nextPriority() {
+  var used = [];
+  st.columns.forEach(function(c) {
+    var p = parseInt(c.ordem, 10);
+    if (!isNaN(p) && p > 0) used.push(p);
+  });
+  for (var i = 1; i <= 30; i++) {
+    if (used.indexOf(i) < 0) return i;
+  }
+  return used.length + 1;
+}
+
+function _compactPriorities(removed) {
+  st.columns.forEach(function(c) {
+    var p = parseInt(c.ordem, 10);
+    if (!isNaN(p) && p > removed) c.ordem = String(p - 1);
+  });
+}
+
+/* ── DESTINO ─────────────────────────────────────────────────────────── */
+function _bindDestino() {
+  function _setMode(mode) {
+    st.destMode = mode;
+    document.getElementById('radio-new').checked      = (mode === 'new');
+    document.getElementById('radio-existing').checked = (mode === 'existing');
+    document.getElementById('dest-new').classList.toggle('selected',      mode === 'new');
+    document.getElementById('dest-existing').classList.toggle('selected', mode === 'existing');
+    _updateDestPreview();
+  }
+
+  document.getElementById('dest-new').addEventListener('click', function() { _setMode('new'); });
+  document.getElementById('dest-existing').addEventListener('click', function() { _setMode('existing'); });
+  document.getElementById('radio-new').addEventListener('change', function() { _setMode('new'); });
+  document.getElementById('radio-existing').addEventListener('change', function() { _setMode('existing'); });
+
+  document.getElementById('dest-suffix').addEventListener('input', function() {
+    st.destSuffix = this.value;
+    _updateDestPreview();
+  });
+  document.getElementById('dest-sheet').addEventListener('change', function() {
+    st.destSheet = this.value;
+  });
+  document.getElementById('dest-cell').addEventListener('input', function() {
+    st.destCell = this.value;
+  });
+}
+
+function _renderDestino() {
+  document.getElementById('dest-suffix').value = st.destSuffix;
+  document.getElementById('dest-cell').value   = st.destCell || 'A1';
+
+  // Popula seletor de abas existentes
+  var sel = document.getElementById('dest-sheet');
+  sel.innerHTML = st.sheets.map(function(s) {
+    return '<option value="' + _esc(s.name) + '"' + (s.name === st.destSheet ? ' selected' : '') + '>' + _esc(s.name) + '</option>';
+  }).join('');
+  if (!st.destSheet && st.sheets.length > 0) {
+    st.destSheet = st.sheets[0].name;
+  }
+
+  _updateDestPreview();
+}
+
+function _updateDestPreview() {
+  var preview  = document.getElementById('dest-preview');
+  var selected = _selectedSheets();
+  var firstName = selected.length > 0 ? selected[0].name : null;
+
+  if (!firstName) {
+    preview.textContent = '⚠ Selecione ao menos uma aba';
+    preview.className = 'dest-preview warn';
+  } else {
+    var suffix = st.destSuffix || '';
+    preview.textContent = '📄 ' + firstName + suffix;
+    preview.className = 'dest-preview';
+  }
+}
+
+/* ── FOOTER ─────────────────────────────────────────────────────────── */
+function _bindFooter() {
+  document.getElementById('btn-save').addEventListener('click', _doSave);
+  document.getElementById('btn-run').addEventListener('click', _doRun);
+}
+
+function _doSave() {
+  _setBusy(true);
+  _setStatus('Salvando...', 'busy');
+  google.script.run
+    .withSuccessHandler(function(r) {
+      _setBusy(false);
+      _setStatus(r.success ? '✓ Configuração salva' : '❌ ' + r.error, r.success ? 'ok' : 'err');
+    })
+    .withFailureHandler(function(e) { _setBusy(false); _setStatus('❌ ' + (e.message || e), 'err'); })
+    .saveSummaryAllConfig(_buildConfig());
+}
+
+function _doRun() {
+  var selected = _selectedSheets();
+  if (selected.length === 0) {
+    _setStatus('⚠ Selecione ao menos uma aba.', 'err');
+    return;
+  }
+  _setBusy(true);
+  _setStatus('⏳ Gerando...', 'busy');
+  google.script.run
+    .withSuccessHandler(function(r) {
+      _setBusy(false);
+      if (r.success) {
+        _setStatus('✅ ' + r.grupos + ' grupos | ' + r.linhas + ' linhas → ' + r.dest, 'ok');
+      } else {
+        _setStatus('❌ ' + r.error, 'err');
+      }
+    })
+    .withFailureHandler(function(e) { _setBusy(false); _setStatus('❌ ' + (e.message || e), 'err'); })
+    .runSummaryAllFromSidebar(_buildConfig());
+}
+
+/* ── BUILD CONFIG ────────────────────────────────────────────────────── */
+function _buildConfig() {
+  return {
+    columns: st.columns.map(function(c) {
+      return { ci: c.ci, acao: c.acao, ordem: c.ordem, dir: c.dir || 'ASC' };
+    }),
+    selectedSheets: _selectedSheets().map(function(s) { return s.name; }),
+    destMode:   st.destMode,
+    destSuffix: st.destSuffix,
+    destSheet:  st.destSheet,
+    destCell:   st.destCell || 'A1',
+  };
+}
+
+/* ── RENDER ALL ──────────────────────────────────────────────────────── */
+function _renderAll() {
+  var selected  = _selectedSheets();
+  var firstName = selected.length > 0 ? selected[0].name : null;
+  st._prevFirst = firstName;
+
+  if (firstName) {
+    document.getElementById('hdr-source-text').textContent = 'Cabeçalho de: ' + firstName;
+  }
+
+  // Banner inicial
+  var banner = document.getElementById('info-banner');
+  if (selected.length === 0) {
+    banner.style.display = 'block';
+    banner.textContent = '⚠ Selecione ao menos uma aba de origem.';
+  }
+
+  var ok = selected.length > 0;
+  document.getElementById('btn-run').disabled  = !ok;
+  document.getElementById('btn-save').disabled = !ok;
+
+  _renderAbas();
+  _renderColunas();
+  _renderDestino();
+}
+
+/* ── HELPERS ─────────────────────────────────────────────────────────── */
+function _selectedSheets() {
+  return st.sheets.filter(function(s) { return s.checked; });
+}
+
+function _setStatus(msg, cls) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+function _setBusy(on) {
+  document.getElementById('btn-save').disabled = on;
+  document.getElementById('btn-run').disabled  = on;
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _colLetter(n) {
+  var s = '';
+  n = n | 0;
+  while (n >= 0) {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
+}
+</script>
+</body>
+</html>

@@ -5,8 +5,8 @@
  * Fornece uma interface simplificada para CacheService com suporte
  * a objetos JSON e chunking para dados maiores que 100KB.
  *
- * NOTA: Renomeado para SharedCache para evitar conflito com
- * CacheManager do BOM.gs que tem logica especifica
+ * NOTA: Nomeado SharedCache. O antigo CacheManager do BOM.gs foi removido
+ * na v3.2 (valores únicos lidos sempre frescos); este é o cache genérico reutilizável.
  *
  * USO:
  *   SharedCache.set('key', { dados: 'valor' }, 300);

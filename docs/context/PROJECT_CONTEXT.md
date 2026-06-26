@@ -181,18 +181,6 @@ const ConfigService = {
 };
 ```
 
-### CacheManager (BOM.gs)
-```javascript
-const CacheManager = {
-  _cache: CacheService.getScriptCache(),
-  TTL: 180, // 3 minutos
-
-  get(key) { /* ... */ },
-  put(key, value, ttl) { /* ... */ },
-  invalidateAll() { /* ... */ }
-};
-```
-
 ### Utilitários Comuns
 ```javascript
 function getColumnIndex(letter)     // A → 1, B → 2

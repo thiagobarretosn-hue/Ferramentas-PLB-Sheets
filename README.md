@@ -174,7 +174,6 @@ const CONFIG = {
   SHEETS: {
     CONFIG: 'Config'  // Nome da aba de configuração
   },
-  CACHE_TTL: 180,     // Tempo de cache (segundos)
   DELIMITER: '|||'    // Delimitador de combinações
 };
 ```
@@ -218,7 +217,6 @@ const CENTRAL_SHEET_NAME = "DATA BASE";
 - 🔧 Fixadores → Fonte
 - 📄 Exportar PDFs (da Aba Config)
 - 🗑️ Limpar Relatórios
-- 🔄 Limpar Cache
 - 🧪 Diagnóstico
 - 🔧 Recriar Config
 
@@ -244,7 +242,6 @@ const CENTRAL_SHEET_NAME = "DATA BASE";
 ### BOM
 ```javascript
 testSystem()           // Diagnóstico completo
-forceRefreshCache()    // Limpa cache
 ```
 
 ### Templates

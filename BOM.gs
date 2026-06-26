@@ -1,6 +1,9 @@
 /**
  * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS + FIXADORES (BOM)
- * @version 3.1.0 - Correções: prefixo PDF, versão zero-pad, cache registry, empty-sheet guards
+ * @version 3.3.0 - Cache de valores únicos removido (sempre fresco) + botão Atualizar na sidebar;
+ *                  lista de exportação = todas as abas exceto a fonte, em ordem alfabética (natural sort);
+ *                  clearOldReports protege a fonte (assinatura de cabeçalho);
+ *                  banding idempotente na regeneração; autodetect col5 PROJECT→QTY; debounce de estado
  *
  * V3.0: Cada ferramenta opera de forma independente:
  * - BomSidebar gerencia suas próprias configurações via PropertiesService
@@ -74,7 +77,6 @@ const BOM_CONFIG = {
     PANEL_EMPTY_BG: '#95a5a6',
     PANEL_ERROR_BG: '#c0392b'
   },
-  CACHE_TTL: 180,
   DELIMITER: '|||',
   FIXADORES: {
     RISER: {
@@ -148,38 +150,6 @@ const Utils = {
    */
   extractDiameter: (desc) => {
     return SharedUtils_extractPipeDiameter(desc);
-  }
-};
-
-// ============================================================================
-// CACHE - BOM
-// ============================================================================
-
-const CacheManager = {
-  _cache: CacheService.getScriptCache(),
-  get: (key) => {
-    const cached = CacheManager._cache.get(key);
-    return cached ? JSON.parse(cached) : null;
-  },
-  put: (key, value, ttl = BOM_CONFIG.CACHE_TTL) => {
-    CacheManager._cache.put(key, JSON.stringify(value), ttl);
-    // Registra a chave para que invalidateAll possa removê-la
-    try {
-      const regJson = CacheManager._cache.get('bom_cache_keys');
-      const keys = regJson ? JSON.parse(regJson) : [];
-      if (!keys.includes(key)) {
-        keys.push(key);
-        CacheManager._cache.put('bom_cache_keys', JSON.stringify(keys), 3600);
-      }
-    } catch (e) {}
-  },
-  invalidateAll: () => {
-    try {
-      const regJson = CacheManager._cache.get('bom_cache_keys');
-      const keys = regJson ? JSON.parse(regJson) : [];
-      if (keys.length) CacheManager._cache.removeAll(keys);
-      CacheManager._cache.remove('bom_cache_keys');
-    } catch (e) {}
   }
 };
 
@@ -272,19 +242,16 @@ const ConfigService = {
  */
 function getUniqueColumnValues(sheet, columnIndex) {
   if (!sheet) return [];
-  const cacheKey = `unique_${sheet.getSheetId()}_${columnIndex}`;
-  const cached = CacheManager.get(cacheKey);
-  if (cached) return cached;
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
+  // Sem cache: os valores únicos são lidos sempre frescos da aba fonte.
+  // O cache anterior (180s, chave sheetId+coluna) não detectava edição
+  // in-place dos dados e deixava os painéis desatualizados.
   const values = sheet.getRange(2, columnIndex, lastRow - 1).getValues().flat();
-  const uniqueValues = [...new Set(values.filter(v => v))]
+  return [...new Set(values.filter(v => v))]
     .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
-
-  CacheManager.put(cacheKey, uniqueValues);
-  return uniqueValues;
 }
 
 // ============================================================================
@@ -469,6 +436,11 @@ function groupAndSumData(data, sortOrder) {
 
 function createAndFormatReport(sheet, kojoSuffix, data, settings) {
   const K = BOM_CONFIG.KEYS;
+
+  // ✅ FIX (B4): clear() não remove banding (é objeto do Sheet, não do Range).
+  // Sem isto, regerar a mesma aba lança "conflicting banding" em applyRowBanding.
+  sheet.getBandings().forEach(b => b.remove());
+
   const reportConfig = {
     project: settings[K.PROJECT],
     bom: settings[K.BOM],
@@ -527,25 +499,32 @@ function clearOldReports() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // ✅ FIX: usa aba fonte configurada, não a aba ativa
-  const config = ConfigService.getAll();
-  const sourceSheetName = config[BOM_CONFIG.KEYS.SOURCE_SHEET] || ss.getActiveSheet().getName();
+  // ✅ FIX (B1): apaga SOMENTE abas com assinatura de relatório BOM gerado.
+  // A aba de dados (fonte) e abas auxiliares nunca são tocadas.
+  const reportSheets = ss.getSheets().filter(_isGeneratedReportSheet);
+  if (reportSheets.length === 0) {
+    ui.alert('Nada a limpar', 'Nenhuma aba de relatório BOM gerado foi encontrada.', ui.ButtonSet.OK);
+    return;
+  }
 
+  const names = reportSheets.map(s => s.getName());
   const response = ui.alert(
     'Confirmação',
-    `Apagar TODAS as abas exceto "${sourceSheetName}" (aba fonte)?`,
+    `Apagar ${names.length} aba(s) de relatório BOM?\n\n${names.join(', ')}\n\n` +
+    `A aba de dados e quaisquer abas auxiliares NÃO serão tocadas.`,
     ui.ButtonSet.YES_NO
   );
   if (response !== ui.Button.YES) return;
 
+  // ✅ FIX (B8): remove também a meta (BOM_META_*) de cada relatório apagado
+  const docProps = PropertiesService.getDocumentProperties();
   let deletedCount = 0;
-  ss.getSheets().forEach(sheet => {
-    if (sheet.getName() !== sourceSheetName) {
-      ss.deleteSheet(sheet);
-      deletedCount++;
-    }
+  reportSheets.forEach(sheet => {
+    docProps.deleteProperty('BOM_META_' + sheet.getName());
+    ss.deleteSheet(sheet);
+    deletedCount++;
   });
-  ui.alert('Limpeza Concluída', `${deletedCount} abas removidas.`, ui.ButtonSet.OK);
+  ui.alert('Limpeza Concluída', `${deletedCount} aba(s) de relatório removida(s).`, ui.ButtonSet.OK);
 }
 
 // ============================================================================
@@ -1044,7 +1023,25 @@ function exportSheetToPdf(sheet, pdfName, folder) {
  * Retorna dados iniciais para a BomSidebar
  * V3.0: Usa aba ativa como fonte e PropertiesService para config
  */
+/**
+ * Remove properties BOM_META_* sem aba correspondente (relatório apagado/renomeado).
+ * Garbage collection barato (só chaves + nomes de abas, sem ler células), ao abrir o painel.
+ */
+function _syncReportMeta() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const existing = new Set(ss.getSheets().map(s => s.getName()));
+    const docProps = PropertiesService.getDocumentProperties();
+    docProps.getKeys().forEach(k => {
+      if (k.indexOf('BOM_META_') === 0 && !existing.has(k.substring(9))) {
+        docProps.deleteProperty(k);
+      }
+    });
+  } catch (e) { /* não crítico */ }
+}
+
 function getBomHtmlInitData() {
+  _syncReportMeta();  // sincroniza o registro de relatórios (prune + adoção de legados)
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const savedConfig = ConfigService.getAll();
   const activeSheet = ss.getActiveSheet();
@@ -1208,7 +1205,7 @@ function testSystem() {
     const config = ConfigService.getAll();
     const fixConfig = ConfigService.getFixConfig();
     const msg = [
-      `Versão do Script: 3.1 (Correções PDF/Versão/Cache)`,
+      `Versão do Script: 3.3 (sem cache; exportação = tudo exceto a fonte)`,
       `Aba Ativa: ${activeSheet.getName()}`,
       `Linhas na Aba Ativa: ${activeSheet.getLastRow() - 1}`,
       `Total de Abas: ${ss.getSheets().length}`,
@@ -1222,18 +1219,44 @@ function testSystem() {
 }
 
 /**
- * V3.0: Retorna abas que são relatórios gerados (todas exceto a fonte)
+ * Detecta se uma aba é um relatório BOM gerado por esta ferramenta.
+ * Usa a assinatura determinística do cabeçalho escrito por createAndFormatReport
+ * (A1 = "PROJECT:", A3 = "BOM KOJO:..."), em vez de "tudo que não é a fonte".
+ * Protege a aba de dados e quaisquer abas auxiliares.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ * @returns {boolean}
  */
-function getReportSheetNames() {
-  const config = ConfigService.getAll();
-  const sourceSheetName = config[BOM_CONFIG.KEYS.SOURCE_SHEET] || '';
-  return SpreadsheetApp.getActiveSpreadsheet().getSheets()
-    .map(s => s.getName())
-    .filter(name => name !== sourceSheetName);
+function _isGeneratedReportSheet(sheet) {
+  try {
+    if (!sheet || sheet.getLastRow() < 3) return false;
+    const colA = sheet.getRange(1, 1, 3, 1).getValues();
+    const a1 = String(colA[0][0] || '').trim();
+    const a3 = String(colA[2][0] || '').trim();
+    return a1 === 'PROJECT:' && a3.indexOf('BOM KOJO') === 0;
+  } catch (e) {
+    return false;
+  }
 }
 
-function getReportSheetNamesForHtml() {
-  return getReportSheetNames();
+/**
+ * V3.3: Retorna os nomes das abas de relatório, em ordem alfabética (natural sort).
+ * Estratégia robusta: TODAS as abas exceto a fonte de dados — não usa assinatura de
+ * cabeçalho (que variava entre versões e escondia relatórios legados).
+ * Rápido: só nomes de abas, sem leitura de células.
+ * @param {string} [sourceSheetName] Aba fonte a excluir (vinda do painel). Fallback: config salva.
+ */
+function getReportSheetNames(sourceSheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const source = sourceSheetName || ConfigService.getAll()[BOM_CONFIG.KEYS.SOURCE_SHEET] || '';
+  return ss.getSheets()
+    .map(s => s.getName())
+    .filter(name => name !== source)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function getReportSheetNamesForHtml(sourceSheetName) {
+  return getReportSheetNames(sourceSheetName);
 }
 
 /**
@@ -1241,10 +1264,10 @@ function getReportSheetNamesForHtml() {
  * @public
  * @returns {Array<{name, project, bom, kojo, engineer, version, l1, l2, l3}>}
  */
-function getReportSheetDataForHtml() {
+function getReportSheetDataForHtml(sourceSheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const docProps = PropertiesService.getDocumentProperties();
-  return getReportSheetNames().map(name => {
+  return getReportSheetNames(sourceSheetName).map(name => {
     const sheet = ss.getSheetByName(name);
     const metaJson = docProps.getProperty('BOM_META_' + name);
     if (!sheet) {
@@ -1278,15 +1301,5 @@ function getReportSheetDataForHtml() {
   });
 }
 
-/**
- * Força limpeza completa do cache do sistema BOM
- * Útil quando os dados parecem desatualizados
- *
- * @public
- * @menuitem '🔧 Relatórios Dinâmicos' > '🔄 Limpar Cache'
- * @returns {void}
- */
-function forceRefreshCache() {
-  CacheManager.invalidateAll();
-  SpreadsheetApp.getActiveSpreadsheet().toast('Cache limpo!', 'Sucesso', 3);
-}
+// Cache removido (V3.2): getUniqueColumnValues lê sempre fresco; não há mais
+// cache a limpar. O botão "🔄 Atualizar" na sidebar relê os dados sob demanda.

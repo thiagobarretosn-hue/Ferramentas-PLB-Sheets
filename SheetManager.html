@@ -136,6 +136,9 @@
     };
     const checkboxIds = Object.keys(inputMap);
 
+    // Ultimo checkbox da lista de abas clicado (para seleção em lote com Shift)
+    let lastChecked = null;
+
     checkboxIds.forEach(id => {
       document.getElementById(id).addEventListener('change', function() {
         if (this.checked) {
@@ -163,6 +166,7 @@
     function displaySheets(sheets) {
       const container = document.getElementById('sheetList');
       container.innerHTML = '';
+      lastChecked = null;  // a lista foi recriada; descarta referência antiga
       sheets.forEach(s => {
         const item = document.createElement('div');
         item.className = 'sheet-item';
@@ -170,6 +174,7 @@
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = s.name;
+        cb.addEventListener('click', onCheckboxClick);
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'sheet-name' + (s.isHidden ? ' is-hidden' : '');
@@ -186,6 +191,17 @@
         }
         container.appendChild(item);
       });
+    }
+
+    function onCheckboxClick(e) {
+      const boxes = Array.from(document.querySelectorAll('#sheetList input[type="checkbox"]'));
+      if (e.shiftKey && lastChecked && lastChecked !== this) {
+        const start = boxes.indexOf(lastChecked);
+        const end   = boxes.indexOf(this);
+        const lo = Math.min(start, end), hi = Math.max(start, end);
+        for (let i = lo; i <= hi; i++) boxes[i].checked = this.checked;
+      }
+      lastChecked = this;
     }
 
     function getSelected() {

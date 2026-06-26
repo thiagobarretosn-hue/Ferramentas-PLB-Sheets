@@ -511,8 +511,10 @@
 
       <!-- Filtros (tabs 1 e 2) -->
       <div class="filter-panel" id="filterPanel">
-        <div class="filter-header">
+        <div class="filter-header" style="display:flex; justify-content:space-between; align-items:center;">
           <h3>3. Painéis de Filtro</h3>
+          <button type="button" class="btn btn-small btn-primary" onclick="refreshData()"
+                  title="Relê os valores da aba de origem. Use após editar os dados na planilha.">🔄 Atualizar</button>
         </div>
         <div class="filter-container" id="groupPanelsContainer">
           <div class="group-level" id="panel-L1">
@@ -677,6 +679,8 @@
           populateGroupDropdowns();
           populateReportConfig();
           autoDetectColumns(allColumns);  // Auto-detecta ao trocar aba
+          // B6: filtros de exclusão são específicos da aba — limpa ao trocar de fonte
+          document.getElementById('exclFiltersContainer').innerHTML = '';
           saveState();
           loadPanels();
         })
@@ -689,12 +693,14 @@
      * Preenche apenas selects que ainda não têm valor selecionado.
      */
     function autoDetectColumns(columns) {
+      // Keywords em ORDEM DE PRIORIDADE (a 1ª que casar alguma coluna vence).
+      // col5: PROJECT primeiro (total final de material somado), com fallback QTY/QUANTITY.
       const patterns = [
         ['col1Select',   ['UNIT ID', 'UNIT_ID', 'FLOOR ID', 'ID']],
         ['col2Select',   ['DESC', 'DESCRIPTION']],
         ['col3Select',   ['UPC']],
         ['col4Select',   ['UOM', 'UNIT OF MEASURE']],
-        ['col5Select',   ['QTY', 'QUANTITY', 'PROJECT']],
+        ['col5Select',   ['PROJECT', 'QTY', 'QUANTITY']],
         ['sortBySelect', ['DESC', 'DESCRIPTION']],
       ];
 
@@ -705,10 +711,13 @@
         // Mantém valor salvo apenas se ele ainda existe na lista de colunas atual
         if (el.value && columns.includes(el.value)) return;
 
-        const match = columns.find(col => {
-          const upper = col.toUpperCase();
-          return keywords.some(kw => upper.includes(kw));
-        });
+        // Prioridade por keyword: tenta cada keyword na ordem; a 1ª que achar
+        // uma coluna correspondente define o match (fallback natural).
+        let match = null;
+        for (const kw of keywords) {
+          match = columns.find(col => col.toUpperCase().includes(kw));
+          if (match) break;
+        }
         if (match) {
           el.value = match;
           currentConfig[formFields[id]] = match;
@@ -779,6 +788,25 @@
         l2: document.getElementById('groupL2Select').value,
         l3: document.getElementById('groupL3Select').value,
       });
+    }
+
+    /**
+     * Relê os valores da aba de origem (pós-edição na planilha), preservando
+     * as seleções atuais de filtro, sufixos kojo e itens marcados no preview.
+     * Substitui o antigo menu "🔄 Limpar Cache" (agora não há cache a limpar).
+     */
+    function refreshData() {
+      const state = getState();
+
+      // Recria os filtros de exclusão com valores frescos, mantendo os marcados
+      const exclContainer = document.getElementById('exclFiltersContainer');
+      if (exclContainer) {
+        exclContainer.innerHTML = '';
+        (state.settings['Filtros de Exclusão'] || []).forEach(f => addExclFilter(f.col, f.vals));
+      }
+
+      // Recarrega os painéis L1/L2/L3 (valores frescos) e reaplica seleção + preview
+      loadPanels(state);
     }
 
     async function loadPanels(savedState = null) {
@@ -1460,7 +1488,7 @@
           onError(err);
           isPdfListLoading = false;
         })
-        .getReportSheetDataForHtml();
+        .getReportSheetDataForHtml(document.getElementById('sourceSheetSelect').value);
     }
 
     /** Atualiza preview de nome nos itens da lista PDF */
@@ -1567,11 +1595,16 @@
     // =========================================================
     // 8. SALVAR/CARREGAR ESTADO
     // =========================================================
+    let _saveStateTimer = null;
     function saveState() {
       try {
         const state = getState();
+        // Local: imediato (barato). Servidor: debounced ~0,8s para poupar quota.
         localStorage.setItem(STATE_KEY, JSON.stringify(state));
-        google.script.run.saveUserSidebarState(JSON.stringify(state));
+        clearTimeout(_saveStateTimer);
+        _saveStateTimer = setTimeout(() => {
+          google.script.run.saveUserSidebarState(JSON.stringify(state));
+        }, 800);
       } catch (e) {
         console.warn('Não foi possível salvar o estado:', e.message);
       }
@@ -1692,7 +1725,7 @@
 
       const pdfBlocks = getPdfBlocksConfig();
 
-      return { settings, filterState, kojoState, previewState, pdfBlocks };
+      return { settings, filterState, kojoState, previewState, pdfBlocks, _ts: Date.now() };
     }
 
     async function loadState() {
@@ -1704,13 +1737,24 @@
             .getUserSidebarState();
         });
 
+        let localState = null;
+        try {
+          const localStateJson = localStorage.getItem(STATE_KEY);
+          if (localStateJson) localState = JSON.parse(localStateJson);
+        } catch (e) { /* ignora local corrompido */ }
+
+        // B7: o servidor pode estar atrás do localStorage (debounce). Usa o mais
+        // recente pelo carimbo _ts para nunca restaurar um estado antigo.
+        if (serverState && localState) {
+          const chosen = (localState._ts || 0) > (serverState._ts || 0) ? localState : serverState;
+          localStorage.setItem(STATE_KEY, JSON.stringify(chosen));
+          return chosen;
+        }
         if (serverState) {
           localStorage.setItem(STATE_KEY, JSON.stringify(serverState));
           return serverState;
         }
-
-        const localStateJson = localStorage.getItem(STATE_KEY);
-        if (localStateJson) return JSON.parse(localStateJson);
+        if (localState) return localState;
       } catch (e) {
         console.warn('Não foi possível carregar o estado.', e);
       }
