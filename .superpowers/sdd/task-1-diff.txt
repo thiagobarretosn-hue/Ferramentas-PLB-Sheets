@@ -1,0 +1,60 @@
+commit 517a9fa55b3863c50522e6f65b2c44e8f6ceca57
+Author: Thiago Barreto Sobral Nunes <thiagobarretosn@gmail.com>
+Date:   Fri Jun 26 15:34:39 2026 -0300
+
+    chore: copia inicial do projeto para versao add-on
+
+ .clasp.json                                        |    1 +
+ .claspignore                                       |    9 +
+ .claude/settings.json                              |   22 +
+ .superpowers/sdd/progress.md                       |   11 +
+ .superpowers/sdd/task-1-brief.md                   |   89 +
+ BOM.gs                                             | 1305 +++++++++++++
+ BomSidebar.html                                    | 2038 ++++++++++++++++++++
+ CLAUDE.md                                          |  563 ++++++
+ ColorConfig.gs                                     |  245 +++
+ ConditionalFormat.gs                               |    3 +
+ ConfigSidebar.html                                 |  586 ++++++
+ "C\303\263digo.js"                                 |    3 +
+ ExportProReceiver.gs                               |   81 +
+ Ferramentas-PLB-Sheets.code-workspace              |    8 +
+ FixadoresSidebar.html                              |  726 +++++++
+ Menu.gs                                            |   23 +
+ README.md                                          |  289 +++
+ Request.gs                                         |  488 +++++
+ RequestSidebar.html                                |  486 +++++
+ SheetManager.gs                                    |  145 ++
+ SheetManager.html                                  |  299 +++
+ SummaryAll.gs                                      |  344 ++++
+ SummaryAllSidebar.html                             |  909 +++++++++
+ SuperBusca.gs                                      |  195 ++
+ SuperBuscaSidebar.html                             |  644 +++++++
+ Template.gs                                        | 1046 ++++++++++
+ appsscript.json                                    |    7 +
+ color-config-sidebar.html                          |  453 +++++
+ docs/README.md                                     |   29 +
+ docs/context/API_REFERENCE.md                      |  542 ++++++
+ docs/context/DIRETRIZES.md                         |  502 +++++
+ docs/context/PROJECT_CONTEXT.md                    |  305 +++
+ .../plans/2026-05-07-request-generator.md          | 1189 ++++++++++++
+ docs/superpowers/plans/2026-06-26-addon-privado.md |  398 ++++
+ .../specs/2026-05-07-request-generator-design.md   |  251 +++
+ .../specs/2026-06-26-addon-privado-design.md       |  209 ++
+ duplicate-dialog.html                              |  437 +++++
+ gas-deploy.bat                                     |    2 +
+ gas-deploy.ps1                                     |  438 +++++
+ lib/Shared/Config.gs                               |  394 ++++
+ lib/Shared/Logger.gs                               |  223 +++
+ lib/Shared/Utils.gs                                |  647 +++++++
+ lib/Snippets/README.md                             |   51 +
+ lib/Snippets/cache/cache_manager.gs                |  176 ++
+ lib/Snippets/drive/pdf_export.gs                   |  203 ++
+ lib/Snippets/sheets/sheet_utils.gs                 |  218 +++
+ lib/Snippets/ui/sidebar_utils.gs                   |  185 ++
+ lib/Snippets/utils/string_utils.gs                 |  213 ++
+ push-to-apps-script.ps1                            |  162 ++
+ template-sidebar.html                              | 1018 ++++++++++
+ templates/README.md                                |   45 +
+ templates/new_script_template.gs                   |  264 +++
+ templates/sidebar_template.html                    |  421 ++++
+ 53 files changed, 19540 insertions(+)

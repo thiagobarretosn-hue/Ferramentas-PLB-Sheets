@@ -1,0 +1,40 @@
+diff --git a/appsscript.json b/appsscript.json
+index b188f0d..3c2a2a9 100644
+--- a/appsscript.json
++++ b/appsscript.json
+@@ -1,7 +1,30 @@
+ {
+   "timeZone": "America/Fortaleza",
+-  "dependencies": {
+-  },
++  "dependencies": {},
+   "exceptionLogging": "STACKDRIVER",
+-  "runtimeVersion": "V8"
+-}
+\ No newline at end of file
++  "runtimeVersion": "V8",
++  "oauthScopes": [
++    "https://www.googleapis.com/auth/spreadsheets",
++    "https://www.googleapis.com/auth/script.container.ui",
++    "https://www.googleapis.com/auth/drive"
++  ],
++  "addOns": {
++    "common": {
++      "name": "PLB Sheet Tools",
++      "logoUrl": "https://www.gstatic.com/images/icons/material/system/1x/table_chart_black_48dp.png",
++      "homepageTrigger": {
++        "runFunction": "onHomepage",
++        "enabled": true
++      }
++    },
++    "sheets": {
++      "homepageTrigger": {
++        "runFunction": "onHomepage",
++        "enabled": true
++      },
++      "onFileScopeGrantedTrigger": {
++        "runFunction": "onFileScopeGranted"
++      }
++    }
++  }
++}

@@ -1,0 +1,76 @@
+diff --git a/Menu.gs b/Menu.gs
+index 48be080..76c776a 100644
+--- a/Menu.gs
++++ b/Menu.gs
+@@ -1,21 +1,56 @@
+ /**
+- * @fileoverview Menu Principal - Ferramentas PLB Sheets
+- * @version 3.1.0 - Cores unificadas em um item; Gerenciador de Abas atualizado
++ * @fileoverview Menu Principal - Ferramentas PLB Sheets (Add-on)
++ * @version 4.0.0 - Convertido para Google Workspace Add-on privado
+  */
+ 
+-function onOpen() {
+-  SpreadsheetApp.getUi()
+-    .createMenu('🛠️ Sheet Tools')
+-    .addItem('📊 Gerador de BOM', 'openBomSidebar')
+-    .addItem('📋 Gerador de Request', 'openRequestSidebar')
+-    .addSeparator()
+-    .addItem('📑 Gerenciador de Abas', 'showSheetManager')
+-    .addItem('🎨 Cores das Abas', 'openColorConfig')
+-    .addSeparator()
+-    .addItem('🔍 Super Busca', 'abrirSuperBuscaSidebar')
+-    .addSeparator()
+-    .addItem('📊 Summary All', 'openSummaryAllSidebar')
+-    .addToUi();
++function onOpen(e) {
++  var ui = SpreadsheetApp.getUi();
++  var menu = ui.createMenu('🛠️ Sheet Tools');
++
++  if (e && e.authMode === ScriptApp.AuthMode.NONE) {
++    // Auth limitada: adiciona apenas item para disparar autorização completa
++    menu.addItem('🔓 Ativar ferramentas PLB', 'showAuthPrompt');
++  } else {
++    menu
++      .addItem('📊 Gerador de BOM', 'openBomSidebar')
++      .addItem('📋 Gerador de Request', 'openRequestSidebar')
++      .addSeparator()
++      .addItem('📑 Gerenciador de Abas', 'showSheetManager')
++      .addItem('🎨 Cores das Abas', 'openColorConfig')
++      .addSeparator()
++      .addItem('🔍 Super Busca', 'abrirSuperBuscaSidebar')
++      .addSeparator()
++      .addItem('📊 Summary All', 'openSummaryAllSidebar');
++  }
++
++  menu.addToUi();
++}
++
++function onFileScopeGranted(e) {
++  onOpen(e);
++}
++
++function onHomepage(e) {
++  return CardService.newCardBuilder()
++    .setHeader(
++      CardService.newCardHeader().setTitle('PLB Sheet Tools')
++    )
++    .addSection(
++      CardService.newCardSection()
++        .addWidget(
++          CardService.newTextParagraph()
++            .setText('Ferramentas PLB ativas. Acesse pelo menu 🛠️ Sheet Tools na barra superior.')
++        )
++    )
++    .build();
++}
++
++function showAuthPrompt() {
++  SpreadsheetApp.getUi().alert(
++    'PLB Sheet Tools',
++    'Clique em OK para autorizar as ferramentas. O menu completo aparecerá em seguida.',
++    SpreadsheetApp.getUi().ButtonSet.OK
++  );
+ }
+ 
+ function onEdit(e) {
