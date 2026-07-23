@@ -109,6 +109,16 @@ o `onEdit(e)` simples, porque mover/criar arquivo no Drive exige autorização c
   de "item novo": o usuário cola o link uma vez, e a partir daí passa a ficar organizado.
 - **Editou PDF** → roda a organização no Drive (sub-projeto 5) e, se o ITEM ainda não
   estava cadastrado, grava a linha nova na DATA BASE SUBMITTAL (sub-projeto 3).
+- **Editou DISCIPLINE, FOLDER ou ROOM** → se a linha já tem um arquivo organizado (célula
+  PDF com link pro repositório), roda o mesmo fluxo de ingestão — que detecta a pasta
+  destino nova e **move** o arquivo (requisito explícito do usuário: mudar a classificação
+  move, nunca duplica). Sem esse gatilho, editar ROOM diretamente nunca moveria nada.
+- **Catálogo acompanha a mudança (upsert):** quando a ingestão organiza/move um arquivo,
+  a linha do ITEM na DATA BASE SUBMITTAL é atualizada com a classificação atual
+  (DISCIPLINE/FOLDER/ROOM; LOCATION só se não vier vazia) — ou criada, se o item é novo.
+  Sem isso, um autofill futuro do mesmo item usaria a classificação antiga, não acharia o
+  arquivo (já movido) e uma nova colagem de link criaria duplicata na pasta velha —
+  exatamente a duplicação que o requisito proíbe.
 
 **Multi-célula (paste de várias colunas/linhas de uma vez):** `e.range` de um paste pode
 cobrir várias colunas e linhas ao mesmo tempo (ex: usuário cola uma linha inteira vinda do
@@ -121,12 +131,13 @@ do range, não só a primeira.
 `SpreadsheetApp.getActiveSpreadsheet().toast(...)` ou uma nota na própria célula, nunca
 um `alert()` (que falharia silenciosamente e só geraria um e-mail de erro que ninguém vê).
 
-**Por que não há risco de loop:** o handler só age quando a coluna editada é ITEM ou PDF.
-As escritas do autofill (DISCIPLINE/FOLDER/ROOM/LOCATION) disparam onEdit de novo, mas
-essas colunas não são gatilho — o handler entra, não reconhece a coluna, sai sem fazer nada.
-A única coluna que é ao mesmo tempo alvo do autofill E gatilho é PDF; resolvido fazendo a
-organização no Drive **idempotente** (só move/copia se o arquivo ainda não está no lugar
-certo com o nome certo) — reprocessar o mesmo valor não tem efeito colateral.
+**Por que não há risco de loop:** a premissa central (a validar cedo, com teste dedicado,
+antes de construir o resto) é que **edição feita por script não dispara onEdit** — só edição
+humana dispara. Com isso, as escritas do autofill (DISCIPLINE/FOLDER/ROOM/LOCATION/PDF)
+nunca re-entram no handler. Mesmo que a premissa falhasse, todas as operações são
+**idempotentes** (só move/copia se o arquivo ainda não está no lugar certo com o nome
+certo; upsert não duplica linha) — reprocessar o mesmo valor não tem efeito colateral,
+então o pior caso seria uma execução extra inútil, não um loop infinito.
 
 **Concorrência:** com múltiplos usuários editando ao mesmo tempo, dois gatilhos podem, em
 teoria, descobrir o mesmo ITEM novo simultaneamente e gravar duas linhas duplicadas na

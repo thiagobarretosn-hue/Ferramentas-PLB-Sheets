@@ -180,11 +180,11 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📦 Submittal')
     .addItem('📦 Montar Submittal', 'openSubmittalSidebar')
-    .addSeparator()
-    .addItem('🔌 Ativar automação (autofill + organização)', '_sub_trg_activate')
     .addToUi();
 }
 ```
+
+(O item "🔌 Ativar automação" é adicionado só na Task 6, junto com a função `_sub_trg_activate` que ele chama — referenciar uma função que ainda não existe daria erro se alguém clicasse no item entre as tasks.)
 
 - [ ] **Step 8: Inicializar git e criar o repositório no GitHub**
 
@@ -539,7 +539,7 @@ git commit -m "feat: resolver colunas por nome de cabecalho em vez de posicao fi
 
 **Interfaces:**
 - Consumes: `_sub_getColumnMap`, `_sub_requireColumns` (Task 3)
-- Produces: `_sub_normalizeItemKey(text)` → string normalizada pra comparação; `_sub_catalog_lookup(itemName)` → `{ discipline, folder, room, location, item, pdf } | null`; `_sub_catalog_append(entry)` → grava linha nova (com `entry = { discipline, folder, room, location, item }`). Task 6 (gatilho) consome as duas últimas.
+- Produces: `_sub_normalizeItemKey(text)` → string normalizada pra comparação; `_sub_catalog_lookup(itemName)` → `{ row, discipline, folder, room, location, item, pdf } | null`; `_sub_catalog_upsert(entry)` → atualiza a linha do item se já existe (classificação nova) ou acrescenta linha nova (com `entry = { discipline, folder, room, location, item }`). Task 6 (gatilho) consome as duas últimas.
 
 - [ ] **Step 1: Escrever o teste da função pura de normalização**
 
@@ -608,10 +608,11 @@ function _sub_catalog_readIndex() {
 
   var numCols = sheet.getLastColumn();
   var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
-  data.forEach(function(row) {
+  data.forEach(function(row, i) {
     var item = String(row[colMap['ITEM'] - 1] || '').trim();
     if (!item) return;
     index[_sub_normalizeItemKey(item)] = {
+      row:        i + 2, // linha real na aba — usado pelo upsert pra atualizar in-place
       discipline: String(row[colMap['DISCIPLINE'] - 1] || '').trim(),
       folder:     String(row[colMap['FOLDER'] - 1] || '').trim(),
       room:       String(row[colMap['ROOM'] - 1] || '').trim(),
@@ -630,17 +631,35 @@ function _sub_catalog_lookup(itemName) {
 }
 
 /**
- * Grava uma linha nova na DATA BASE SUBMITTAL, se o item ainda nao existir.
+ * Atualiza a linha do item na DATA BASE SUBMITTAL (classificacao mudou) ou acrescenta
+ * linha nova (item inedito). Manter o catalogo em sincronia com o Drive e essencial:
+ * se o arquivo foi movido pra outra DISCIPLINE/FOLDER/ROOM mas o catalogo guardasse a
+ * classificacao antiga, um autofill futuro procuraria o arquivo na pasta velha, nao
+ * acharia, e uma nova colagem de link criaria DUPLICATA — exatamente o que o requisito
+ * "mover, nunca duplicar" proibe.
  * entry: { discipline, folder, room, location, item }
  * Protegido por LockService — dois usuarios editando ao mesmo tempo nao duplicam linha.
  */
-function _sub_catalog_append(entry) {
+function _sub_catalog_upsert(entry) {
   var lock = LockService.getDocumentLock();
   lock.waitLock(10000);
   try {
-    if (_sub_catalog_lookup(entry.item)) return; // outra execucao ja cadastrou entre a checagem e agora
+    var built = _sub_catalog_readIndex();
     var sheet = _sub_catalog_getSheet();
-    var colMap = _sub_getColumnMap(sheet);
+    var colMap = built.colMap;
+    var existing = built.index[_sub_normalizeItemKey(entry.item)];
+
+    if (existing) {
+      sheet.getRange(existing.row, colMap['DISCIPLINE']).setValue(entry.discipline || '');
+      sheet.getRange(existing.row, colMap['FOLDER']).setValue(entry.folder || '');
+      sheet.getRange(existing.row, colMap['ROOM']).setValue(entry.room || '');
+      // LOCATION so atualiza se veio preenchida — nao apagar dado do catalogo com vazio
+      if (String(entry.location || '').trim()) {
+        sheet.getRange(existing.row, colMap['LOCATION']).setValue(entry.location);
+      }
+      return;
+    }
+
     var row = new Array(sheet.getLastColumn()).fill('');
     row[colMap['DISCIPLINE'] - 1] = entry.discipline || '';
     row[colMap['FOLDER'] - 1]     = entry.folder || '';
@@ -693,7 +712,7 @@ Expected no log: objeto com `discipline: "PLUMBING"`, `folder: "FIXTURES"`, `roo
 
 ```bash
 git add SubmittalCatalog.gs SubmittalCatalog.test.js Submittal.gs
-git commit -m "feat: catalogo DATA BASE SUBMITTAL (leitura indexada + gravacao com lock)"
+git commit -m "feat: catalogo DATA BASE SUBMITTAL (leitura indexada + upsert com lock)"
 ```
 
 ---
@@ -898,9 +917,10 @@ git commit -m "feat: organizacao automatica de cut-sheets no Shared Drive (02-PR
 
 **Files:**
 - Create: `C:\DEV\Sheets\Submittal-GAS\SubmittalTriggers.gs`
+- Modify: `C:\DEV\Sheets\Submittal-GAS\Menu.gs` (adicionar o item "🔌 Ativar automação")
 
 **Interfaces:**
-- Consumes: `_sub_getColumnMap` (Task 3), `_sub_catalog_lookup`/`_sub_catalog_append` (Task 4), `_sub_org_organizeItem`/`_sub_org_resolveExistingFile` (Task 5)
+- Consumes: `_sub_getColumnMap` (Task 3), `_sub_catalog_lookup`/`_sub_catalog_upsert` (Task 4), `_sub_org_organizeItem`/`_sub_org_resolveExistingFile` (Task 5)
 - Produces: `_sub_trg_activate()` (chamada pelo menu), `_sub_trg_onEditInstalled(e)` (handler do gatilho)
 
 - [ ] **Step 1: Validar a premissa "escrita por script não re-dispara onEdit" ANTES de construir o resto**
@@ -930,8 +950,12 @@ Depois do teste: apagar o gatilho de teste (`ScriptApp.getProjectTriggers().forE
 
 ```javascript
 /**
- * @fileoverview Gatilho onEdit instalavel: autofill (coluna ITEM) + ingestao (coluna PDF).
+ * @fileoverview Gatilho onEdit instalavel: autofill (coluna ITEM), ingestao (coluna PDF)
+ * e move por mudanca de classificacao (DISCIPLINE/FOLDER/ROOM).
  * Instalavel (nao onEdit(e) simples) porque mover/criar arquivo no Drive exige autorizacao completa.
+ * Premissa validada no Step 1: edicao feita por script NAO re-dispara onEdit — so edicao
+ * humana. Mesmo se falhasse, todas as operacoes sao idempotentes (nao loopam, so gastam
+ * uma execucao extra).
  */
 
 function _sub_trg_activate() {
@@ -976,13 +1000,17 @@ function _sub_trg_handleEdit(e) {
   var endCol = startCol + e.range.getNumColumns() - 1;
   var endRow = startRow + e.range.getNumRows() - 1;
 
-  var touchesItem = !!itemCol && itemCol >= startCol && itemCol <= endCol;
-  var touchesPdf = !!pdfCol && pdfCol >= startCol && pdfCol <= endCol;
-  if (!touchesItem && !touchesPdf) return;
+  var inRange = function(col) { return !!col && col >= startCol && col <= endCol; };
+  var touchesItem = inRange(itemCol);
+  var touchesPdf = inRange(pdfCol);
+  // Editar a classificacao move o arquivo (requisito: mover, nunca duplicar) — a
+  // ingestao ja detecta pasta-destino diferente e faz o moveTo + upsert do catalogo.
+  var touchesClassification = inRange(colMap['DISCIPLINE']) || inRange(colMap['FOLDER']) || inRange(colMap['ROOM']);
+  if (!touchesItem && !touchesPdf && !touchesClassification) return;
 
   for (var row = startRow; row <= endRow; row++) {
     if (touchesItem) _sub_trg_runAutofill(sheet, colMap, row);
-    if (touchesPdf) _sub_trg_runIngest(sheet, colMap, row);
+    if (touchesPdf || touchesClassification) _sub_trg_runIngest(sheet, colMap, row);
   }
 }
 
@@ -1060,45 +1088,71 @@ function _sub_trg_runIngest(sheet, colMap, row) {
     .build();
   pdfCell.setRichTextValue(rt);
 
-  if (!_sub_catalog_lookup(itemName)) {
-    _sub_catalog_append({
-      discipline: discipline,
-      folder: folder,
-      room: room,
-      location: colMap['LOCATION'] ? String(sheet.getRange(row, colMap['LOCATION']).getValue() || '').trim() : '',
-      item: itemName
-    });
-  }
+  // Upsert SEMPRE (nao so quando o item e novo): se a classificacao mudou e o arquivo
+  // acabou de ser movido, o catalogo precisa acompanhar — senao um autofill futuro
+  // apontaria pra pasta velha e uma nova colagem de link criaria duplicata.
+  _sub_catalog_upsert({
+    discipline: discipline,
+    folder: folder,
+    room: room,
+    location: colMap['LOCATION'] ? String(sheet.getRange(row, colMap['LOCATION']).getValue() || '').trim() : '',
+    item: itemName
+  });
 }
 ```
 
-- [ ] **Step 3: Push**
+- [ ] **Step 3: Adicionar o item de ativação no Menu.gs**
+
+Substituir o conteúdo de `Menu.gs` por:
+
+```javascript
+/**
+ * @fileoverview Menu Principal — Submittal-GAS
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('📦 Submittal')
+    .addItem('📦 Montar Submittal', 'openSubmittalSidebar')
+    .addSeparator()
+    .addItem('🔌 Ativar automação (autofill + organização)', '_sub_trg_activate')
+    .addToUi();
+}
+```
+
+- [ ] **Step 4: Push**
 
 ```bash
 clasp push
 ```
 
-- [ ] **Step 4: Teste manual — item NOVO (fluxo de ingestão)**
+- [ ] **Step 5: Teste manual — item NOVO (fluxo de ingestão)**
 
 Numa linha vazia da aba de teste: digitar um `ITEM` que **não existe** na DATA BASE SUBMITTAL, preencher manualmente `DISCIPLINE`/`FOLDER`/`ROOM`, e colar um link de um PDF real (do Drive ou da web) na célula `PDF`. Expected: em poucos segundos, a célula `PDF` vira um hyperlink pro arquivo já dentro de `RAIZ/DISCIPLINE/FOLDER/ROOM/<ITEM>.pdf`, e uma linha nova aparece na `DATA BASE SUBMITTAL` com esses dados.
 
-- [ ] **Step 5: Teste manual — item CONHECIDO (fluxo de autofill)**
+- [ ] **Step 6: Teste manual — item CONHECIDO (fluxo de autofill)**
 
 Numa outra linha vazia: digitar um `ITEM` que **já existe** na DATA BASE SUBMITTAL (ex: `PLASTIC ACCESS PANEL 6 IN. X 6 IN.`, o mesmo teste da Task 4). Expected: `DISCIPLINE`/`FOLDER`/`ROOM`/`LOCATION` preenchem sozinhos; `PDF` preenche com link se esse item já tiver sido organizado por outro teste anterior, ou fica em branco se ainda não (comportamento esperado pros itens legados nunca organizados).
 
-- [ ] **Step 6: Teste manual — paste de linha inteira**
+- [ ] **Step 7: Teste manual — mudança de classificação MOVE o arquivo (nunca duplica)**
 
-Copiar uma linha inteira de uma aba (todas as colunas de uma vez) e colar numa linha vazia da aba de teste. Expected: mesmo comportamento das Steps 4/5 (autofill e/ou ingestão rodam pra essa linha), sem erro — confirma que o tratamento de `e.range` com várias colunas/linhas de uma vez funciona.
+Na linha do item criado no Step 5 (já organizado, PDF com link): editar a célula `ROOM` pra outro valor (ex: de `TESTE` pra `TESTE2`). Expected:
+1. O arquivo **some** da pasta antiga (`RAIZ/DISCIPLINE/FOLDER/TESTE/`) e **aparece** na nova (`RAIZ/DISCIPLINE/FOLDER/TESTE2/`) — conferir no Drive que existe **uma única cópia** (movido, não duplicado).
+2. A linha desse item na `DATA BASE SUBMITTAL` foi atualizada com o `ROOM` novo (upsert).
+3. O link na célula `PDF` continua funcionando (o `fileId` não muda num move).
 
-- [ ] **Step 7: Ativar e confirmar persistência do gatilho**
+- [ ] **Step 8: Teste manual — paste de linha inteira**
+
+Copiar uma linha inteira de uma aba (todas as colunas de uma vez) e colar numa linha vazia da aba de teste. Expected: mesmo comportamento das Steps 5/6 (autofill e/ou ingestão rodam pra essa linha), sem erro — confirma que o tratamento de `e.range` com várias colunas/linhas de uma vez funciona.
+
+- [ ] **Step 9: Ativar e confirmar persistência do gatilho**
 
 Pelo menu **📦 Submittal → 🔌 Ativar automação**, confirmar o alerta de ativação. Rodar `clasp push` de novo (simulando um deploy futuro) e confirmar, em `Extensões > Apps Script > Gatilhos`, que o gatilho `_sub_trg_onEditInstalled` continua listado (push não apaga gatilho).
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add SubmittalTriggers.gs
-git commit -m "feat: gatilho onEdit instalavel (autofill por ITEM + ingestao por PDF)"
+git add SubmittalTriggers.gs Menu.gs
+git commit -m "feat: gatilho onEdit instalavel (autofill, ingestao e move por classificacao)"
 ```
 
 ---
