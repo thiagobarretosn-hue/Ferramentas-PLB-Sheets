@@ -100,9 +100,26 @@ registrado uma vez por um item de menu "🔌 Ativar automação" — precisa ser
 o `onEdit(e)` simples, porque mover/criar arquivo no Drive exige autorização completa):
 
 - **Editou ITEM** → busca na DATA BASE SUBMITTAL; se achar, escreve
-  DISCIPLINE/FOLDER/ROOM/LOCATION/PDF na mesma linha.
+  DISCIPLINE/FOLDER/ROOM/LOCATION na mesma linha. Pra coluna PDF: a base só guarda o
+  *nome* do arquivo (texto), não um link de verdade — então o autofill busca ao vivo
+  dentro de `<RAIZ>/DISCIPLINE/FOLDER/ROOM/` um arquivo com esse nome exato. Se achar,
+  escreve o hyperlink de verdade. **Se não achar** (caso dos itens legados da DATA BASE
+  SUBMITTAL que foram cadastrados manualmente antes de qualquer automação existir, sem
+  nunca terem sido organizados de fato), deixa PDF em branco — o item cai no mesmo fluxo
+  de "item novo": o usuário cola o link uma vez, e a partir daí passa a ficar organizado.
 - **Editou PDF** → roda a organização no Drive (sub-projeto 5) e, se o ITEM ainda não
   estava cadastrado, grava a linha nova na DATA BASE SUBMITTAL (sub-projeto 3).
+
+**Multi-célula (paste de várias colunas/linhas de uma vez):** `e.range` de um paste pode
+cobrir várias colunas e linhas ao mesmo tempo (ex: usuário cola uma linha inteira vinda do
+Excel), não só uma célula. O handler precisa checar se o range editado **intersecta** a
+coluna ITEM ou PDF (não comparar "é exatamente" essa coluna) e iterar por **cada linha**
+do range, não só a primeira.
+
+**Erros dentro do gatilho:** um trigger instalável não tem contexto de UI —
+`SpreadsheetApp.getUi().alert()` não funciona aqui. Erros devem virar
+`SpreadsheetApp.getActiveSpreadsheet().toast(...)` ou uma nota na própria célula, nunca
+um `alert()` (que falharia silenciosamente e só geraria um e-mail de erro que ninguém vê).
 
 **Por que não há risco de loop:** o handler só age quando a coluna editada é ITEM ou PDF.
 As escritas do autofill (DISCIPLINE/FOLDER/ROOM/LOCATION) disparam onEdit de novo, mas
@@ -110,6 +127,11 @@ essas colunas não são gatilho — o handler entra, não reconhece a coluna, sa
 A única coluna que é ao mesmo tempo alvo do autofill E gatilho é PDF; resolvido fazendo a
 organização no Drive **idempotente** (só move/copia se o arquivo ainda não está no lugar
 certo com o nome certo) — reprocessar o mesmo valor não tem efeito colateral.
+
+**Concorrência:** com múltiplos usuários editando ao mesmo tempo, dois gatilhos podem, em
+teoria, descobrir o mesmo ITEM novo simultaneamente e gravar duas linhas duplicadas na
+DATA BASE SUBMITTAL. Baixa probabilidade (uso não é de alta frequência), mas vale usar
+`LockService.getDocumentLock()` ao redor da gravação na base como proteção barata.
 
 ## 5) Organização automática no Drive (02-PRECON)
 
@@ -131,8 +153,10 @@ certo com o nome certo) — reprocessar o mesmo valor não tem efeito colateral.
   `_sub_extractDriveId`, já existente), o script sabe que esse item já foi organizado antes.
   Compara a pasta atual desse arquivo (`file.getParents()`) com a pasta
   DISCIPLINE/FOLDER/ROOM que deveria ser agora: se for a mesma, não faz nada; se for
-  diferente, **move** o arquivo (`addTo`/`removeFrom` na nova/antiga pasta) em vez de
-  duplicar. Não precisa de coluna extra — o próprio link da célula já carrega o `fileId`.
+  diferente, **move** com `file.moveTo(novaPasta)` — não com o padrão antigo
+  `addTo`/`removeFrom` (frágil em Shared Drive, onde um arquivo deve ter exatamente um
+  pai; `moveTo` já cuida disso corretamente). Não precisa de coluna extra — o próprio link
+  da célula já carrega o `fileId`.
 - A pasta pai já configurável hoje (`config.parentFolderId`, usada só pelo pacote final
   "SUBMITTAL <num> - data") continua existindo e não tem nenhuma relação com este
   repositório fixo — são coisas diferentes por natureza (pacote final pro cliente vs.
