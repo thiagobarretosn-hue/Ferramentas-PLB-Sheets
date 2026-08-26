@@ -57,8 +57,11 @@
     .sheet-item {
       display: flex; align-items: center;
       padding: 8px 12px; border-bottom: 1px solid #f2f3f4; gap: 8px;
+      cursor: pointer; user-select: none;
     }
     .sheet-item:last-child { border-bottom: none; }
+    .sheet-item:hover { background: #f8fafc; }
+    .sheet-item.selected { background: #eaf2fb; }
     .sheet-name { flex: 1; font-size: 13px; }
     .sheet-name.is-hidden { color: #bdc3c7; text-decoration: line-through; }
     .hidden-badge {
@@ -68,7 +71,22 @@
     .result {
       margin-top: 10px; padding: 10px; border-radius: 6px;
       font-size: 12px; white-space: pre-line;
+      max-height: 140px; overflow-y: auto;
     }
+    .result::-webkit-scrollbar { width: 5px; }
+    .result::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    .pin {
+      cursor: pointer; font-size: 13px; opacity: 0.18; user-select: none;
+      transition: opacity 0.15s;
+    }
+    .pin:hover { opacity: 0.6; }
+    .pin.pinned { opacity: 1; }
+    .btn-mini {
+      padding: 2px 8px; font-size: 10px; font-weight: 600;
+      border: none; border-radius: 5px; cursor: pointer;
+      background: #ecf0f1; color: #555;
+    }
+    .title-row { display: flex; justify-content: space-between; align-items: center; }
     .result.success { background: #eafaf1; color: #1e8449; border: 1px solid #a9dfbf; }
     .result.error   { background: #fdedec; color: #922b21; border: 1px solid #f1948a; }
     .sheet-list::-webkit-scrollbar { width: 5px; }
@@ -122,11 +140,41 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Abas da Planilha</div>
+    <div class="section-title">Organizar (abas selecionadas)</div>
+    <div class="btn-row">
+      <button class="btn btn-dark"  id="btnPinSel">📌 Fixar seleção</button>
+      <button class="btn btn-ghost" id="btnUnpinSel">📌✕ Soltar seleção</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-blue" id="btnSortAsc">🔤 Ordenar A→Z</button>
+      <button class="btn btn-blue" id="btnSortDesc">🔤 Z→A</button>
+    </div>
+    <div class="btn-row" style="align-items:center;">
+      <input type="color" id="tabColor" value="#f1c232"
+             style="width:42px; height:31px; padding:2px; border:1px solid #dce1e7; border-radius:6px; cursor:pointer; background:white;">
+      <button class="btn btn-amber" id="btnApplyColor">🎨 Aplicar cor</button>
+      <button class="btn btn-ghost" id="btnClearColor">✕ Remover cor</button>
+    </div>
+    <div class="btn-row" style="align-items:center;">
+      <input type="number" id="movePos" min="1" placeholder="nº"
+             style="width:64px; padding:7px 10px; border:1px solid #dce1e7; border-radius:6px; font-size:12px; background:#f8f9fa;">
+      <button class="btn btn-dark" id="btnMovePos">↕ Mover p/ posição</button>
+      <button class="btn btn-ghost" id="btnMoveStart">⏮ Início</button>
+      <button class="btn btn-ghost" id="btnMoveEnd">⏭ Fim</button>
+    </div>
+    <div class="hint">Ordenar reagrupa as selecionadas em bloco na posição da primeira. Mover mantém a ordem atual entre elas. Abas 📌 fixadas nunca mudam de posição.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title title-row">
+      <span>Abas da Planilha <span style="font-weight:normal; text-transform:none;">(📌 fixa · clique = uma · Ctrl = alterna · Shift = intervalo)</span></span>
+      <button class="btn-mini" id="btnClearLog" style="display:none;">🧹 Limpar log</button>
+    </div>
     <div class="sheet-list" id="sheetList"></div>
     <div id="result"></div>
   </div>
 
+  <?!= include('SharedScripts'); ?>
   <script>
     const inputMap = {
       prefixCheck:         ['prefix'],
@@ -174,7 +222,15 @@
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = s.name;
-        cb.addEventListener('click', onCheckboxClick);
+        cb.addEventListener('click', function(e) {
+          e.stopPropagation();           // não dispara o clique da linha
+          onCheckboxClick.call(this, e); // shift-range no checkbox (comportamento antigo)
+          refreshRowStyles();
+        });
+
+        // Linha inteira clicável — seleção estilo Explorer:
+        // clique = só esta · Ctrl+clique = alterna · Shift+clique = intervalo
+        item.addEventListener('click', function(e) { onRowClick(e, cb); });
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'sheet-name' + (s.isHidden ? ' is-hidden' : '');
@@ -189,6 +245,29 @@
           badge.textContent = 'oculta';
           item.appendChild(badge);
         }
+
+        // 📌 fixar posição — a aba não se move em ordenar/mover em lote
+        const pin = document.createElement('span');
+        pin.className = 'pin' + (s.isPinned ? ' pinned' : '');
+        pin.textContent = '📌';
+        pin.title = s.isPinned
+          ? 'Posição fixa — clique para soltar'
+          : 'Fixar posição (não muda ao ordenar/mover)';
+        pin.addEventListener('click', (e) => {
+          e.stopPropagation(); // clique no pin não altera a seleção da linha
+          google.script.run
+            .withSuccessHandler(list => {
+              const isPinned = list.indexOf(s.name) >= 0;
+              pin.className = 'pin' + (isPinned ? ' pinned' : '');
+              pin.title = isPinned
+                ? 'Posição fixa — clique para soltar'
+                : 'Fixar posição (não muda ao ordenar/mover)';
+            })
+            .withFailureHandler(showError)
+            .togglePinnedSheet(s.name);
+        });
+        item.appendChild(pin);
+
         container.appendChild(item);
       });
     }
@@ -204,14 +283,41 @@
       lastChecked = this;
     }
 
+    // Clique na LINHA (fora do checkbox/pin) — seleção dinâmica:
+    //   clique simples = seleciona só esta linha
+    //   Ctrl+clique    = alterna esta, mantém as demais
+    //   Shift+clique   = marca o intervalo desde a última clicada
+    function onRowClick(e, cb) {
+      const boxes = Array.from(document.querySelectorAll('#sheetList input[type="checkbox"]'));
+      if (e.shiftKey && lastChecked && lastChecked !== cb) {
+        const start = boxes.indexOf(lastChecked);
+        const end   = boxes.indexOf(cb);
+        const lo = Math.min(start, end), hi = Math.max(start, end);
+        for (let i = lo; i <= hi; i++) boxes[i].checked = true;
+      } else if (e.ctrlKey || e.metaKey) {
+        cb.checked = !cb.checked;
+      } else {
+        boxes.forEach(b => { b.checked = (b === cb); });
+      }
+      lastChecked = cb;
+      refreshRowStyles();
+    }
+
+    // Destaque visual das linhas selecionadas
+    function refreshRowStyles() {
+      document.querySelectorAll('#sheetList input[type="checkbox"]').forEach(cb => {
+        cb.closest('.sheet-item').classList.toggle('selected', cb.checked);
+      });
+    }
+
     function getSelected() {
       return Array.from(
         document.querySelectorAll('#sheetList input[type="checkbox"]:checked')
       ).map(cb => cb.value);
     }
 
-    function selectAll()   { document.querySelectorAll('#sheetList input').forEach(cb => cb.checked = true); }
-    function unselectAll() { document.querySelectorAll('#sheetList input').forEach(cb => cb.checked = false); }
+    function selectAll()   { document.querySelectorAll('#sheetList input').forEach(cb => cb.checked = true);  refreshRowStyles(); }
+    function unselectAll() { document.querySelectorAll('#sheetList input').forEach(cb => cb.checked = false); refreshRowStyles(); }
 
     function renameSheets() {
       const selected = getSelected();
@@ -280,10 +386,41 @@
       runner[fnName](...args);
     }
 
+    // ── Organizar em lote (v1.2) ──
+    function withSelected(fn) {
+      const selected = getSelected();
+      if (!selected.length) { showError('Selecione pelo menos uma aba'); return; }
+      fn(selected);
+    }
+
+    document.getElementById('btnPinSel').addEventListener('click',
+      () => withSelected(sel => call('setPinnedForSheets', sel, true)));
+    document.getElementById('btnUnpinSel').addEventListener('click',
+      () => withSelected(sel => call('setPinnedForSheets', sel, false)));
+    document.getElementById('btnSortAsc').addEventListener('click',
+      () => withSelected(sel => call('sortSelectedSheets', sel, 'asc')));
+    document.getElementById('btnSortDesc').addEventListener('click',
+      () => withSelected(sel => call('sortSelectedSheets', sel, 'desc')));
+    document.getElementById('btnApplyColor').addEventListener('click',
+      () => withSelected(sel => call('setTabColorSelected', sel, document.getElementById('tabColor').value)));
+    document.getElementById('btnClearColor').addEventListener('click',
+      () => withSelected(sel => call('setTabColorSelected', sel, '')));
+    document.getElementById('btnMovePos').addEventListener('click',
+      () => withSelected(sel => {
+        const pos = parseInt(document.getElementById('movePos').value);
+        if (!pos || pos < 1) { showError('Digite uma posição válida (1 = primeira)'); return; }
+        call('moveSelectedToPosition', sel, pos);
+      }));
+    document.getElementById('btnMoveStart').addEventListener('click',
+      () => withSelected(sel => call('moveSelectedToPosition', sel, 1)));
+    document.getElementById('btnMoveEnd').addEventListener('click',
+      () => withSelected(sel => call('moveSelectedToPosition', sel, 9999)));
+
     function showSuccess(results) {
       const div = document.getElementById('result');
       div.className = 'result success';
-      div.textContent = 'Concluído:\n' + results.join('\n');
+      div.textContent = 'Concluído (' + results.length + '):\n' + results.join('\n');
+      document.getElementById('btnClearLog').style.display = '';
       loadSheets();
     }
 
@@ -291,7 +428,15 @@
       const div = document.getElementById('result');
       div.className = 'result error';
       div.textContent = 'Erro: ' + (error.message || error);
+      document.getElementById('btnClearLog').style.display = '';
     }
+
+    document.getElementById('btnClearLog').addEventListener('click', () => {
+      const div = document.getElementById('result');
+      div.className = '';
+      div.textContent = '';
+      document.getElementById('btnClearLog').style.display = 'none';
+    });
 
     loadSheets();
   </script>

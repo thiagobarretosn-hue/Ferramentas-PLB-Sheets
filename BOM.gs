@@ -1,5 +1,9 @@
 /**
- * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS + FIXADORES (BOM)
+ * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS (BOM)
+ * @version 3.4.0 - Higiene 07/2026: ferramenta Fixadores removida (sem ponto de entrada;
+ *                  código preservado em C:\DEV\_OBSOLETO\Sheets\); órfãos removidos
+ *                  (testSystem, exportPDFsWithFeedback, getReportSheetNamesForHtml);
+ *                  fix ConfigService.get com valores falsy
  * @version 3.3.0 - Cache de valores únicos removido (sempre fresco) + botão Atualizar na sidebar;
  *                  lista de exportação = todas as abas exceto a fonte, em ordem alfabética (natural sort);
  *                  clearOldReports protege a fonte (assinatura de cabeçalho);
@@ -7,7 +11,6 @@
  *
  * V3.0: Cada ferramenta opera de forma independente:
  * - BomSidebar gerencia suas próprias configurações via PropertiesService
- * - FixadoresSidebar gerencia mapeamento de colunas via PropertiesService
  * - Todas as funções usam a aba ativa como fonte de dados
  * - Não existe mais dependência de uma aba "Config"
  */
@@ -40,13 +43,6 @@ const BOM_CONFIG = {
     SORT_BY: 'CLASSIFICAR POR',
     SORT_ORDER: 'ORDEM',
 
-    // Chaves Fixadores
-    FIX_SECTION: 'Fixador: Coluna Seção',
-    FIX_DESC: 'Fixador: Coluna Descrição',
-    FIX_QTY: 'Fixador: Coluna Quantidade',
-    FIX_UOM: 'Fixador: Coluna UOM',
-    FIX_TRADE: 'Fixador: Coluna Trade (FIX)',
-
     EXCL_FILTERS: 'Filtros de Exclusão',
   },
   // Valores padrão para quando nenhuma configuração existe
@@ -58,11 +54,6 @@ const BOM_CONFIG = {
     'Coluna 5': 'O - PROJECT',
     'CLASSIFICAR POR': 'J - DESC',
     'ORDEM': 'Ascendente (A-Z, 0-9)',
-    'Fixador: Coluna Seção': 'B - SECTION',
-    'Fixador: Coluna Descrição': 'K - DESC',
-    'Fixador: Coluna Quantidade': 'L - QTT',
-    'Fixador: Coluna UOM': 'M - UOM',
-    'Fixador: Coluna Trade (FIX)': 'G - TRADE',
     'Filtros de Exclusão': [],
   },
   COLORS: {
@@ -77,37 +68,7 @@ const BOM_CONFIG = {
     PANEL_EMPTY_BG: '#95a5a6',
     PANEL_ERROR_BG: '#c0392b'
   },
-  DELIMITER: '|||',
-  FIXADORES: {
-    RISER: {
-      interval: 10,
-      clamps: {
-        '1/2': 'RISER CLAMP 1 IN. METAL', '3/4': 'RISER CLAMP 1 IN. METAL', '1': 'RISER CLAMP 1 IN. METAL',
-        '1-1/4': 'RISER CLAMP 1-1/4 IN. METAL', '1-1/2': 'RISER CLAMP 1-1/2 IN. METAL', '2': 'RISER CLAMP 2 IN. METAL',
-        '2-1/2': 'RISER CLAMP 2 IN. METAL', '3': 'RISER CLAMP 3 IN. METAL', '4': 'RISER CLAMP 4 IN. METAL',
-        '6': 'RISER CLAMP 6 IN. METAL', '8': 'RISER CLAMP 8 IN. METAL', '10': 'RISER CLAMP 12 IN. METAL', '12': 'RISER CLAMP 12 IN. METAL'
-      },
-      materials: [
-        { desc: 'NUT 3/8 IN. METAL', factor: 4 }, { desc: 'FENDER WASHER 3/8 X 1-1/2', factor: 4 },
-        { desc: 'ANCHOR DROP-IN 3/8 IN. X 3/4 IN. LONG HDI-P (W/ AUTO SET TOOL) [HILTI 409499]', factor: 2 },
-        { desc: 'PLTD STEEL ALL THREAD ROD 3/8 IN. X 6 FT.', factor: 2 }
-      ]
-    },
-    LOOP: {
-      interval: 3,
-      hangs: {
-        '1/2': 'LOOP HANG 1/2 IN. HANGER', '3/4': 'LOOP HANG 3/4 IN. HANGER', '1': 'LOOP HANG 1 IN. METAL',
-        '1-1/4': 'LOOP HANG 1-1/4 IN. METAL', '1-1/2': 'LOOP HANG 1-1/2 IN. HANGER', '2': 'LOOP HANG 2 IN. METAL',
-        '2-1/2': 'LOOP HANG 2-1/2 IN. METAL', '3': 'LOOP HANG 3 IN. METAL', '4': 'LOOP HANG 4 IN. METAL',
-        '6': 'LOOP HANG 6 IN. METAL', '8': 'LOOP HANG 6 IN. METAL', '10': 'LOOP HANG 12 IN. METAL', '12': 'LOOP HANG 12 IN. METAL'
-      },
-      materials: [
-        { desc: 'NUT 3/8 IN. METAL', factor: 2 }, { desc: 'FENDER WASHER 3/8 X 1-1/2', factor: 2 },
-        { desc: 'ANCHOR DROP-IN 3/8 IN. X 3/4 IN. LONG HDI-P (W/ AUTO SET TOOL) [HILTI 409499]', factor: 1 },
-        { desc: 'PLTD STEEL ALL THREAD ROD 3/8 IN. X 6 FT.', factor: 1 }
-      ]
-    }
-  }
+  DELIMITER: '|||'
 };
 
 // ============================================================================
@@ -143,13 +104,6 @@ const Utils = {
    */
   sanitizeSheetName: (name) => {
     return SharedUtils_sanitizeSheetName(name);
-  },
-
-  /**
-   * Extrai diâmetro de descrição de tubo (PIPE X IN)
-   */
-  extractDiameter: (desc) => {
-    return SharedUtils_extractPipeDiameter(desc);
   }
 };
 
@@ -159,74 +113,24 @@ const Utils = {
 // ============================================================================
 
 const BOM_SETTINGS_KEY = 'BOM_SETTINGS_V3';
-const FIX_SETTINGS_KEY = 'FIX_SETTINGS_V3';
 
+// V3.4: delega ao factory compartilhado (lib/Shared/Config.gs).
+// Inicialização lazy: a ordem de avaliação dos arquivos no GAS não é garantida,
+// então a chamada cross-file só acontece em runtime, nunca no load.
 const ConfigService = {
-  /**
-   * Retorna todas as configurações BOM do PropertiesService
-   * Se não existirem, retorna os defaults
-   */
-  getAll: () => {
-    try {
-      const saved = PropertiesService.getDocumentProperties().getProperty(BOM_SETTINGS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Merge com defaults para garantir que novas chaves existam
-        return { ...BOM_CONFIG.DEFAULTS, ...parsed };
-      }
-    } catch (e) {
-      console.error('[ConfigService] Erro ao ler configurações:', e.message);
+  _svc: null,
+  _store() {
+    if (!this._svc) {
+      this._svc = SharedConfig_createDocConfigService(
+        BOM_SETTINGS_KEY,
+        () => ({ ...BOM_CONFIG.DEFAULTS })
+      );
     }
-    return { ...BOM_CONFIG.DEFAULTS };
+    return this._svc;
   },
-
-  /**
-   * Obtém uma configuração específica
-   */
-  get: (key, defaultValue = '') => {
-    const all = ConfigService.getAll();
-    return all[key] || defaultValue;
-  },
-
-  /**
-   * Salva todas as configurações BOM
-   */
-  saveAll: (config) => {
-    try {
-      PropertiesService.getDocumentProperties().setProperty(BOM_SETTINGS_KEY, JSON.stringify(config));
-      return { success: true };
-    } catch (e) {
-      return { success: false, message: e.message };
-    }
-  },
-
-  /**
-   * Salva configurações de fixadores
-   */
-  getFixConfig: () => {
-    try {
-      const saved = PropertiesService.getDocumentProperties().getProperty(FIX_SETTINGS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) { /* ignora */ }
-    // Defaults de fixadores
-    const K = BOM_CONFIG.KEYS;
-    return {
-      [K.FIX_SECTION]: BOM_CONFIG.DEFAULTS[K.FIX_SECTION],
-      [K.FIX_DESC]: BOM_CONFIG.DEFAULTS[K.FIX_DESC],
-      [K.FIX_QTY]: BOM_CONFIG.DEFAULTS[K.FIX_QTY],
-      [K.FIX_UOM]: BOM_CONFIG.DEFAULTS[K.FIX_UOM],
-      [K.FIX_TRADE]: BOM_CONFIG.DEFAULTS[K.FIX_TRADE],
-    };
-  },
-
-  saveFixConfig: (config) => {
-    try {
-      PropertiesService.getDocumentProperties().setProperty(FIX_SETTINGS_KEY, JSON.stringify(config));
-      return { success: true };
-    } catch (e) {
-      return { success: false, message: e.message };
-    }
-  }
+  getAll() { return this._store().getAll(); },
+  get(key, defaultValue = '') { return this._store().get(key, defaultValue); },
+  saveAll(config) { return this._store().saveAll(config); }
 };
 
 // ============================================================================
@@ -528,47 +432,8 @@ function clearOldReports() {
 }
 
 // ============================================================================
-// FIXADORES (SEÇÃO V2.7 - CÓPIA INTELIGENTE)
+// COLUNAS — helpers usados pelo BomSidebar
 // ============================================================================
-
-/**
- * Abre a sidebar para seleção de fixadores
- * Permite adicionar automaticamente fixadores (clamps, hangers) para tubulações
- *
- * @public
- * @menuitem '🔧 Relatórios Dinâmicos' > '🔧 Fixadores → Fonte'
- * @returns {void}
- */
-function abrirSeletorFixadores() {
-  const html = HtmlService.createHtmlOutputFromFile('FixadoresSidebar.html')
-    .setTitle('Seletor de Fixadores')
-    .setWidth(900).setHeight(800);
-  SpreadsheetApp.getUi().showModelessDialog(html, 'Seletor de Fixadores');
-}
-
-/**
- * Retorna configuração de colunas dos fixadores
- * Chamada pela sidebar para popular a UI de configuração
- */
-function getFixadorConfig() {
-  return ConfigService.getFixConfig();
-}
-
-/**
- * Salva configuração de colunas dos fixadores
- * Chamada pela sidebar ao alterar mapeamento de colunas
- */
-function saveFixadorConfig(config) {
-  return ConfigService.saveFixConfig(config);
-}
-
-/**
- * Retorna colunas disponíveis na aba ativa para configurar fixadores
- */
-function getActiveSheetColumns() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  return _getColumnsFromSheet(sheet);
-}
 
 /**
  * Retorna colunas de uma aba pelo nome (ou aba ativa se não informado)
@@ -580,191 +445,8 @@ function getSheetColumnsByName(sheetName) {
 }
 
 function _getColumnsFromSheet(sheet) {
-  if (!sheet || sheet.getLastColumn() === 0) return [];
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  return headers.map((h, i) => {
-    const letter = SharedUtils_numberToColumnLetter(i + 1);
-    return `${letter} - ${h || 'Coluna ' + letter}`;
-  });
+  return SharedUtils_getColumnLabelsFromSheet(sheet);
 }
-
-function getPipesElegiveis() {
-  const fixConfig = ConfigService.getFixConfig();
-  const K = BOM_CONFIG.KEYS;
-  const fixIdx = {
-    section: Utils.getColumnIndex(fixConfig[K.FIX_SECTION]) - 1,
-    desc: Utils.getColumnIndex(fixConfig[K.FIX_DESC]) - 1,
-    qty: Utils.getColumnIndex(fixConfig[K.FIX_QTY]) - 1,
-    uom: Utils.getColumnIndex(fixConfig[K.FIX_UOM]) - 1,
-    trade: Utils.getColumnIndex(fixConfig[K.FIX_TRADE]) - 1
-  };
-
-  if ([fixIdx.section, fixIdx.desc, fixIdx.qty, fixIdx.uom, fixIdx.trade].some(idx => idx < 0)) {
-    Logger.log('Erro de Configuração de Fixadores: Pelo menos uma coluna-chave não está definida.');
-    return [];
-  }
-
-  // Usa a aba ativa como fonte de dados
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (!sourceSheet) return [];
-  const lastRow = sourceSheet.getLastRow();
-  if (lastRow < 2) return [];
-  const data = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
-  const pipes = [];
-
-  data.forEach((row, idx) => {
-    const section = String(row[fixIdx.section] || '');
-    const desc = String(row[fixIdx.desc] || '');
-    const qty = SharedUtils_toNumber(row[fixIdx.qty]);
-    const uom = String(row[fixIdx.uom] || '');
-
-    if (validarTipoFixacao(section) && desc.toUpperCase().includes('PIPE') && qty > 0) {
-      const diameter = Utils.extractDiameter(desc);
-      const isRiser = section.toUpperCase().includes('RISER');
-      const fixConfig = isRiser ? BOM_CONFIG.FIXADORES.RISER : BOM_CONFIG.FIXADORES.LOOP;
-      const itemMap = isRiser ? fixConfig.clamps : fixConfig.hangs;
-
-      if (diameter && itemMap[diameter]) {
-        let jaTemFixador = false;
-        if (idx + 1 < data.length) {
-          const nextRow = data[idx + 1];
-          const nextRowTrade = String(nextRow[fixIdx.trade] || '').toUpperCase();
-          if (nextRowTrade === 'FIX') jaTemFixador = true;
-        }
-
-        pipes.push({
-          rowIndex: idx + 2,
-          section: section, desc: desc, qty: qty, uom: uom,
-          diameter: diameter, isRiser: isRiser, jaTemFixador: jaTemFixador,
-          originalRow: [...row],
-          trade: String(row[fixIdx.trade] || ''),
-          floor: String(row[8] || ''),
-          unitType: String(row[4] || ''),
-          phase: String(row[7])
-        });
-      }
-    }
-  });
-  return pipes;
-}
-
-function validarTipoFixacao(section) {
-  const s = String(section).toUpperCase();
-  return s.includes('RISER') || s.includes('COLGANTE');
-}
-
-function processarFixadoresSelecionados(selectedPipes) {
-  const fixConfig = ConfigService.getFixConfig();
-  const K = BOM_CONFIG.KEYS;
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (!sourceSheet || !selectedPipes || selectedPipes.length === 0) {
-    return { success: false, message: 'Dados inválidos' };
-  }
-
-  const fixIdx = {
-    desc: Utils.getColumnIndex(fixConfig[K.FIX_DESC]) - 1,
-    qty: Utils.getColumnIndex(fixConfig[K.FIX_QTY]) - 1,
-    trade: Utils.getColumnIndex(fixConfig[K.FIX_TRADE]) - 1
-  };
-
-  if (fixIdx.desc < 0 || fixIdx.qty < 0 || fixIdx.trade < 0) {
-     return { success: false, message: 'Configuração de colunas "Fixadores" inválida. Verifique no painel de configuração.' };
-  }
-
-  selectedPipes.sort((a, b) => b.rowIndex - a.rowIndex);
-  let totalAdded = 0;
-  const maxCol = sourceSheet.getLastColumn();
-
-  selectedPipes.forEach(pipe => {
-    const pipeFixConfig = pipe.isRiser ? BOM_CONFIG.FIXADORES.RISER : BOM_CONFIG.FIXADORES.LOOP;
-    const itemMap = pipe.isRiser ? pipeFixConfig.clamps : pipeFixConfig.hangs;
-    const fixadorItem = itemMap[pipe.diameter];
-    if (!fixadorItem) return;
-
-    const originalFormulas = sourceSheet.getRange(pipe.rowIndex, 1, 1, maxCol).getFormulasR1C1()[0];
-    const linhasParaInserir = [];
-    const insertRow = pipe.rowIndex + 1;
-
-    // Linha do fixador
-    const linhaFixador = [...pipe.originalRow];
-    linhaFixador[fixIdx.trade] = 'FIX';
-    linhaFixador[fixIdx.desc] = fixadorItem;
-    linhaFixador[fixIdx.qty] = `=ROUNDUP(R[-1]C/${pipeFixConfig.interval})`;
-    linhasParaInserir.push(linhaFixador);
-    const fixadorRow = insertRow;
-
-    // Materiais
-    pipeFixConfig.materials.forEach(mat => {
-      const linhaMat = [...pipe.originalRow];
-      linhaMat[fixIdx.trade] = 'FIX';
-      linhaMat[fixIdx.desc] = mat.desc;
-      linhaMat[fixIdx.qty] = `=R${fixadorRow}C*${mat.factor}`;
-      linhasParaInserir.push(linhaMat);
-    });
-
-    sourceSheet.insertRowsAfter(pipe.rowIndex, linhasParaInserir.length);
-    const formatoOrigem = sourceSheet.getRange(pipe.rowIndex, 1, 1, maxCol);
-    formatoOrigem.copyFormatToRange(sourceSheet, 1, maxCol, insertRow, insertRow + linhasParaInserir.length - 1);
-    const rangeDestino = sourceSheet.getRange(insertRow, 1, linhasParaInserir.length, maxCol);
-    // Limpa validações de dados copiadas para evitar conflito ao setar valores
-    rangeDestino.clearDataValidations();
-    rangeDestino.setValues(linhasParaInserir);
-
-    // Restaura fórmulas
-    linhasParaInserir.forEach((row, idx) => {
-      const currentRow = insertRow + idx;
-      for (let col = 0; col < maxCol; col++) {
-        if (originalFormulas[col] && col !== fixIdx.trade && col !== fixIdx.desc && col !== fixIdx.qty) {
-          sourceSheet.getRange(currentRow, col + 1).setFormulaR1C1(originalFormulas[col]);
-        }
-      }
-      sourceSheet.getRange(currentRow, fixIdx.qty + 1).setFormulaR1C1(row[fixIdx.qty]);
-    });
-    totalAdded += linhasParaInserir.length;
-  });
-
-  return { success: true, added: totalAdded };
-}
-
-function removerFixadoresSelecionados(selectedPipes) {
-  const fixConfig = ConfigService.getFixConfig();
-  const K = BOM_CONFIG.KEYS;
-  const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (!sourceSheet || !selectedPipes || selectedPipes.length === 0) {
-    return { success: false, message: 'Dados inválidos' };
-  }
-
-  const tradeColIndex = Utils.getColumnIndex(fixConfig[K.FIX_TRADE]) - 1;
-  if (tradeColIndex < 0) {
-    return { success: false, message: 'Configuração de "Fixador: Coluna Trade" inválida.' };
-  }
-
-  selectedPipes.sort((a, b) => b.rowIndex - a.rowIndex);
-  let totalRemoved = 0;
-  const allData = sourceSheet.getDataRange().getValues();
-
-  try {
-    selectedPipes.forEach(pipe => {
-      const rowIndex = pipe.rowIndex;
-      let rowsToDelete = 0;
-      for (let i = rowIndex; i < allData.length; i++) {
-        const rowData = allData[i];
-        const trade = String(rowData[tradeColIndex] || '').toUpperCase();
-        if (trade === 'FIX') rowsToDelete++;
-        else break;
-      }
-      if (rowsToDelete > 0) {
-        sourceSheet.deleteRows(rowIndex + 1, rowsToDelete);
-        totalRemoved += rowsToDelete;
-      }
-    });
-    return { success: true, removed: totalRemoved };
-  } catch (e) {
-    Logger.log(`Erro ao remover fixadores: ${e.message}`);
-    return { success: false, message: `Erro ao apagar linhas: ${e.message}` };
-  }
-}
-
 
 // ============================================================================
 // EXPORTAÇÃO PDF (V3.1)
@@ -881,48 +563,6 @@ function runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson) {
 
   _setExportProgress(total, total, '', 'done');
   return { success: true, exported, folder: folder.getName(), errors };
-}
-
-/**
- * Exporta PDFs via menu (usa configurações salvas)
- * V3.0: Lê pasta Drive das configurações salvas em PropertiesService
- *
- * @public
- * @menuitem '🔧 Relatórios Dinâmicos' > '📄 Exportar PDFs'
- * @returns {void}
- */
-function exportPDFsWithFeedback() {
-  SpreadsheetApp.getActiveSpreadsheet().toast('Exportando PDFs...', 'Aguarde', -1);
-  const config = ConfigService.getAll();
-  const K = BOM_CONFIG.KEYS;
-
-  const sheetNames = getReportSheetNames();
-  if (!sheetNames || sheetNames.length === 0) {
-     SpreadsheetApp.getUi().alert('Erro', 'Nenhum relatório gerado para exportar.', SpreadsheetApp.getUi().ButtonSet.OK);
-     return;
-  }
-
-  const folder = getFolderFromInput(config[K.DRIVE_FOLDER_ID], config[K.DRIVE_FOLDER_NAME]);
-  if (!folder) {
-    SpreadsheetApp.getUi().alert('Erro', 'Pasta de destino não configurada. Configure pelo Painel BOM.', SpreadsheetApp.getUi().ButtonSet.OK);
-    return;
-  }
-
-  const prefix = config[K.PDF_PREFIX] || '';
-  sheetNames.forEach(sheetName => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-    if (sheet) {
-      const bomKojoName = getBomKojoNameFromSheet(sheet);
-      const baseName = bomKojoName || sheetName;
-      const fileName = prefix ? `${prefix}${baseName}` : baseName;
-      exportSheetToPdf(sheet, fileName, folder);
-    }
-  });
-
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-      `✅ ${sheetNames.length} PDFs exportados para "${folder.getName()}"!`,
-      'Sucesso', 5
-    );
 }
 
 /**
@@ -1049,18 +689,10 @@ function getBomHtmlInitData() {
   const allSheets = ss.getSheets().map(s => s.getName());
 
   // Pega colunas da aba ativa como referência inicial
-  let allColumns = [];
   const targetSheet = savedConfig[BOM_CONFIG.KEYS.SOURCE_SHEET]
     ? ss.getSheetByName(savedConfig[BOM_CONFIG.KEYS.SOURCE_SHEET])
     : activeSheet;
-
-  if (targetSheet && targetSheet.getLastColumn() > 0) {
-    const headers = targetSheet.getRange(1, 1, 1, targetSheet.getLastColumn()).getValues()[0];
-    allColumns = headers.map((h, i) => {
-      const letter = SharedUtils_numberToColumnLetter(i + 1);
-      return `${letter} - ${h || 'Coluna ' + letter}`;
-    });
-  }
+  const allColumns = _getColumnsFromSheet(targetSheet);
 
   const savedState = getUserSidebarState();
 
@@ -1192,33 +824,6 @@ function openBomSidebar() {
 }
 
 /**
- * Executa diagnóstico do sistema BOM
- * V3.0: Mostra info da aba ativa
- *
- * @public
- * @menuitem '🔧 Relatórios Dinâmicos' > '🧪 Diagnóstico'
- */
-function testSystem() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const activeSheet = ss.getActiveSheet();
-    const config = ConfigService.getAll();
-    const fixConfig = ConfigService.getFixConfig();
-    const msg = [
-      `Versão do Script: 3.3 (sem cache; exportação = tudo exceto a fonte)`,
-      `Aba Ativa: ${activeSheet.getName()}`,
-      `Linhas na Aba Ativa: ${activeSheet.getLastRow() - 1}`,
-      `Total de Abas: ${ss.getSheets().length}`,
-      `Fixador Trade: ${fixConfig[BOM_CONFIG.KEYS.FIX_TRADE] || 'Não configurado'}`,
-      `Config BOM salva: ${config[BOM_CONFIG.KEYS.SOURCE_SHEET] ? 'Sim' : 'Usando defaults'}`
-    ].join('\n');
-    SpreadsheetApp.getUi().alert('🧪 Diagnóstico do Sistema', msg, SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (error) {
-    SpreadsheetApp.getUi().alert('Erro no Diagnóstico', error.message, SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-
-/**
  * Detecta se uma aba é um relatório BOM gerado por esta ferramenta.
  * Usa a assinatura determinística do cabeçalho escrito por createAndFormatReport
  * (A1 = "PROJECT:", A3 = "BOM KOJO:..."), em vez de "tudo que não é a fonte".
@@ -1253,10 +858,6 @@ function getReportSheetNames(sourceSheetName) {
     .map(s => s.getName())
     .filter(name => name !== source)
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-}
-
-function getReportSheetNamesForHtml(sourceSheetName) {
-  return getReportSheetNames(sourceSheetName);
 }
 
 /**

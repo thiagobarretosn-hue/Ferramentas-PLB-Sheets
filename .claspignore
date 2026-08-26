@@ -1,9 +1,13 @@
 .git/**
 .claude/**
+.superpowers/**
 docs/**
+lib/Snippets/**
+templates/**
 CLAUDE.md
 README.md
 *.code-workspace
 Código.js
 **/*.js
 **/*.html.html
+**/*.md

@@ -1,5 +1,9 @@
 /**
  * @fileoverview Request Generator — Gerador de Requisição de Materiais KOJO
+ * @version 1.2.0 - Autosave de config (sem botão Salvar); aba gerada com prefixo
+ *                  "REQUEST-" e cor de aba amarela (#f1c232); Requisition #/Need By
+ *                  saíram da sidebar (preenchidos depois, direto na aba);
+ *                  config via factory compartilhado (lib/Shared/Config.gs)
  * @version 1.1.0
  */
 
@@ -12,6 +16,8 @@ const REQUEST_CONFIG = {
   HEADER_ROWS: 7,
   COL_HEADER_ROW: 9,
   DATA_START_ROW: 10,
+  SHEET_PREFIX: 'REQUEST-',
+  TAB_COLOR: '#f1c232',
   COLORS: {
     HEADER_BG: '#2c3e50',
     FONT_LIGHT: '#ffffff'
@@ -37,7 +43,20 @@ const REQUEST_CONFIG = {
 // ============================================================================
 // CONFIG SERVICE
 // ============================================================================
+// V1.2: storage delegado ao factory compartilhado (lib/Shared/Config.gs).
+// Só a migração de regras v1.0→v1.1 permanece aqui (específica do Request).
 const RequestConfigService = {
+  _svc: null,
+  _store: function() {
+    if (!this._svc) {
+      this._svc = SharedConfig_createDocConfigService(
+        REQUEST_CONFIG.SETTINGS_KEY,
+        RequestConfigService._defaults
+      );
+    }
+    return this._svc;
+  },
+
   _defaults: function() {
     return {
       sourceSheet: '',
@@ -45,6 +64,8 @@ const RequestConfigService = {
       groupL1: '', groupL2: '', groupL3: '',
       project: '', kojoPrefix: '', engineer: '', version: '01',
       // Header fields persisted across sessions
+      // (requisitionNum/needBy: legado — mantidos p/ compat com configs salvas,
+      //  não são mais editados na sidebar)
       request: '', kojoSuffix: '', requisitionNum: '', needBy: '',
       // Last combination used (restored in Section 3 dropdowns)
       lastGroupVals: [],
@@ -55,34 +76,18 @@ const RequestConfigService = {
   },
 
   get: function() {
-    try {
-      const saved = PropertiesService.getDocumentProperties()
-        .getProperty(REQUEST_CONFIG.SETTINGS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const config = Object.assign(RequestConfigService._defaults(), parsed);
-        // Migrate v1.0 plain-text rules → v1.1 regex rules
-        config.roundingRules = config.roundingRules.map(function(r) {
-          if (r.pattern === 'FOAM CORE') return { pattern: '^PIPE.*FOAM CORE', roundUp: r.roundUp };
-          if (r.pattern === 'CPVC')      return { pattern: '^PIPE.*CPVC',      roundUp: r.roundUp };
-          return r;
-        });
-        return config;
-      }
-    } catch (e) {
-      console.error('[RequestConfigService] Erro ao ler config:', e.message);
-    }
-    return RequestConfigService._defaults();
+    const config = this._store().getAll();
+    // Migrate v1.0 plain-text rules → v1.1 regex rules
+    config.roundingRules = (config.roundingRules || []).map(function(r) {
+      if (r.pattern === 'FOAM CORE') return { pattern: '^PIPE.*FOAM CORE', roundUp: r.roundUp };
+      if (r.pattern === 'CPVC')      return { pattern: '^PIPE.*CPVC',      roundUp: r.roundUp };
+      return r;
+    });
+    return config;
   },
 
   save: function(config) {
-    try {
-      PropertiesService.getDocumentProperties()
-        .setProperty(REQUEST_CONFIG.SETTINGS_KEY, JSON.stringify(config));
-      return { success: true };
-    } catch (e) {
-      return { success: false, message: e.message };
-    }
+    return this._store().saveAll(config);
   }
 };
 
@@ -90,38 +95,24 @@ const RequestConfigService = {
 // COLUMN HELPERS
 // ============================================================================
 
-/** "J - DESC" → 10 (1-indexed). Supports AA, AB, etc. */
+// Wrappers finos sobre lib/Shared/Utils.gs — mantidos para não tocar os call sites.
+
+/** "J - DESC" → 10 (1-indexed). Supports AA, AB, etc. Exige o formato "X - ..." */
 function _req_getColumnIndex(colConfig) {
   if (!colConfig) return -1;
-  const match = String(colConfig).match(/^([A-Z]+)\s*-/);
+  const match = String(colConfig).match(/^([A-Za-z]+)\s*-/);
   if (!match) return -1;
-  const letters = match[1];
-  let index = 0;
-  for (let i = 0; i < letters.length; i++) {
-    index = index * 26 + (letters.charCodeAt(i) - 64);
-  }
-  return index;
+  return SharedUtils_columnLetterToIndex(match[1]);
 }
 
 /** 1 → "A", 26 → "Z", 27 → "AA" */
 function _req_numberToLetter(n) {
-  let result = '';
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    result = String.fromCharCode(65 + rem) + result;
-    n = Math.floor((n - 1) / 26);
-  }
-  return result;
+  return SharedUtils_numberToColumnLetter(n);
 }
 
 /** Returns ["A - Header", "B - Header", ...] for every column in the sheet */
 function _req_getColumnsFromSheet(sheet) {
-  if (!sheet || sheet.getLastColumn() === 0) return [];
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  return headers.map(function(h, i) {
-    const letter = _req_numberToLetter(i + 1);
-    return letter + ' - ' + (h || 'Col ' + letter);
-  });
+  return SharedUtils_getColumnLabelsFromSheet(sheet, 'Col');
 }
 
 /**
@@ -410,14 +401,19 @@ function processRequestCore(combination, settings) {
       row.roundUp = _req_applyRoundingRule(row.desc, rules);
     });
 
-    // 5. Create or clear target sheet
-    const sheetName = String(settings.kojoSuffix || 'Request').trim().substring(0, 100);
+    // 5. Create or clear target sheet — nome sempre com prefixo "REQUEST-"
+    const baseName = String(settings.kojoSuffix || 'Request').trim();
+    const prefixed = new RegExp('^' + REQUEST_CONFIG.SHEET_PREFIX, 'i').test(baseName)
+      ? baseName
+      : REQUEST_CONFIG.SHEET_PREFIX + baseName;
+    const sheetName = SharedUtils_sanitizeSheetName(prefixed);
     let targetSheet = ss.getSheetByName(sheetName);
     if (targetSheet) {
       targetSheet.clear();
     } else {
       targetSheet = ss.insertSheet(sheetName);
     }
+    targetSheet.setTabColor(REQUEST_CONFIG.TAB_COLOR);
 
     // 6. Write header (rows 1-7)
     _req_writeHeader(targetSheet, settings, combination, groupCols);
@@ -453,7 +449,9 @@ function processRequestCore(combination, settings) {
 // ============================================================================
 
 function openRequestSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('RequestSidebar')
+  // Template (não HtmlOutput direto): necessário para o include() de SharedStyles/SharedScripts
+  const html = HtmlService.createTemplateFromFile('RequestSidebar')
+    .evaluate()
     .setTitle('📋 Gerador de Request')
     .setWidth(380);
   SpreadsheetApp.getUi().showSidebar(html);

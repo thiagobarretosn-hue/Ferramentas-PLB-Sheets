@@ -1,7 +1,7 @@
 // ExportPro — Google Apps Script doPost
 // Deploy como web app standalone em script.google.com
 // Execute as: Me | Who has access: Anyone within Ambar Technologies
-// Versao 2.2 — modo append: insere abaixo do conteudo existente em aba nomeada
+// Versao 2.3 — retorna o nome da planilha de destino na resposta (rastreabilidade)
 
 function _uniqueTabName(ss, baseName) {
   if (!ss.getSheetByName(baseName)) return baseName;
@@ -49,7 +49,8 @@ function doPost(e) {
         sheet.getRange(1, 1, padded.length, maxCols).setValues(padded);
       }
       return ContentService.createTextOutput(
-        JSON.stringify({ status: 'ok', mode: 'stacked', rows: allRows.length })
+        JSON.stringify({ status: 'ok', mode: 'stacked', rows: allRows.length,
+                         spreadsheet: ss.getName(), tabName: tabName })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -106,7 +107,8 @@ function doPost(e) {
         appendSheet.getRange(startRow, 1, padded.length, maxCols).setValues(padded);
       }
       return ContentService.createTextOutput(
-        JSON.stringify({ status: 'ok', mode: 'append', tabName: appendTabName, rows: appendRows.length })
+        JSON.stringify({ status: 'ok', mode: 'append', tabName: appendTabName,
+                         rows: appendRows.length, spreadsheet: ss.getName() })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -138,7 +140,7 @@ function doPost(e) {
       sheetsWritten++;
     }
     return ContentService.createTextOutput(
-      JSON.stringify({ status: 'ok', sheets: sheetsWritten })
+      JSON.stringify({ status: 'ok', sheets: sheetsWritten, spreadsheet: ss.getName() })
     ).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {

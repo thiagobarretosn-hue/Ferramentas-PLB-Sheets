@@ -22,7 +22,8 @@
 // ============================================================================
 
 const APP_CONFIG_DEFAULTS = {
-  // Template.gs - ID da planilha central de templates
+  // Legado da ferramenta Template (removida 07/2026) — mantido para não quebrar
+  // configs salvas; sem consumidor ativo
   CENTRAL_SPREADSHEET_ID: '1IE_NTWtwB9PHlrFsM853SkkVwWttiZxVZPcBDE6qjKk',
   CENTRAL_SHEET_NAME: 'DATA BASE',
 
@@ -240,6 +241,59 @@ const AppConfig = {
     this._cache = null;
   }
 };
+
+// ============================================================================
+// FACTORY DE CONFIG POR DOCUMENTO (unificacao 07/2026)
+// Um unico lugar para o padrao "JSON em DocumentProperties + merge com defaults".
+// Usado por BOM.gs (ConfigService) e Request.gs (RequestConfigService).
+// SummaryAll e ColorConfig permanecem customizados de proposito:
+//   SummaryAll tem fallback de migracao (ScriptProperties + formato array antigo);
+//   ColorConfig persiste um mapa por aba, nao um objeto unico de config.
+// ============================================================================
+
+/**
+ * Cria um servico de configuracao persistido em DocumentProperties.
+ *
+ * @param {string} propKey - Chave no PropertiesService
+ * @param {function(): Object} getDefaults - Retorna um objeto NOVO com os defaults
+ * @returns {{getAll: function, get: function, saveAll: function}}
+ */
+function SharedConfig_createDocConfigService(propKey, getDefaults) {
+  return {
+    /** Config completa: defaults + valores salvos (chaves novas sempre existem) */
+    getAll: function() {
+      try {
+        const raw = PropertiesService.getDocumentProperties().getProperty(propKey);
+        if (raw) return Object.assign(getDefaults(), JSON.parse(raw));
+      } catch (e) {
+        console.error('[SharedConfig:' + propKey + '] ' + e.message);
+      }
+      return getDefaults();
+    },
+
+    /**
+     * Valor individual. Sem `||`: 0 e false sao valores legitimos;
+     * apenas undefined/null/'' caem no defaultValue.
+     */
+    get: function(key, defaultValue) {
+      const all = this.getAll();
+      const value = all[key];
+      if (value === undefined || value === null || value === '') {
+        return defaultValue === undefined ? '' : defaultValue;
+      }
+      return value;
+    },
+
+    saveAll: function(config) {
+      try {
+        PropertiesService.getDocumentProperties().setProperty(propKey, JSON.stringify(config));
+        return { success: true };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    }
+  };
+}
 
 // ============================================================================
 // FUNCOES DE CONVENIENCIA

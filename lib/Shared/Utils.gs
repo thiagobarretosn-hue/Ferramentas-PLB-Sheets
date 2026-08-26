@@ -6,9 +6,9 @@
  * IMPORTANTE: Não modifique as assinaturas das funções para manter compatibilidade.
  *
  * Módulos que usam este arquivo:
- * - BOM.gs (via Utils object)
- * - Template.gs (funções diretas)
- * - SuperBusca.gs (funções diretas)
+ * - BOM.gs (via Utils object + funções diretas)
+ * - Request.gs (via wrappers _req_*)
+ * - SuperBusca.gs, ColorConfig.gs (funções diretas)
  */
 
 // ============================================================================
@@ -87,6 +87,24 @@ function SharedUtils_getColumnHeaderFromConfig(colConfig) {
 
   const parts = colConfig.split(' - ');
   return parts.length > 1 ? parts.slice(1).join(' - ').trim() : '';
+}
+
+/**
+ * Retorna labels "A - Header" para todas as colunas de uma aba.
+ * Usado por BOM.gs e Request.gs para popular dropdowns de coluna.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ * @param {string} [emptyPrefix='Coluna'] - Prefixo quando o header está vazio
+ * @returns {string[]} Ex.: ["A - UNIT ID", "B - Coluna B", ...]
+ */
+function SharedUtils_getColumnLabelsFromSheet(sheet, emptyPrefix) {
+  if (!sheet || sheet.getLastColumn() === 0) return [];
+  const prefix = emptyPrefix || 'Coluna';
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  return headers.map((h, i) => {
+    const letter = SharedUtils_numberToColumnLetter(i + 1);
+    return letter + ' - ' + (h || prefix + ' ' + letter);
+  });
 }
 
 // ============================================================================

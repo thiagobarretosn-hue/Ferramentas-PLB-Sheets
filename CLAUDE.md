@@ -1,5 +1,7 @@
 # CLAUDE.md - Google Apps Script Development Hub
-> **Versão:** 1.0 | **Autor:** Claude Code Agent | **Atualizado:** 2026-01-20
+> **Versão:** 1.1 | **Autor:** Claude Code Agent | **Atualizado:** 2026-07-08
+> Higiene 07/2026: ferramentas Template e Fixadores removidas (código em `C:\DEV\_OBSOLETO\Sheets\`);
+> ferramentas ativas = itens do menu em `Menu.gs` + endpoint `ExportProReceiver.gs`.
 
 Este arquivo é o centro de conhecimento para desenvolvimento de Google Apps Script com assistência de IA.
 
@@ -62,34 +64,28 @@ Nunca invente soluções que a API não suporta. Sempre verifique a documentaç�
 - **gas-fakes** - Emulação local do ambiente GAS
 - **TypeScript** - Opcional, com bundler (Rollup)
 
-### Estrutura do Projeto
+### Estrutura do Projeto (real — arquivos .gs/.html na raiz, sem src/ ou html/)
 ```
 Ferramentas-PLB-Sheets/
-├── CLAUDE.md              # Este arquivo
-├── README.md              # Documentação pública
-├── .clasp.json            # Configuração clasp
-├── appsscript.json        # Manifesto do projeto
-├── docs/
-│   ├── context/           # Contexto para IA
-│   │   ├── DIRETRIZES.md
-│   │   ├── PROJECT_CONTEXT.md
-│   │   └── API_REFERENCE.md
-│   └── guides/            # Guias e tutoriais
+├── CLAUDE.md              # Este arquivo (não vai ao GAS — .claspignore)
+├── .clasp.json / .claspignore / appsscript.json
+├── Menu.gs                # onOpen() — fonte da verdade das ferramentas ativas
+├── BOM.gs                 + BomSidebar.html          # Gerador de BOM
+├── Request.gs             + RequestSidebar.html      # Gerador de Request KOJO
+├── SheetManager.gs        + SheetManager.html        # Gerenciador de Abas
+├── ColorConfig.gs         + color-config-sidebar.html# Cores por grupo
+├── SuperBusca.gs          + SuperBuscaSidebar.html   # Busca de materiais
+├── SummaryAll.gs          + SummaryAllSidebar.html   # Consolidação de abas
+├── ExportProReceiver.gs   # doPost — recebe schedules do Revit (ExportPro)
 ├── lib/
-│   └── Snippets/          # Funções reutilizáveis
-│       ├── cache/
-│       ├── sheets/
-│       ├── drive/
-│       ├── ui/
-│       └── utils/
-├── src/
-│   ├── Menu.gs
-│   ├── BOM.gs
-│   ├── Template.gs
-│   └── SuperBusca.gs
-├── html/                  # Arquivos HTML para sidebars
-└── .claude/               # Configuração do agente
+│   ├── Shared/            # ENVIADO ao GAS: Config.gs (AppConfig), Utils.gs (SharedUtils_*)
+│   └── Snippets/          # Referência dev — NÃO enviado (.claspignore)
+├── templates/             # Scaffolding dev — NÃO enviado (.claspignore)
+└── docs/, .claude/, .superpowers/  # NÃO enviados
 ```
+
+**Ferramentas removidas (07/2026):** Template (planilha central), Fixadores, ConditionalFormat,
+Logger — código preservado em `C:\DEV\_OBSOLETO\Sheets\Ferramentas-PLB-Sheets-higiene-2026-07-08\`.
 
 ---
 
@@ -287,30 +283,25 @@ function log(message, level = 'INFO') {
 
 ## SEÇÃO 5: BIBLIOTECA DE SNIPPETS
 
-### Categorias Disponíveis
+### Runtime compartilhado — `lib/Shared/` (enviado ao GAS)
+- `Config.gs` — `AppConfig` (ScriptProperties, prefixo `PLB_CONFIG_`) +
+  **`SharedConfig_createDocConfigService(propKey, getDefaults)`** — factory padrão para
+  config de ferramenta em DocumentProperties (usado por BOM e Request; instanciar lazy,
+  a ordem de load dos arquivos no GAS não é garantida)
+- `Utils.gs` — `SharedUtils_*`: conversão de colunas, labels "A - Header", sanitize,
+  formatVersion, toNumber, respostas padronizadas. **Usar sempre antes de criar helper novo.**
+- `Html.gs` — `include(filename)` para compartilhar CSS/JS entre sidebars
 
-#### `lib/Snippets/cache/`
-- `cache_manager.gs` - Gerenciador de cache com chunks
-- `cache_invalidation.gs` - Invalidação seletiva
+### CSS/JS compartilhado entre sidebars (padrão para novas ferramentas)
+- `SharedStyles.html` — tokens (`--plb-*`) + base (section, btn, input, status)
+- `SharedScripts.html` — `runGS()` (google.script.run como Promise), `debounce()`, `escHtml()`
+- No `.gs`: abrir com `HtmlService.createTemplateFromFile('X').evaluate()` (não `createHtmlOutputFromFile`)
+- No HTML: `<?!= include('SharedStyles'); ?>` no `<head>`, `<?!= include('SharedScripts'); ?>` antes do script
+- Adotado em: RequestSidebar, SheetManager. Demais sidebars: migrar quando forem tocadas.
 
-#### `lib/Snippets/sheets/`
-- `sheet_utils.gs` - Utilitários de planilha
-- `data_validation.gs` - Validação de dados
-- `formatting.gs` - Formatação de células
-
-#### `lib/Snippets/drive/`
-- `folder_manager.gs` - Gerenciamento de pastas
-- `pdf_export.gs` - Exportação para PDF
-
-#### `lib/Snippets/ui/`
-- `sidebar_base.gs` - Base para sidebars
-- `dialog_utils.gs` - Utilitários para diálogos
-- `toast_notifications.gs` - Notificações toast
-
-#### `lib/Snippets/utils/`
-- `string_utils.gs` - Manipulação de strings
-- `date_utils.gs` - Manipulação de datas
-- `array_utils.gs` - Operações em arrays
+### Referência dev — `lib/Snippets/` (NÃO enviado ao GAS)
+- `cache/cache_manager.gs`, `sheets/sheet_utils.gs`, `drive/pdf_export.gs`,
+  `ui/sidebar_utils.gs`, `utils/string_utils.gs` — material de consulta/cópia.
 
 ---
 
@@ -382,36 +373,20 @@ function operacaoCritica() {
 
 ## SEÇÃO 7: FERRAMENTAS EXISTENTES
 
-### Menu.gs
-| Função | Descrição |
-|--------|-----------|
-| `onOpen()` | Inicializa menus na abertura |
-| `onEdit(e)` | Processa edições (trigger) |
+Fonte da verdade: `Menu.gs → onOpen()`. Ferramentas ativas:
 
-### BOM.gs
-| Função | Descrição |
-|--------|-----------|
-| `processBomCore()` | Engine de processamento de relatórios |
-| `forceCreateConfig()` | Cria aba Config |
-| `updateGroupingPanel()` | Atualiza painel de agrupamento |
-| `exportPDFsWithFeedback()` | Exporta PDFs para Drive |
-| `processarFixadoresSelecionados()` | Adiciona fixadores |
+| Ferramenta | Backend | Entry point | Config |
+|------------|---------|-------------|--------|
+| 📊 Gerador de BOM | `BOM.gs` | `openBomSidebar()` | DocumentProperties `BOM_SETTINGS_V3` |
+| 📋 Gerador de Request | `Request.gs` | `openRequestSidebar()` | DocumentProperties `REQUEST_SETTINGS_V1` |
+| 📑 Gerenciador de Abas | `SheetManager.gs` | `showSheetManager()` | — |
+| 🎨 Cores das Abas | `ColorConfig.gs` | `openColorConfig()` | DocumentProperties `SHEET_COLOR_CONFIGS` |
+| 🔍 Super Busca | `SuperBusca.gs` | `abrirSuperBuscaSidebar()` | AppConfig + UserProperties |
+| 📊 Summary All | `SummaryAll.gs` | `openSummaryAllSidebar()` | DocumentProperties `SUMMARY_ALL_CONFIG_V3` |
+| ExportPro (Revit → Sheets) | `ExportProReceiver.gs` | `doPost(e)` (Web App) | — |
 
-### Template.gs
-| Função | Descrição |
-|--------|-----------|
-| `loadTemplatesWithCache()` | Carrega templates com cache |
-| `insertLocalTemplates()` | Insere template |
-| `createTemplateFromSelection()` | Cria template da seleção |
-| `applyGroupColors()` | Aplica cores por grupo |
-| `showSheetManager()` | Gerenciador de abas |
-
-### SuperBusca.gs
-| Função | Descrição |
-|--------|-----------|
-| `abrirSuperBuscaSidebar()` | Abre sidebar de busca |
-| `getDadosParaBusca()` | Obtém dados para busca |
-| `inserirItensSelecionados()` | Insere itens selecionados |
+Utilitário de manutenção sem menu: `clearOldReports()` (BOM.gs — apaga relatórios gerados,
+protegido por assinatura de cabeçalho; rodar pelo editor).
 
 ---
 

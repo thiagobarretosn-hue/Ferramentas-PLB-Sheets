@@ -36,10 +36,10 @@ function getHeadersForFirstSheet(sheetName) {
   }
 }
 
-/** Salva config completa */
+/** Salva config completa (DocumentProperties: por planilha, não vaza entre docs/usuários) */
 function saveSummaryAllConfig(fullConfig) {
   try {
-    PropertiesService.getScriptProperties()
+    PropertiesService.getDocumentProperties()
       .setProperty(SUMMARY_ALL_CFG.PROPS_KEY, JSON.stringify(fullConfig));
     return { success: true };
   } catch(e) {
@@ -143,7 +143,10 @@ function _getSheetHeaders(ss, sheetName) {
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────
 function _loadFullConfig() {
-  const raw = PropertiesService.getScriptProperties().getProperty(SUMMARY_ALL_CFG.PROPS_KEY);
+  // DocumentProperties é o local atual; ScriptProperties é fallback de migração
+  // (config salva antes de 07/2026 era compartilhada entre todas as planilhas do script)
+  const raw = PropertiesService.getDocumentProperties().getProperty(SUMMARY_ALL_CFG.PROPS_KEY)
+    || PropertiesService.getScriptProperties().getProperty(SUMMARY_ALL_CFG.PROPS_KEY);
   if (!raw) return {};
 
   const parsed = JSON.parse(raw);

@@ -1,6 +1,6 @@
 /**
  * @fileoverview Menu Principal - Ferramentas PLB Sheets
- * @version 3.1.0 - Cores unificadas em um item; Gerenciador de Abas atualizado
+ * @version 3.2.0 - Removido onEdit vazio (rodava a cada edição sem fazer nada)
  */
 
 function onOpen() {
@@ -15,9 +15,6 @@ function onOpen() {
     .addItem('🔍 Super Busca', 'abrirSuperBuscaSidebar')
     .addSeparator()
     .addItem('📊 Summary All', 'openSummaryAllSidebar')
+    .addItem('📦 Montar Submittal', 'openSubmittalSidebar')
     .addToUi();
-}
-
-function onEdit(e) {
-  if (!e || !e.source || !e.range) return;
 }

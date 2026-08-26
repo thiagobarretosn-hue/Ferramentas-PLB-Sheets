@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('SharedStyles'); ?>
+  <style>
+    .item-list { max-height: 240px; overflow-y: auto; border: 1px solid var(--plb-border); border-radius: 3px; background: #fafafa; }
+    .item-row { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 11px; }
+    .item-row:last-child { border-bottom: none; }
+    .item-name { font-weight: bold; color: var(--plb-dark); }
+    .item-ok { color: var(--plb-green); font-size: 10px; word-break: break-all; }
+    .item-missing { color: var(--plb-red); font-size: 10px; }
+    .link-input-row { display: flex; gap: 4px; margin-top: 4px; }
+    .link-input-row input { margin-bottom: 0; flex: 1; }
+    .progress-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 3px; padding: 8px; font-size: 11px; margin-top: 8px; display: none; }
+    .report-box { background: #eafaf1; border: 1px solid #a9dfbf; border-radius: 3px; padding: 8px; font-size: 11px; margin-top: 8px; display: none; white-space: pre-line; }
+    .report-box.err { background: #fdedec; border-color: #f1948a; }
+    .report-box a { color: #2471a3; font-weight: bold; }
+    .save-badge { float: right; font-size: 9px; color: var(--plb-grey); font-weight: normal; text-transform: none; letter-spacing: 0; opacity: 0; transition: opacity 0.4s; }
+    .save-badge.show { opacity: 1; }
+    .warn-template { background: #fdedec; border: 1px solid #f1948a; border-radius: 3px; padding: 6px 8px; font-size: 10px; color: #922b21; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<div class="header">📦 Montar Submittal <span class="save-badge" id="save-badge">💾 salvo</span></div>
+
+<!-- ==================== CONFIG (autosave) ==================== -->
+<div class="section">
+  <div class="section-title">⚙️ Configuração do Projeto <span style="font-weight:normal; text-transform:none; color:#7f8c8d;">(salva automaticamente)</span></div>
+
+  <div id="warn-template" class="warn-template" style="display:none">
+    ⚠️ TEMPLATE_DOC_ID não configurado no Submittal.gs — a capa não será gerada.
+  </div>
+
+  <label>Aba Fonte (Submittal Items LOG)</label>
+  <select id="sel-source-sheet"></select>
+
+  <label>Pasta pai no Drive (ID ou URL da pasta)</label>
+  <input type="text" id="inp-parent-folder" placeholder="ex: 1AbC... ou https://drive.google.com/drive/folders/..." />
+
+  <label>Project Name</label>
+  <input type="text" id="inp-project-name" placeholder="ex: SAXUM 7522NE" />
+
+  <label>Project Address</label>
+  <input type="text" id="inp-project-address" placeholder="ex: 7522 NE 3rd Pl. MIAMI, FL 33188" />
+
+  <div class="row2">
+    <div><label>To</label><input type="text" id="inp-to" placeholder="ex: PORTLAND" /></div>
+    <div><label>Título padrão do Submittal</label><input type="text" id="inp-title-default" placeholder="ex: Plumbing Fixtures" /></div>
+  </div>
+</div>
+
+<!-- ==================== SELEÇÃO ==================== -->
+<div class="section">
+  <div class="section-title">🔽 Submittal (status NOT COMMITTED)</div>
+  <div class="row2">
+    <div>
+      <label>Número (col B)</label>
+      <select id="sel-num"></select>
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button class="btn btn-secondary" id="btn-load" style="width:100%">📋 Carregar itens</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ITENS ==================== -->
+<div class="section">
+  <div class="section-title">📄 Itens <span id="items-count" style="font-weight:normal; text-transform:none;"></span></div>
+  <div class="item-list" id="item-list">
+    <div class="item-row loading">Escolha o número e clique em Carregar itens.</div>
+  </div>
+</div>
+
+<!-- ==================== CAPA + GERAR ==================== -->
+<div class="section">
+  <div class="section-title">📑 Capa desta montagem</div>
+  <div class="row2">
+    <div><label>Título (capa)</label><input type="text" id="inp-cover-title" /></div>
+    <div><label>Data (capa)</label><input type="text" id="inp-cover-date" placeholder="MM/DD/YYYY" /></div>
+  </div>
+  <button class="btn btn-primary" id="btn-generate">📦 MONTAR SUBMITTAL</button>
+  <div class="progress-box" id="progress-box"></div>
+  <div class="report-box" id="report-box"></div>
+</div>
+<div id="status" style="padding:8px 14px; font-size:11px; min-height:20px;"></div>
+
+<?!= include('SharedScripts'); ?>
+<script>
+  var state = { config: {}, items: [], num: '' };
+  var pollTimer = null;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    bindEvents();
+    runGS('getSubmittalInitData').then(onInit).catch(onError);
+    showStatus('Carregando...', 'loading');
+  });
+
+  function bindEvents() {
+    document.getElementById('btn-load').addEventListener('click', loadItems);
+    document.getElementById('btn-generate').addEventListener('click', onGenerate);
+    document.getElementById('sel-source-sheet').addEventListener('change', function() {
+      scheduleAutosave();
+      loadNumbers();
+    });
+    ['inp-parent-folder', 'inp-project-name', 'inp-project-address', 'inp-to', 'inp-title-default']
+      .forEach(function(id) {
+        document.getElementById(id).addEventListener('input', function() { scheduleAutosave(); });
+      });
+  }
+
+  function onInit(data) {
+    state.config = data.config || {};
+    if (!data.templateOk) document.getElementById('warn-template').style.display = 'block';
+
+    var sel = document.getElementById('sel-source-sheet');
+    sel.innerHTML = '<option value="">-- Selecione --</option>';
+    (data.allSheets || []).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      if (s === state.config.sourceSheet) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('inp-parent-folder').value   = state.config.parentFolderId || '';
+    document.getElementById('inp-project-name').value    = state.config.projectName    || '';
+    document.getElementById('inp-project-address').value = state.config.projectAddress || '';
+    document.getElementById('inp-to').value              = state.config.toName         || '';
+    document.getElementById('inp-title-default').value   = state.config.submittalTitle || '';
+    document.getElementById('inp-cover-title').value     = state.config.submittalTitle || '';
+
+    var d = new Date();
+    document.getElementById('inp-cover-date').value =
+      ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2) + '/' + d.getFullYear();
+
+    if (state.config.sourceSheet) loadNumbers();
+    showStatus('', '');
+  }
+
+  /* ---------- autosave ---------- */
+  var _autosave = debounce(function(cfg) {
+    runGS('saveSubmittalConfig', cfg).then(function(r) {
+      if (r && r.success) {
+        var b = document.getElementById('save-badge');
+        b.classList.add('show');
+        setTimeout(function() { b.classList.remove('show'); }, 1500);
+      }
+    }).catch(onError);
+  }, 600);
+
+  function scheduleAutosave() {
+    var cfg = {
+      sourceSheet:    document.getElementById('sel-source-sheet').value,
+      parentFolderId: extractFolderId(document.getElementById('inp-parent-folder').value),
+      projectName:    document.getElementById('inp-project-name').value,
+      projectAddress: document.getElementById('inp-project-address').value,
+      toName:         document.getElementById('inp-to').value,
+      submittalTitle: document.getElementById('inp-title-default').value
+    };
+    state.config = cfg;
+    _autosave(cfg);
+  }
+
+  function extractFolderId(v) {
+    var m = String(v || '').match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+    if (m) return m[1];
+    return String(v || '').trim();
+  }
+
+  /* ---------- números ---------- */
+  function loadNumbers() {
+    var sheet = document.getElementById('sel-source-sheet').value;
+    if (!sheet) return;
+    runGS('getSubmittalNumbers', sheet).then(function(nums) {
+      var sel = document.getElementById('sel-num');
+      sel.innerHTML = '';
+      if (!nums || nums.length === 0) {
+        sel.innerHTML = '<option value="">(nenhum NOT COMMITTED)</option>';
+        return;
+      }
+      nums.forEach(function(n) {
+        var opt = document.createElement('option');
+        opt.value = n.num;
+        opt.textContent = n.num + '  (' + n.count + ' itens)';
+        sel.appendChild(opt);
+      });
+    }).catch(onError);
+  }
+
+  /* ---------- itens ---------- */
+  function loadItems() {
+    var sheet = document.getElementById('sel-source-sheet').value;
+    var num = document.getElementById('sel-num').value;
+    if (!sheet || !num) return showStatus('⚠️ Selecione a aba e o número.', 'err');
+
+    showStatus('Carregando itens...', 'loading');
+    runGS('getSubmittalItems', num, sheet).then(function(resp) {
+      if (!resp.success) return showStatus('❌ ' + resp.message, 'err');
+      state.items = resp.items;
+      state.num = num;
+      renderItems();
+      showStatus('', '');
+    }).catch(onError);
+  }
+
+  function renderItems() {
+    var list = document.getElementById('item-list');
+    list.innerHTML = '';
+    var missing = 0;
+
+    state.items.forEach(function(it) {
+      var div = document.createElement('div');
+      div.className = 'item-row';
+
+      var name = document.createElement('div');
+      name.className = 'item-name';
+      name.textContent = it.item;
+      div.appendChild(name);
+
+      if (it.link) {
+        var ok = document.createElement('div');
+        ok.className = 'item-ok';
+        ok.textContent = '✓ ' + (it.link.label || it.link.url);
+        div.appendChild(ok);
+      } else {
+        missing++;
+        var miss = document.createElement('div');
+        miss.className = 'item-missing';
+        miss.textContent = '✗ sem link — cole a URL (Drive ou PDF na web):';
+        div.appendChild(miss);
+
+        var rowEl = document.createElement('div');
+        rowEl.className = 'link-input-row';
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.placeholder = 'https://...';
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-small btn-secondary';
+        btn.textContent = '💾';
+        btn.addEventListener('click', (function(item, input) {
+          return function() {
+            runGS('saveSubmittalItemLink', item.row, input.value, item.item, state.config.sourceSheet)
+              .then(function(r) {
+                if (r.success) loadItems();
+                else showStatus('❌ ' + r.message, 'err');
+              }).catch(onError);
+          };
+        })(it, inp));
+        rowEl.appendChild(inp);
+        rowEl.appendChild(btn);
+        div.appendChild(rowEl);
+      }
+      list.appendChild(div);
+    });
+
+    document.getElementById('items-count').textContent =
+      '— ' + state.items.length + ' itens' + (missing ? ' (' + missing + ' sem link)' : '');
+  }
+
+  /* ---------- gerar ---------- */
+  function onGenerate() {
+    if (!state.items.length || !state.num) return showStatus('⚠️ Carregue os itens primeiro.', 'err');
+    if (!state.config.parentFolderId) return showStatus('⚠️ Configure a pasta pai no Drive.', 'err');
+
+    var coverFields = {
+      title: document.getElementById('inp-cover-title').value,
+      date:  document.getElementById('inp-cover-date').value
+    };
+
+    var btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+    document.getElementById('report-box').style.display = 'none';
+    showProgress('Iniciando...');
+
+    // Dispara e acompanha via polling (execução longa + merge async)
+    runGS('montarSubmittal', state.num, coverFields, state.config.sourceSheet).catch(function() {});
+    pollTimer = setInterval(pollProgress, 1500);
+  }
+
+  function pollProgress() {
+    runGS('getSubmittalProgress').then(function(p) {
+      if (!p || p.status === 'idle') return;
+      if (p.status === 'running') {
+        var pct = p.total ? ' (' + p.done + '/' + p.total + ')' : '';
+        showProgress('⏳ ' + (p.step || 'Processando...') + pct);
+        return;
+      }
+      clearInterval(pollTimer);
+      document.getElementById('btn-generate').disabled = false;
+      document.getElementById('progress-box').style.display = 'none';
+
+      if (p.status === 'error') {
+        showReport('❌ ERRO: ' + p.message, true);
+      } else if (p.status === 'done') {
+        showFinalReport(p.report);
+        loadItems(); // atualiza a lista (col M preenchida)
+      }
+    }).catch(function() {});
+  }
+
+  function showFinalReport(r) {
+    var box = document.getElementById('report-box');
+    box.className = 'report-box';
+    box.style.display = 'block';
+    box.innerHTML = '';
+
+    var lines = [];
+    lines.push('✅ ' + r.pdfName + ' — ' + r.pages + ' páginas');
+    lines.push(r.total + ' itens | ' + r.merged + ' mesclados no PDF');
+    if (r.loose && r.loose.length)   lines.push('📎 Copiados soltos (' + r.loose.length + '): ' + r.loose.join('; '));
+    if (r.noLink && r.noLink.length) lines.push('✗ Sem link (' + r.noLink.length + '): ' + r.noLink.join('; '));
+    if (r.failed && r.failed.length) lines.push('⚠️ Falharam (' + r.failed.length + '): ' + r.failed.join('; '));
+
+    box.appendChild(document.createTextNode(lines.join('\n') + '\n'));
+
+    var a1 = document.createElement('a');
+    a1.href = r.pdfUrl; a1.target = '_blank'; a1.textContent = '📄 Abrir PDF';
+    var a2 = document.createElement('a');
+    a2.href = r.folderUrl; a2.target = '_blank'; a2.textContent = '📁 Abrir pasta';
+    box.appendChild(a1);
+    box.appendChild(document.createTextNode('   '));
+    box.appendChild(a2);
+  }
+
+  function showReport(text, isErr) {
+    var box = document.getElementById('report-box');
+    box.className = 'report-box' + (isErr ? ' err' : '');
+    box.style.display = 'block';
+    box.textContent = text;
+  }
+
+  function showProgress(msg) {
+    var box = document.getElementById('progress-box');
+    box.style.display = 'block';
+    box.textContent = msg;
+  }
+
+  function onError(err) {
+    showStatus('Erro: ' + (err.message || err), 'err');
+  }
+
+  function showStatus(msg, type) {
+    var el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = type === 'err' ? 'status-err' : type === 'loading' ? 'loading' : 'status-ok';
+  }
+</script>
+</body>
+</html>
