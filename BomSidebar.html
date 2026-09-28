@@ -386,11 +386,11 @@
               <select id="col2Select" onchange="saveState()"></select>
             </div>
             <div class="form-group">
-              <label for="col3Select">Coluna 3 (UPC)</label>
+              <label for="col3Select">Coluna 3 (UOM)</label>
               <select id="col3Select" onchange="saveState()"></select>
             </div>
             <div class="form-group">
-              <label for="col4Select">Coluna 4 (UOM)</label>
+              <label for="col4Select">Coluna 4 (UPC)</label>
               <select id="col4Select" onchange="saveState()"></select>
             </div>
             <div class="form-group">
@@ -629,6 +629,15 @@
         currentConfig = { ...currentConfig, ...savedState.settings };
       }
 
+      // V3.5: Coluna 3 passou a ser UOM e Coluna 4 UPC. Config salva na ordem antiga
+      // (3 = UPC, 4 = UOM) é trocada uma vez; a próxima gravação persiste a ordem nova.
+      const c3 = String(currentConfig[CONFIG_KEYS.COL_3] || '').toUpperCase();
+      const c4 = String(currentConfig[CONFIG_KEYS.COL_4] || '').toUpperCase();
+      if (c3.includes('UPC') && c4.includes('UOM')) {
+        [currentConfig[CONFIG_KEYS.COL_3], currentConfig[CONFIG_KEYS.COL_4]] =
+          [currentConfig[CONFIG_KEYS.COL_4], currentConfig[CONFIG_KEYS.COL_3]];
+      }
+
       // Popular Aba Origem
       const ssSelect = document.getElementById('sourceSheetSelect');
       ssSelect.options.length = 1;
@@ -698,8 +707,8 @@
       const patterns = [
         ['col1Select',   ['UNIT ID', 'UNIT_ID', 'FLOOR ID', 'ID']],
         ['col2Select',   ['DESC', 'DESCRIPTION']],
-        ['col3Select',   ['UPC']],
-        ['col4Select',   ['UOM', 'UNIT OF MEASURE']],
+        ['col3Select',   ['UOM', 'UNIT OF MEASURE']],
+        ['col4Select',   ['UPC']],
         ['col5Select',   ['PROJECT', 'QTY', 'QUANTITY']],
         ['sortBySelect', ['DESC', 'DESCRIPTION']],
       ];
@@ -1122,7 +1131,13 @@
       google.script.run
         .withSuccessHandler(result => {
           if (result.success) {
-            showStatus(`✅ ${result.created} relatórios criados!`, 'success');
+            const skipped = result.skipped || [];
+            if (skipped.length === 0) {
+              showStatus(`✅ ${result.created} relatórios criados!`, 'success');
+            } else {
+              const list = skipped.map(s => `${s.name} (${s.reason})`).join('; ');
+              showStatus(`⚠️ ${result.created} criado(s), ${skipped.length} pulado(s): ${list}`, 'error', 15000);
+            }
           } else {
             onError(new Error(result.message));
           }
@@ -1452,7 +1467,8 @@
             const cbId = `pdf-cb-${name}`;
             cb.id = cbId;
             cb.value = name;
-            cb.checked = true;
+            // Aba sem assinatura de relatório BOM (auxiliar) aparece, mas desmarcada
+            cb.checked = sheetData.isReport !== false;
             cb.addEventListener('click', (e) => {
               if (e.shiftKey && lastCheckedPdf) {
                 const allCbs = Array.from(container.querySelectorAll('.pdf-check'));
@@ -1820,13 +1836,14 @@
       document.getElementById('exportPdfBtn').disabled = false;
     }
 
-    function showStatus(msg, type) {
+    function showStatus(msg, type, durationMs) {
       const status = document.getElementById('status');
       status.textContent = msg;
       status.className = `status ${type}`;
       status.style.display = 'block';
-      const duration = (type === 'info') ? 2000 : 4000;
-      setTimeout(() => status.style.display = 'none', duration);
+      const duration = durationMs || ((type === 'info') ? 2000 : 4000);
+      clearTimeout(showStatus._timer);
+      showStatus._timer = setTimeout(() => status.style.display = 'none', duration);
     }
     // ── Export Config Prompt ──────────────────────────────────────────
     function exportConfigPrompt() {

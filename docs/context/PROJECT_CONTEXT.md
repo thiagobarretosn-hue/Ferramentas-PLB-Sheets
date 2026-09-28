@@ -200,7 +200,7 @@ function sanitizeSheetName(name)    // Remove caracteres inválidos
 | `FixadoresSidebar.html` | Seletor de fixadores |
 | `SuperBuscaSidebar.html` | Interface de busca |
 | `template-sidebar.html` | Navegador de templates |
-| `SheetManager.html` | Gerenciador de abas |
+| `SheetManagerSidebar.html` | Gerenciador de abas |
 | `color-config-sidebar.html` | Configuração de cores |
 | `duplicate-dialog.html` | Resolução de conflitos |
 

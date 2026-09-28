@@ -24,7 +24,7 @@ Ferramentas-PLB-Sheets/
 ├── SuperBuscaSidebar.html        # Painel Super Busca
 │
 ├── template-sidebar.html         # Sidebar de templates
-├── SheetManager.html             # Gerenciador de abas
+├── SheetManagerSidebar.html             # Gerenciador de abas
 ├── color-config-sidebar.html    # Configuração de cores
 ├── duplicate-dialog.html        # Dialog de conflito de templates
 │
@@ -87,7 +87,7 @@ openConfigSidebar()           // Abre painel de controle
 #### Arquivos:
 - **Template.gs** - Código principal do sistema Templates
 - **template-sidebar.html** - Sidebar de navegação de templates
-- **SheetManager.html** - Gerenciador de abas
+- **SheetManagerSidebar.html** - Gerenciador de abas
 - **color-config-sidebar.html** - Configuração de cores
 - **duplicate-dialog.html** - Resolução de conflitos
 

@@ -19,6 +19,22 @@
                      {
                          "name":  "134-plb work",
                          "scriptId":  "1i_XVaJ9i0QAAHxOQOPG950-ipoDJl123rlQHof1ueWApNCHBupcfBwOE"
+                     },
+                     {
+                         "name":  "PVP",
+                         "scriptId":  "1mqSh2ApKPb5tRNDecyADbUdl5wHXewQRT6a0qN1Txqo1u3HY5kXxuTKX"
+                     },
+                     {
+                         "name":  "PVP-ELE",
+                         "scriptId":  "10870KwHieJ3VqOhjv2NH8yWOY5bkoYf8LnKFjNon6wzvDzSIvHt3az59"
+                     },
+                     {
+                         "name":  "VPVP",
+                         "scriptId":  "1nGZ_Aq3kHffrw7YvVwBelngvg4XbGcjCcR2yJCqoGGP8F2hTG3MROyzC"
+                     },
+                     {
+                         "name":  "PYI PLB WORK",
+                         "scriptId":  "1rQP7M-HpNAU5oyEdqUkMWhnj3Sb0shB3Bj5L3juYe2MBU2jSDtVIPNsV"
                      }
                  ]
 }

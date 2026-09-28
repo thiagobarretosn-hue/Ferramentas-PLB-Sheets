@@ -35,7 +35,7 @@ const SBCache = {
  * @public
  */
 function abrirSuperBuscaSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('SuperBuscaSidebar.html')
+  const html = HtmlService.createHtmlOutputFromFile('SuperBuscaSidebar')
     .setTitle('Busca de Materiais')
     .setWidth(350);
   SpreadsheetApp.getUi().showSidebar(html);

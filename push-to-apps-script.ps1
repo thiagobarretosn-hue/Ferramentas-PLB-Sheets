@@ -89,7 +89,7 @@ Write-Host "Token OK" -ForegroundColor Green
 
 # ── Ignored dirs and files (matches .claspignore) ────────────────────────────
 $ignoreDirs  = @('.git', '.claude', 'docs', 'node_modules')
-$ignoreFiles = @('CLAUDE.md', 'README.md', 'Código.js')
+$ignoreFiles = @('CLAUDE.md', 'README.md', 'Código.js', 'ExportProReceiver.gs')
 
 # ── Collect files ─────────────────────────────────────────────────────────────
 $allFiles = [System.Collections.Generic.List[PSCustomObject]]::new()
@@ -124,14 +124,14 @@ Get-ChildItem -Path $root -Recurse -File |
 
         if ($_.Extension.ToLower() -eq '.gs') {
             $allFiles.Add([PSCustomObject]@{
-                name   = $rel -replace '\.gs$', ''   # e.g. "BOM" or "lib/Shared/Config"
+                name   = ($rel -replace '\.gs$', '')   # e.g. "BOM" or "lib/Shared/Config"
                 type   = "SERVER_JS"
                 source = $src
             })
         } else {
-            # HTML files MUST keep .html in name (Apps Script API requirement)
+            # Nome SEM extensao: a API identifica pelo type (senao vira "X.html.html")
             $allFiles.Add([PSCustomObject]@{
-                name   = $rel                          # e.g. "BomSidebar.html"
+                name   = ($rel -replace '\.html$', '')   # e.g. "BomSidebar"
                 type   = "HTML"
                 source = $src
             })

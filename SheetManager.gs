@@ -85,7 +85,7 @@ function _syncPinnedRename(oldName, newName) {
 
 function showSheetManager() {
   // Template (não HtmlOutput direto): necessário para o include() de SharedScripts
-  const html = HtmlService.createTemplateFromFile('SheetManager')
+  const html = HtmlService.createTemplateFromFile('SheetManagerSidebar')
     .evaluate()
     .setTitle('Gerenciador de Abas')
     .setWidth(420);

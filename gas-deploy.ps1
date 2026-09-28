@@ -303,7 +303,8 @@ function Get-FilesToPush([string]$folder) {
     # dev e NAO devem ir ao GAS (higiene 07/2026)
     $ignoreDirs  = @('.git', '.claude', '.superpowers', 'docs', 'node_modules', 'templates')
     $ignorePaths = @('lib\Snippets')
-    $ignoreFiles = @('CLAUDE.md', 'README.md')
+    # ExportProReceiver fora do push por enquanto (v3.0 exige token — 28/09/2026)
+    $ignoreFiles = @('CLAUDE.md', 'README.md', 'ExportProReceiver.gs')
     $result      = [System.Collections.Generic.List[PSCustomObject]]::new()
 
     $manifest = Join-Path $folder "appsscript.json"
@@ -339,8 +340,10 @@ function Get-FilesToPush([string]$folder) {
                 source = $src
             })
         } else {
+            # A API guarda o nome SEM extensao e o editor soma ".html" pelo type.
+            # Enviar "X.html" gerava "X.html.html" (igual ao .gs, que ja tirava a extensao).
             $result.Add([PSCustomObject]@{
-                name   = $rel
+                name   = ($rel -replace '\.html$', '')
                 type   = "HTML"
                 source = $src
             })

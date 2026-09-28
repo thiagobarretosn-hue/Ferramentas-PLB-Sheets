@@ -72,11 +72,11 @@ Ferramentas-PLB-Sheets/
 ├── Menu.gs                # onOpen() — fonte da verdade das ferramentas ativas
 ├── BOM.gs                 + BomSidebar.html          # Gerador de BOM
 ├── Request.gs             + RequestSidebar.html      # Gerador de Request KOJO
-├── SheetManager.gs        + SheetManager.html        # Gerenciador de Abas
+├── SheetManager.gs        + SheetManagerSidebar.html      # Gerenciador de Abas
 ├── ColorConfig.gs         + color-config-sidebar.html# Cores por grupo
 ├── SuperBusca.gs          + SuperBuscaSidebar.html   # Busca de materiais
 ├── SummaryAll.gs          + SummaryAllSidebar.html   # Consolidação de abas
-├── ExportProReceiver.gs   # doPost — recebe schedules do Revit (ExportPro)
+├── ExportProReceiver.gs   # doPost — recebe schedules do Revit (ExportPro) — FORA DO PUSH desde 28/09/2026
 ├── lib/
 │   ├── Shared/            # ENVIADO ao GAS: Config.gs (AppConfig), Utils.gs (SharedUtils_*)
 │   └── Snippets/          # Referência dev — NÃO enviado (.claspignore)
@@ -383,7 +383,11 @@ Fonte da verdade: `Menu.gs → onOpen()`. Ferramentas ativas:
 | 🎨 Cores das Abas | `ColorConfig.gs` | `openColorConfig()` | DocumentProperties `SHEET_COLOR_CONFIGS` |
 | 🔍 Super Busca | `SuperBusca.gs` | `abrirSuperBuscaSidebar()` | AppConfig + UserProperties |
 | 📊 Summary All | `SummaryAll.gs` | `openSummaryAllSidebar()` | DocumentProperties `SUMMARY_ALL_CONFIG_V3` |
-| ExportPro (Revit → Sheets) | `ExportProReceiver.gs` | `doPost(e)` (Web App) | — |
+| ExportPro (Revit → Sheets) | `ExportProReceiver.gs` | `doPost(e)` (Web App) | — (fora do push: `$ignoreFiles` dos .ps1 + `.claspignore`) |
+
+**Nome de arquivo no GAS:** a API guarda o nome SEM extensão (o `type` define `.gs`/`.html`).
+Enviar `X.html` vira `X.html.html`; e `.gs` e `.html` não podem ter o mesmo nome base
+(por isso `SheetManager.gs` + `SheetManagerSidebar.html`). Chamar `createTemplateFromFile('X')` sem `.html`.
 
 Utilitário de manutenção sem menu: `clearOldReports()` (BOM.gs — apaga relatórios gerados,
 protegido por assinatura de cabeçalho; rodar pelo editor).

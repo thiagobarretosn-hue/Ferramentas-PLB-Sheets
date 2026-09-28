@@ -183,7 +183,7 @@ function onEditColorTrigger(e) {
 // ============================================================================
 
 function openColorConfig() {
-  const sidebar = HtmlService.createTemplateFromFile('color-config-sidebar.html')
+  const sidebar = HtmlService.createTemplateFromFile('color-config-sidebar')
     .evaluate()
     .setTitle('🎨 Configuração de Cores')
     .setWidth(350);

@@ -1,5 +1,12 @@
 /**
  * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS (BOM)
+ * @version 3.5.0 - Coluna 3 = UOM e Coluna 4 = UPC (config antiga trocada na sidebar);
+ *                  relatório todo alinhado à esquerda + largura das colunas pelo conteúdo;
+ *                  guardas antes do clear() (fonte, aba não-relatório, nome repetido) com
+ *                  lista de pulados; trim igual na prévia e no processamento; filtro de
+ *                  exclusão não derruba célula vazia; 0 volta aos painéis; PDF lança erro
+ *                  quando esgota tentativas e não repete 4xx; link de pasta inválido não
+ *                  cria pasta; KOJO sem prefixo; lista de PDF desmarca aba não-relatório
  * @version 3.4.0 - Higiene 07/2026: ferramenta Fixadores removida (sem ponto de entrada;
  *                  código preservado em C:\DEV\_OBSOLETO\Sheets\); órfãos removidos
  *                  (testSystem, exportPDFsWithFeedback, getReportSheetNamesForHtml);
@@ -49,8 +56,8 @@ const BOM_CONFIG = {
   DEFAULTS: {
     'Coluna 1': 'D - UNIT ID',
     'Coluna 2': 'J - DESC',
-    'Coluna 3': 'M - UPC',
-    'Coluna 4': 'L - UOM',
+    'Coluna 3': 'L - UOM',
+    'Coluna 4': 'M - UPC',
     'Coluna 5': 'O - PROJECT',
     'CLASSIFICAR POR': 'J - DESC',
     'ORDEM': 'Ascendente (A-Z, 0-9)',
@@ -154,7 +161,11 @@ function getUniqueColumnValues(sheet, columnIndex) {
   // O cache anterior (180s, chave sheetId+coluna) não detectava edição
   // in-place dos dados e deixava os painéis desatualizados.
   const values = sheet.getRange(2, columnIndex, lastRow - 1).getValues().flat();
-  return [...new Set(values.filter(v => v))]
+  // V3.5: descarta só célula vazia — o antigo filter(v => v) também sumia com o 0
+  // e trim: "X" e "X " eram duas opções no painel
+  return [...new Set(values
+    .map(v => (typeof v === 'string' ? v.trim() : v))
+    .filter(v => v !== null && String(v) !== ''))]
     .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
 }
 
@@ -253,10 +264,16 @@ function processBomCore(combinationsToProcess, settings) {
     }))
     .filter(r => r.colIdx >= 0);
 
+  // Texto com espaço sobrando vira item/combinação diferente; número e data passam intactos
+  const clean = v => (typeof v === 'string' ? v.trim() : v);
+
   for (const row of allData) {
-    if (exclRules.length > 0 && exclRules.some(r =>
-      !r.allowed.has(String(row[r.colIdx] ?? '').trim().toLowerCase())
-    )) continue;
+    // V3.5: célula vazia nunca é excluída — o painel de filtro não oferece o vazio
+    // para marcar, então antes toda linha em branco na coluna filtrada sumia.
+    if (exclRules.length > 0 && exclRules.some(r => {
+      const val = String(row[r.colIdx] ?? '').trim().toLowerCase();
+      return val !== '' && !r.allowed.has(val);
+    })) continue;
 
     const rowCombination = groupIndices
       .map(index => String(row[index - 1] ?? '').trim())
@@ -264,25 +281,53 @@ function processBomCore(combinationsToProcess, settings) {
 
     if (dataMap.has(rowCombination)) {
       dataMap.get(rowCombination).push([
-        row[bomCols.c1 - 1], row[bomCols.c2 - 1], row[bomCols.c3 - 1],
-        row[bomCols.c4 - 1], SharedUtils_toNumber(row[bomCols.c5 - 1]),
+        clean(row[bomCols.c1 - 1]), clean(row[bomCols.c2 - 1]), clean(row[bomCols.c3 - 1]),
+        clean(row[bomCols.c4 - 1]), SharedUtils_toNumber(row[bomCols.c5 - 1]),
         row[sortColumnIndex] // Valor para classificação
       ]);
     }
   }
 
+  const sourceName = sourceSheet.getName();
+  const usedNames = new Set();
+  const skipped = [];   // { name, reason } — mostrado na sidebar
   let createdCount = 0;
   combinationsToProcess.forEach(item => {
     const { combination, kojoSuffix } = item;
+    const label = String(combination).split(BOM_CONFIG.DELIMITER).join('.');
     const rawData = dataMap.get(combination);
-    if (!rawData || rawData.length === 0) return;
-
-    const processedData = groupAndSumData(rawData, sortOrder);
+    if (!rawData || rawData.length === 0) {
+      skipped.push({ name: label, reason: 'nenhuma linha na aba fonte' });
+      return;
+    }
 
     // ✅ MUDANÇA (V2.12): Nomeia a aba usando o kojoSuffix
     const sanitizedName = Utils.sanitizeSheetName(kojoSuffix);
 
+    // V3.5: guardas antes do clear() — nunca limpar a fonte nem aba que não é relatório,
+    // e duas combinações que viram o mesmo nome (ex.: "A/B" e "A:B" → "A_B") não se sobrescrevem.
+    if (!sanitizedName) {
+      skipped.push({ name: label, reason: 'sufixo KOJO vazio' });
+      return;
+    }
+    if (sanitizedName === sourceName) {
+      skipped.push({ name: sanitizedName, reason: 'mesmo nome da aba de dados' });
+      return;
+    }
+    if (usedNames.has(sanitizedName)) {
+      skipped.push({ name: sanitizedName, reason: 'nome repetido nesta geração' });
+      return;
+    }
+
     let targetSheet = ss.getSheetByName(sanitizedName);
+    if (targetSheet && !_isGeneratedReportSheet(targetSheet) && targetSheet.getLastRow() > 0) {
+      skipped.push({ name: sanitizedName, reason: 'já existe uma aba com esse nome que não é relatório BOM' });
+      return;
+    }
+    usedNames.add(sanitizedName);
+
+    const processedData = groupAndSumData(rawData, sortOrder);
+
     if (targetSheet) {
       targetSheet.clear();
     } else {
@@ -301,7 +346,7 @@ function processBomCore(combinationsToProcess, settings) {
     createdCount++;
   });
 
-  return { success: true, created: createdCount };
+  return { success: true, created: createdCount, skipped: skipped };
 }
 
 
@@ -361,7 +406,10 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
   };
 
   const lastUpdate = Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'MM/dd/yyyy');
-  const bomKojoComplete = `${reportConfig.kojoPrefix}.${kojoSuffix}`;
+  // Sem prefixo, o KOJO é só o sufixo (antes saía ".SUFIXO")
+  const bomKojoComplete = reportConfig.kojoPrefix
+    ? `${reportConfig.kojoPrefix}.${kojoSuffix}`
+    : kojoSuffix;
 
   const headerValues = [
     ['PROJECT:', reportConfig.project], ['BOM:', reportConfig.bom], ['BOM KOJO:', bomKojoComplete],
@@ -381,13 +429,47 @@ function createAndFormatReport(sheet, kojoSuffix, data, settings) {
   sheet.getRange(dataStartRow, 1, finalData.length, 5).applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
   sheet.getRange(dataStartRow, 1, 1, 5).setFontWeight('bold');
 
-  sheet.setColumnWidth(1, 105).setColumnWidth(2, 570).setColumnWidth(3, 105).setColumnWidth(4, 105).setColumnWidth(5, 105);
+  // V3.5: tudo alinhado à esquerda (número incluso — UPC e QTY vinham à direita)
+  sheet.getRange(1, 1, dataStartRow + finalData.length - 1, 5).setHorizontalAlignment('left');
+
+  _fitReportColumns(sheet, headerValues, finalData);
 
   try {
     const protection = sheet.getRange(1, 1, dataStartRow - 1, 5).protect();
     protection.setDescription('Cabeçalho protegido').removeEditors(protection.getEditors());
   } catch (e) {
     Logger.log(`Aviso: ${e.message}`);
+  }
+}
+
+/**
+ * V3.5: largura das 5 colunas pelo conteúdo, com teto e piso.
+ *
+ * autoResizeColumns sozinho não serve: sem flush() ele mede a aba antes da escrita
+ * e devolve largura errada, e costuma cortar o texto em negrito. Por isso a largura
+ * final é o MAIOR entre o auto ajuste (após flush) e uma estimativa por caracteres,
+ * limitada por coluna — o teto da DESC segura o PDF (fitw) legível.
+ * Linhas do cabeçalho só contam na coluna A: o valor em B está mesclado B:E.
+ */
+function _fitReportColumns(sheet, headerValues, tableValues) {
+  const PX_PER_CHAR = 7.5;   // Arial 10, texto majoritariamente em maiúsculas
+  const PAD = 16;
+  const MIN = 50;
+  const MAX = [200, 600, 160, 160, 120];
+
+  const maxChars = [0, 0, 0, 0, 0];
+  headerValues.forEach(r => { maxChars[0] = Math.max(maxChars[0], String(r[0]).length); });
+  tableValues.forEach(r => r.forEach((v, c) => {
+    maxChars[c] = Math.max(maxChars[c], String(v ?? '').length);
+  }));
+
+  SpreadsheetApp.flush();
+  sheet.autoResizeColumns(1, 5);
+
+  for (let c = 0; c < 5; c++) {
+    const estimate = Math.ceil(maxChars[c] * PX_PER_CHAR) + PAD;
+    const auto = sheet.getColumnWidth(c + 1) + PAD;
+    sheet.setColumnWidth(c + 1, Math.min(MAX[c], Math.max(MIN, auto, estimate)));
   }
 }
 
@@ -606,6 +688,10 @@ function getFolderFromInput(folderInput, folderName) {
           if (f) return f;
         } catch(e) { /* ID inválido */ }
       }
+      // V3.5: LINK que não abriu é erro — antes caía na busca por nome e criava na raiz
+      // do Drive uma pasta chamada com o próprio link. Texto sem / ? = continua valendo
+      // como nome de pasta (um nome como "PDFs_PYI_2026" também casa o formato de ID).
+      if (/[\/?=]/.test(folderInput)) return null;
     }
 
     const nameToSearch = folderInput || folderName;
@@ -630,29 +716,40 @@ function exportSheetToPdf(sheet, pdfName, folder) {
   const url = `https://docs.google.com/spreadsheets/d/${ss.getId()}/export?` +
     `gid=${sheet.getSheetId()}&format=pdf&size=A4&portrait=true&fitw=true&` +
     `sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false`;
-  for (let attempt = 0, delay = 1000; attempt < 5; attempt++) {
+  // V3.5: só 429 e 5xx são temporários e merecem nova tentativa; 4xx falha na hora.
+  // Esgotadas as tentativas, LANÇA — antes o último 429 saía do laço calado e a aba
+  // entrava como exportada sem arquivo no Drive.
+  const MAX_ATTEMPTS = 5;
+  let lastError = null;
+  for (let attempt = 0, delay = 1000; attempt < MAX_ATTEMPTS; attempt++) {
+    let code;
+    let response;
     try {
-      const response = UrlFetchApp.fetch(url, {
+      response = UrlFetchApp.fetch(url, {
         headers: { Authorization: `Bearer ${ScriptApp.getOAuthToken()}` },
         muteHttpExceptions: true
       });
-      if (response.getResponseCode() === 200) {
-        const existing = folder.getFilesByName(`${pdfName}.pdf`);
-        while (existing.hasNext()) existing.next().setTrashed(true);
-        folder.createFile(response.getBlob().setName(`${pdfName}.pdf`));
-        return;
-      }
-      if (response.getResponseCode() === 429) {
-        Utilities.sleep(delay + Math.floor(Math.random() * 500));
-        delay *= 2;
-        continue;
-      }
-      throw new Error(`Código HTTP ${response.getResponseCode()}`);
+      code = response.getResponseCode();
     } catch (error) {
-      if (attempt === 4) throw error;
-      Utilities.sleep(delay);
+      lastError = error;   // falha de rede: temporária
+    }
+
+    if (code === 200) {
+      const existing = folder.getFilesByName(`${pdfName}.pdf`);
+      while (existing.hasNext()) existing.next().setTrashed(true);
+      folder.createFile(response.getBlob().setName(`${pdfName}.pdf`));
+      return;
+    }
+    if (code !== undefined) {
+      lastError = new Error(`Código HTTP ${code}`);
+      if (code !== 429 && code < 500) throw lastError;
+    }
+    if (attempt < MAX_ATTEMPTS - 1) {
+      Utilities.sleep(delay + Math.floor(Math.random() * 500));
+      delay *= 2;
     }
   }
+  throw lastError || new Error('Exportação falhou');
 }
 
 // ============================================================================
@@ -748,8 +845,10 @@ function getCombinationsForPreview(selectedGroups, groupConfigs, sheetName) {
   const existingCombinations = new Set();
 
   allData.forEach(row => {
-    const combinationParts = groupIndices.map(index => row[index - 1] ?? '');
-    if (combinationParts.every(part => String(part).trim() !== '')) {
+    // V3.5: trim igual ao processBomCore — sem isso, célula com espaço sobrando
+    // gerava combinação que o processamento não achava e o relatório sumia calado
+    const combinationParts = groupIndices.map(index => String(row[index - 1] ?? '').trim());
+    if (combinationParts.every(part => part !== '')) {
       existingCombinations.add(combinationParts.join(BOM_CONFIG.DELIMITER));
     }
   });
@@ -816,7 +915,7 @@ function getUserSidebarState() {
  * @returns {void}
  */
 function openBomSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('BomSidebar.html')
+  const html = HtmlService.createHtmlOutputFromFile('BomSidebar')
     .setTitle('Painel Gerador de BOM')
     .setWidth(1100)
     .setHeight(750);
@@ -873,10 +972,16 @@ function getReportSheetDataForHtml(sourceSheetName) {
     const metaJson = docProps.getProperty('BOM_META_' + name);
     if (!sheet) {
       const meta = metaJson ? JSON.parse(metaJson) : {};
-      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: meta.l1 || '', l2: meta.l2 || '', l3: meta.l3 || '' };
+      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: meta.l1 || '', l2: meta.l2 || '', l3: meta.l3 || '', isReport: !!metaJson };
     }
     try {
-      const vals = sheet.getRange(1, 2, 6, 1).getValues();
+      // V3.5: lê A1:B6 numa chamada — coluna A decide isReport (mesma assinatura do
+      // clearOldReports). Aba auxiliar continua na lista, mas vem desmarcada.
+      const block = sheet.getRange(1, 1, 6, 2).getValues();
+      const vals = block.map(r => [r[1]]);
+      const a1 = String(block[0][0] || '').trim();
+      const a3 = String(block[2][0] || '').trim();
+      const isReport = !!metaJson || (a1 === 'PROJECT:' && a3.indexOf('BOM KOJO') === 0);
       const kojo = String(vals[2][0] || '');
       let l1 = '', l2 = '', l3 = '';
       if (metaJson) {
@@ -895,9 +1000,10 @@ function getReportSheetDataForHtml(sourceSheetName) {
         engineer: String(vals[3][0] || ''),
         version:  String(vals[4][0] || ''),
         l1, l2, l3,
+        isReport,
       };
     } catch (e) {
-      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: '', l2: '', l3: '' };
+      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: '', l2: '', l3: '', isReport: false };
     }
   });
 }
