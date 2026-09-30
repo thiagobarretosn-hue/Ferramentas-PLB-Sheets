@@ -1,5 +1,10 @@
 /**
  * @fileoverview SISTEMA UNIFICADO DE RELATÓRIOS DINÂMICOS (BOM)
+ * @version 3.6.0 - Nome do PDF: _reportFields é a fonte única da prévia e da exportação
+ *                  (antes divergiam em L1-L3); aba não-relatório sem campos (B3 não é KOJO);
+ *                  L1-L3 só do BOM_META_ (dedução pelo KOJO removida). Sidebar: prompt da
+ *                  IA só com abas marcadas, campos por aba, marcadores {L2}, resposta em
+ *                  blocos + regras; importação aceita @bloco/@separador, aspas e "#"
  * @version 3.5.0 - Coluna 3 = UOM e Coluna 4 = UPC (config antiga trocada na sidebar);
  *                  relatório todo alinhado à esquerda + largura das colunas pelo conteúdo;
  *                  guardas antes do clear() (fonte, aba não-relatório, nome repetido) com
@@ -545,22 +550,11 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
     const config = blocksConfigJson ? JSON.parse(blocksConfigJson) : null;
     let name;
     if (!config || !config.blocks || config.blocks.length === 0) {
-      name = getBomKojoNameFromSheet(sheet) || sheet.getName();
+      const f = _reportFields(sheet, PropertiesService.getDocumentProperties());
+      name = f.kojo || sheet.getName();
     } else {
-      const vals = sheet.getRange(1, 2, 6, 1).getValues();
-      const metaJson = PropertiesService.getDocumentProperties().getProperty('BOM_META_' + sheet.getName());
-      const meta = metaJson ? JSON.parse(metaJson) : {};
-      const fields = {
-        project:    String(vals[0][0] || ''),
-        bom:        String(vals[1][0] || ''),
-        kojo:       String(vals[2][0] || ''),
-        engineer:   String(vals[3][0] || ''),
-        version:    String(vals[4][0] || ''),
-        sheet_name: sheet.getName(),
-        l1:         meta.l1 || '',
-        l2:         meta.l2 || '',
-        l3:         meta.l3 || '',
-      };
+      const f = _reportFields(sheet, PropertiesService.getDocumentProperties());
+      const fields = { ...f, sheet_name: sheet.getName() };
       const globalSep = config.separator || '-';
       const segments = [];
       config.blocks.forEach(b => {
@@ -585,7 +579,7 @@ function _assemblePdfFilename(sheet, blocksConfigJson) {
     return name || sheet.getName();
   } catch (e) {
     Logger.log('_assemblePdfFilename error: ' + e.message);
-    return getBomKojoNameFromSheet(sheet) || sheet.getName();
+    return sheet.getName();
   }
 }
 
@@ -645,24 +639,6 @@ function runPdfExportFromHtml(sheetNames, folderInput, blocksConfigJson) {
 
   _setExportProgress(total, total, '', 'done');
   return { success: true, exported, folder: folder.getName(), errors };
-}
-
-/**
- * Extrai o nome da BOM KOJO da célula B3 de uma sheet de relatório.
- * Retorna null se não encontrar o valor.
- */
-function getBomKojoNameFromSheet(sheet) {
-  try {
-    if (!sheet) return null;
-    // O valor da BOM KOJO está na célula B3 (linha 3, coluna 2)
-    const bomKojoValue = sheet.getRange(3, 2).getValue();
-    if (bomKojoValue && String(bomKojoValue).trim() !== '') {
-      return String(bomKojoValue).trim();
-    }
-  } catch (error) {
-    Logger.log(`Erro ao ler BOM KOJO da sheet "${sheet.getName()}": ${error.message}`);
-  }
-  return null;
 }
 
 function _extractDriveFolderId(input) {
@@ -960,48 +936,50 @@ function getReportSheetNames(sourceSheetName) {
 }
 
 /**
+ * V3.5: campos de uma aba para o nome do PDF — FONTE ÚNICA da prévia (sidebar) e da
+ * exportação (_assemblePdfFilename). Antes cada lado montava os seus e divergiam.
+ *
+ * - isReport: tem BOM_META_ ou a assinatura de cabeçalho (mesma do clearOldReports).
+ * - Aba que não é relatório: campos vazios — a célula B3 dela não é KOJO nenhum.
+ * - L1/L2/L3 só vêm do BOM_META_. A dedução antiga (KOJO quebrado nos pontos) dava
+ *   lixo com prefixo ("PY1" como L1); sem meta, o bloco de nível fica vazio e é pulado.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ * @param {GoogleAppsScript.Properties.Properties} docProps
+ * @returns {{project, bom, kojo, engineer, version, l1, l2, l3, isReport}}
+ */
+function _reportFields(sheet, docProps) {
+  const empty = { project: '', bom: '', kojo: '', engineer: '', version: '', l1: '', l2: '', l3: '', isReport: false };
+  const metaJson = docProps.getProperty('BOM_META_' + sheet.getName());
+  let meta = {};
+  try { meta = metaJson ? JSON.parse(metaJson) : {}; } catch (e) { /* meta corrompida = sem meta */ }
+
+  const block = sheet.getRange(1, 1, 6, 2).getValues();
+  const a1 = String(block[0][0] || '').trim();
+  const a3 = String(block[2][0] || '').trim();
+  const isReport = !!metaJson || (a1 === 'PROJECT:' && a3.indexOf('BOM KOJO') === 0);
+  if (!isReport) return empty;
+
+  const b = i => String(block[i][1] || '').trim();
+  return {
+    project: b(0), bom: b(1), kojo: b(2), engineer: b(3), version: b(4),
+    l1: meta.l1 || '', l2: meta.l2 || '', l3: meta.l3 || '',
+    isReport: true,
+  };
+}
+
+/**
  * Retorna dados de header de cada aba de relatório para montar preview de nome PDF.
  * @public
- * @returns {Array<{name, project, bom, kojo, engineer, version, l1, l2, l3}>}
+ * @returns {Array<{name, project, bom, kojo, engineer, version, l1, l2, l3, isReport}>}
  */
 function getReportSheetDataForHtml(sourceSheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const docProps = PropertiesService.getDocumentProperties();
   return getReportSheetNames(sourceSheetName).map(name => {
     const sheet = ss.getSheetByName(name);
-    const metaJson = docProps.getProperty('BOM_META_' + name);
-    if (!sheet) {
-      const meta = metaJson ? JSON.parse(metaJson) : {};
-      return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: meta.l1 || '', l2: meta.l2 || '', l3: meta.l3 || '', isReport: !!metaJson };
-    }
     try {
-      // V3.5: lê A1:B6 numa chamada — coluna A decide isReport (mesma assinatura do
-      // clearOldReports). Aba auxiliar continua na lista, mas vem desmarcada.
-      const block = sheet.getRange(1, 1, 6, 2).getValues();
-      const vals = block.map(r => [r[1]]);
-      const a1 = String(block[0][0] || '').trim();
-      const a3 = String(block[2][0] || '').trim();
-      const isReport = !!metaJson || (a1 === 'PROJECT:' && a3.indexOf('BOM KOJO') === 0);
-      const kojo = String(vals[2][0] || '');
-      let l1 = '', l2 = '', l3 = '';
-      if (metaJson) {
-        const meta = JSON.parse(metaJson);
-        l1 = meta.l1 || ''; l2 = meta.l2 || ''; l3 = meta.l3 || '';
-      } else {
-        // Fallback para BOMs existentes: infere do kojo (funciona se não foi editado manualmente)
-        const parts = kojo.split('.');
-        l1 = (parts[0] || '').trim(); l2 = (parts[1] || '').trim(); l3 = (parts[2] || '').trim();
-      }
-      return {
-        name,
-        project:  String(vals[0][0] || ''),
-        bom:      String(vals[1][0] || ''),
-        kojo,
-        engineer: String(vals[3][0] || ''),
-        version:  String(vals[4][0] || ''),
-        l1, l2, l3,
-        isReport,
-      };
+      return { name, ..._reportFields(sheet, docProps) };
     } catch (e) {
       return { name, project: '', bom: '', kojo: '', engineer: '', version: '', l1: '', l2: '', l3: '', isReport: false };
     }

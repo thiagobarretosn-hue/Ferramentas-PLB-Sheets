@@ -475,7 +475,7 @@
               <div id="pdfFindReplaceContainer"></div>
               <div style="display:flex; gap:4px; margin-top:4px; flex-wrap:wrap;">
                 <button type="button" class="pdf-add-block-btn" onclick="addFindReplaceRule()">+ Adicionar regra</button>
-                <button type="button" class="pdf-add-block-btn" style="background:#f0f4ff;color:var(--primary);border-color:var(--primary);" onclick="openImportRulesDialog()">📥 Importar CSV</button>
+                <button type="button" class="pdf-add-block-btn" style="background:#f0f4ff;color:var(--primary);border-color:var(--primary);" onclick="openImportRulesDialog()">📥 Importar</button>
                 <button type="button" class="pdf-add-block-btn" style="background:#fff8e1;color:#b8860b;border-color:#e6c000;" onclick="exportConfigPrompt()">📤 Exportar Prompt</button>
               </div>
               <div class="pdf-preview-box" id="pdfBlockPreview">Prévia: (adicione blocos)</div>
@@ -1846,133 +1846,164 @@
       showStatus._timer = setTimeout(() => status.style.display = 'none', duration);
     }
     // ── Export Config Prompt ──────────────────────────────────────────
-    function exportConfigPrompt() {
-      const config    = getPdfBlocksConfig();
-      const globalSep = config.separator || '-';
+    // ── Formato de config em texto (prompt ↔ importação) ────────────────
+    // Uma linha por item, campos separados por ";". Campo com espaço nas pontas,
+    // ";" ou aspas vai entre aspas duplas ("" = aspa literal).
+    //   @separador;-
+    //   @bloco;tipo;valor;sep      (sep = separador ANTES do bloco; vazio = global)
+    //   localizar;substituir;regex
+    const PDF_CFG_TYPES = ['text', 'sheet_name', 'kojo', 'project', 'bom', 'engineer', 'version', 'l1', 'l2', 'l3'];
 
-      const BLOCK_LABELS = {
-        text: 'Texto fixo', sheet_name: 'Nome da Aba', kojo: 'Sufixo Kojo',
-        project: 'Projeto', bom: 'BOM', engineer: 'Engenheiro', version: 'Versão',
-        l1: 'Nível 1', l2: 'Nível 2', l3: 'Nível 3',
-      };
+    function _cfgQuote(v) {
+      v = String(v == null ? '' : v);
+      return /^\s|\s$|;|"/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
 
-      // ── Blocos ────────────────────────────────────────────────────
-      let blocksLines = '';
-      config.blocks.forEach((b, i) => {
-        const lbl = BLOCK_LABELS[b.type] || b.type;
-        const val = b.type === 'text' ? `"${b.value}"` : `<${lbl}>`;
-        const hasSep = b.sep !== '' && b.sep !== undefined;
-        const sep = hasSep ? `"${b.sep}"` : `"${globalSep}" (global)`;
-        blocksLines += `  ${i + 1}. [${lbl}] = ${val}   sep-após: ${sep}\n`;
+    function _cfgSplit(line) {
+      const out = [];
+      let cur = '', inQ = false, quoted = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQ) {
+          if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (ch === '"') inQ = false;
+          else cur += ch;
+        } else if (ch === '"' && cur.trim() === '') { inQ = true; quoted = true; cur = ''; }
+        else if (ch === ';') { out.push(quoted ? cur : cur.trim()); cur = ''; quoted = false; }
+        else if (!quoted) cur += ch;
+      }
+      out.push(quoted ? cur : cur.trim());
+      return out;
+    }
+
+    function _pdfConfigToText(config) {
+      const lines = [`@separador;${_cfgQuote(config.separator || '-')}`];
+      config.blocks.forEach(b => {
+        lines.push(`@bloco;${b.type};${_cfgQuote(b.type === 'text' ? b.value : '')};${_cfgQuote(b.sep)}`);
       });
-      if (!blocksLines) {
-        blocksLines = '  (nenhum bloco configurado — o nome base é o próprio nome da aba)\n';
-      }
+      lines.push('localizar;substituir;regex');
+      (config.findReplaceRules || []).forEach(r => {
+        if (r.find) lines.push(`${_cfgQuote(r.find)};${_cfgQuote(r.replace || '')};${r.regex ? 'true' : 'false'}`);
+      });
+      return lines.join('\n');
+    }
 
-      // ── Regras actuais ────────────────────────────────────────────
-      const hasRules = config.findReplaceRules && config.findReplaceRules.some(r => r.find);
-      let rulesCSV = 'localizar;substituir;regex\n';
-      if (hasRules) {
-        config.findReplaceRules.forEach(r => {
-          if (r.find) rulesCSV += `${r.find};${r.replace || ''};${r.regex ? 'true' : 'false'}\n`;
-        });
-      } else {
-        rulesCSV += '(sem regras)\n';
-      }
+    function exportConfigPrompt() {
+      const config = getPdfBlocksConfig();
 
-      // ── Lista de abas — SEM extensão .pdf ─────────────────────────
-      const sheetItems = [];
+      // ── Abas: só as MARCADAS para exportar entram no escopo ──────────
+      const selected = [];
+      let notSelected = 0;
       document.querySelectorAll('.pdf-item').forEach(item => {
         try {
           const sd = JSON.parse(item.dataset.sheetData || '{}');
-          if (sd.name) sheetItems.push({ name: sd.name, preview: assemblePdfFilename(sd, config) });
-        } catch(e) {}
+          if (!sd.name) return;
+          const cb = item.querySelector('.pdf-check');
+          if (cb && cb.checked) selected.push({ sd, preview: assemblePdfFilename(sd, config) });
+          else notSelected++;
+        } catch (e) {}
       });
-      if (!sheetItems.length) {
-        showStatus('Carregue os relatórios na aba "3. Exportar" antes de gerar o prompt.', 'error');
+      if (!selected.length) {
+        showStatus('Marque na lista de exportação as abas que quer renomear antes de gerar o prompt.', 'error');
         return;
       }
-      const sheetList = sheetItems.map(s => `  ${s.name} → ${s.preview}`).join('\n');
+
+      const FIELD_ORDER = [
+        ['sheet_name', 'ABA'], ['project', 'PROJECT'], ['bom', 'BOM'], ['kojo', 'KOJO'],
+        ['engineer', 'ENGINEER'], ['version', 'VERSION'], ['l1', 'L1'], ['l2', 'L2'], ['l3', 'L3'],
+      ];
+      const fieldOf = (sd, key) => key === 'sheet_name' ? sd.name : (sd[key] || '');
+
+      const sheetBlocks = selected.map(({ sd, preview }) => {
+        const fields = FIELD_ORDER
+          .map(([k, tag]) => [tag, fieldOf(sd, k)])
+          .filter(([, v]) => v !== '')
+          .map(([tag, v]) => `    {${tag}} = ${v}`)
+          .join('\n');
+        return `  ▸ ${sd.name}\n    nome atual → ${preview}\n${fields}`;
+      }).join('\n\n');
+
+      const mapTemplate = selected.map(({ sd }) => `  ${sd.name} → `).join('\n');
+
+      // Rótulo real das colunas de nível (ex.: L1 = ROOM)
+      const lvlLabel = k => (PDF_BLOCK_LABELS[k] || '').replace(/^\[|\]$/g, '');
+      const levelNames = ['l1', 'l2', 'l3']
+        .map(k => `{${k.toUpperCase()}} = coluna ${lvlLabel(k) || '(não configurado)'}`)
+        .join(' · ');
 
       const prompt =
-`# BOM PDF — Gerador de Regras (para IA)
+`# BOM PDF — Nome dos arquivos (prompt para IA)
 
 ═══════════════════════════════════════════
-COMO A FERRAMENTA FUNCIONA
+✏️  O QUE EU QUERO  (preencha UMA das opções e apague a outra)
 ═══════════════════════════════════════════
-1. BLOCOS são concatenados para formar o NOME BASE do arquivo.
-2. REGRAS Find & Replace são aplicadas ao NOME BASE.
-3. A extensão ".pdf" é adicionada automaticamente pelo sistema APÓS as regras.
+OPÇÃO 1 — Padrão com marcadores (recomendado):
+  Escreva o nome desejado usando os marcadores das abas ({L2}, {KOJO}, {PROJECT}...).
+  Texto fora de { } é FIXO. Ex.: P-FIN-WH-{L2}_PY1 B1 BOM PLB FINISHES WH - {L2}
+  Padrão:
 
-⚠️  CRÍTICO: as regras operam sobre o NOME BASE sem ".pdf".
-    NUNCA inclua ".pdf" nos campos "localizar" ou "substituir".
-
-Separador global entre blocos: "${globalSep}"
-
-═══════════════════════════════════════════
-BLOCOS ATUAIS (montam o nome base em ordem)
-═══════════════════════════════════════════
-${blocksLines.trimEnd()}
-
-Exemplo de montagem com os blocos acima:
-  [bloco1]${globalSep}[bloco2]${globalSep}[bloco3] → nome_base_resultante
+OPÇÃO 2 — Nome desejado aba por aba (quanto mais exemplos, menos ambiguidade):
+${mapTemplate}
 
 ═══════════════════════════════════════════
-REGRAS FIND & REPLACE ATUAIS
+ABAS SELECIONADAS (${selected.length}) — campos disponíveis de cada uma
 ═══════════════════════════════════════════
-\`\`\`csv
-${rulesCSV.trimEnd()}
+${levelNames}
+${notSelected ? `(${notSelected} aba(s) não selecionada(s) ficam fora do escopo — ignore-as.)\n` : ''}
+${sheetBlocks}
+
+═══════════════════════════════════════════
+COMO A FERRAMENTA MONTA O NOME
+═══════════════════════════════════════════
+1. BLOCOS em ordem. Cada bloco é um texto fixo (text) ou um campo da aba:
+   ${PDF_CFG_TYPES.join(', ')}
+   (sheet_name={ABA}, kojo={KOJO}, l1={L1}...).
+2. Entre dois blocos entra o "sep" do bloco da DIREITA (separador ANTES dele);
+   sep vazio = separador global. Não existe separador vazio.
+3. Bloco cujo valor é vazio é pulado, junto com o seu sep.
+4. Sem nenhum bloco, o nome é {KOJO} (ou {ABA}, se não houver KOJO).
+5. Depois, as REGRAS localizar/substituir rodam em ordem sobre o nome inteiro.
+   regex=true → RegExp do JavaScript com flag "g" ($1, $2 no substituir).
+6. ".pdf" é somado no fim pelo sistema — NUNCA escreva ".pdf".
+
+═══════════════════════════════════════════
+CONFIGURAÇÃO ATUAL (mesmo formato da resposta)
+═══════════════════════════════════════════
 \`\`\`
-
-═══════════════════════════════════════════
-NOME BASE ATUAL DE CADA ABA (sem .pdf)
-═══════════════════════════════════════════
-Formato: [nome da aba] → [nome base atual após blocos + regras]
-\`\`\`
-${sheetList}
-\`\`\`
-
-═══════════════════════════════════════════
-✏️  O QUE VOCÊ QUER — descreva ou mapeie
-═══════════════════════════════════════════
-
-OPÇÃO A — Descrição por padrão (recomendado para muitas abas):
-Use linguagem natural. A IA infere as regex para cobrir todos os casos.
-Exemplos:
-  Abas com número puro (201, 202, 301...): prefixar com "HG1.PLB.FIN.JS.BF.UNT." e manter o número
-  Abas com ponto+número (HW.201, HW.301...): prefixar com "HG1.PLB.FIN.JS.HW." e manter só o número após o ponto
-  Abas especiais (5.COST.LIST, RISER...): manter o nome como está
-
-OPÇÃO B — Mapeamento explícito (para casos únicos ou exceções):
-Formato: [nome da aba] → [nome base desejado SEM .pdf]
-\`\`\`
-201 → HG1.PLB.FIN.JS.BF.UNT.201
-HW.201 → HG1.PLB.FIN.JS.HW.201
+${_pdfConfigToText(config)}
 \`\`\`
 
 ═══════════════════════════════════════════
 INSTRUÇÕES PARA A IA
 ═══════════════════════════════════════════
-Analise os nomes base ATUAIS listados acima e o que o usuário descreveu/mapeou.
-Gere o conjunto MÍNIMO de regras Find & Replace que transformem TODOS os nomes.
+- Resolva só as ABAS SELECIONADAS, conforme "O QUE EU QUERO".
+- PREFIRA BLOCOS: se o nome é texto fixo + campos, monte com @bloco e nenhuma regra.
+  Use regras só quando um campo precisa ser alterado por dentro.
+- A resposta SUBSTITUI a configuração atual inteira: devolva o conjunto completo
+  (@separador, todos os @bloco e todas as regras que devem ficar).
+- Ambiguidade (ex.: um exemplo só, parte que pode ser fixa ou variável): escolha a
+  leitura mais literal e declare a suposição numa linha "#".
+- Antes da config, liste em "#" o nome final previsto de CADA aba selecionada,
+  simulando as regras acima — o usuário confere antes de importar.
 
-Regras do jogo:
-- ⚠️  NUNCA inclua ".pdf" em nenhum campo do CSV
-- OPÇÃO A usada: infira padrões e gere regex que cubram todas as abas descritas
-- OPÇÃO B usada: gere regras que produzam exatamente os nomes mapeados
-- Use regex=true quando 1 regra cobre N abas com padrão variável (ex: todos os numéricos)
-- Use regex=false para substituições literais fixas
-- Grupos de captura: (\\d+) no localizar → $1 no substituir
-- Ordene: mais específicas primeiro (ex: HW\\. antes de \\d+$)
-- Não gere regras para nomes que já estão corretos (nome base atual = desejado)
-- Cubra 100% das abas listadas em "NOME BASE ATUAL DE CADA ABA"
+Formato (linhas "#" são comentário; campo com espaço nas pontas ou ";" vai entre aspas):
+  @separador;<sep global>
+  @bloco;<tipo>;<valor — só para text>;<sep antes do bloco>
+  localizar;substituir;regex
 
-Retorne SOMENTE o bloco CSV abaixo, sem nenhum texto adicional:
+Retorne SOMENTE um bloco de código, sem texto fora dele. Exemplo:
 \`\`\`csv
+# suposição: "B1" do meio é fixo
+# A1.WH → P-FIN-WH-A1_PY1 B1 BOM PLB FINISHES WH - A1
+@separador;-
+@bloco;text;P-FIN-WH;
+@bloco;l2;;
+@bloco;text;PY1 B1 BOM PLB FINISHES WH;_
+@bloco;l2;;" - "
 localizar;substituir;regex
 \`\`\`
 
-Para importar: botão "📥 Importar CSV" → regras entram e o preview atualiza.`;
+Para aplicar: "📥 Importar" → cole a resposta inteira.`;
 
       document.getElementById('exportPromptText').value = prompt;
       document.getElementById('promptCopyBtn').textContent = '📋 Copiar';
@@ -2005,19 +2036,44 @@ Para importar: botão "📥 Importar CSV" → regras entram e o preview atualiza
     function importRulesFromText() {
       const text = document.getElementById('importRulesText').value.trim();
       if (!text) { closeImportRulesDialog(); return; }
-      let added = 0;
-      text.split('\n').forEach(line => {
-        line = line.trim();
-        if (!line || line.startsWith('#')) return;
-        const sep = line.includes(';') ? ';' : ',';
-        const parts = line.split(sep);
-        const find    = parts[0].trim();
-        const replace = (parts[1] || '').trim();
-        const isRegex = /^(true|1|sim|yes)$/i.test((parts[2] || '').trim());
-        if (find && find.toLowerCase() !== 'localizar') { _addFindReplaceRow(find, replace, isRegex); added++; }
+      // Aceita a resposta da IA inteira: cercas ```, comentários "#", @separador,
+      // @bloco e regras. Campos entre aspas preservam espaço nas pontas e ";".
+      const blocks = [];
+      const rules = [];
+      let separator = null;
+      const unknown = [];
+      text.split(/\r?\n/).forEach(raw => {
+        const line = raw.trim();
+        if (!line || line.startsWith('#') || line.startsWith('```')) return;
+        // Formato antigo com vírgula continua aceito (sem ";" na linha)
+        const parts = line.includes(';') ? _cfgSplit(line) : line.split(',').map(s => s.trim());
+        const head = parts[0].toLowerCase();
+        if (head === '@separador') {
+          if (parts[1]) separator = parts[1];
+        } else if (head === '@bloco') {
+          const type = (parts[1] || '').toLowerCase();
+          if (PDF_CFG_TYPES.includes(type)) blocks.push({ type, value: parts[2] || '', sep: parts[3] || '' });
+          else unknown.push(parts[1]);
+        } else if (parts[0] && head !== 'localizar') {
+          rules.push({ find: parts[0], replace: parts[1] || '', regex: /^(true|1|sim|yes)$/i.test(parts[2] || '') });
+        }
       });
-      if (added > 0) onPdfConfigChange();
+
+      const replaceAll = document.getElementById('importReplaceAll').checked;
+      if (replaceAll) {
+        // Só troca a parte que veio: sem @bloco na colagem, os blocos atuais ficam
+        if (blocks.length) document.getElementById('pdfBlocksContainer').innerHTML = '';
+        document.getElementById('pdfFindReplaceContainer').innerHTML = '';
+      }
+      blocks.forEach(b => _addPdfBlockRow(b.type, b.value, b.sep));
+      rules.forEach(r => _addFindReplaceRow(r.find, r.replace, r.regex));
+      if (separator !== null) document.getElementById('pdfSeparatorInput').value = separator;
+
+      onPdfConfigChange();
       closeImportRulesDialog();
+      const msg = `Importado: ${blocks.length} bloco(s), ${rules.length} regra(s).`;
+      if (unknown.length) showStatus(`${msg} Tipo de bloco desconhecido ignorado: ${unknown.join(', ')}`, 'error', 10000);
+      else showStatus(msg, 'success');
     }
   </script>
 
@@ -2025,7 +2081,7 @@ Para importar: botão "📥 Importar CSV" → regras entram e o preview atualiza
   <div id="exportPromptOverlay" class="import-rules-overlay" onclick="if(event.target===this)closePromptModal()">
     <div class="import-rules-box" style="max-width:460px;">
       <h4>📤 Prompt para IA</h4>
-      <p>Descreva o padrão desejado (OPÇÃO A) ou mapeie aba por aba (OPÇÃO B) na seção <strong>✏️ O QUE VOCÊ QUER</strong> e cole no chat. A IA retorna um CSV pronto para importar.</p>
+      <p>Só entram as abas <strong>marcadas</strong> na lista. Copie, cole no chat e preencha <strong>✏️ O QUE EU QUERO</strong> (padrão com marcadores como <code>{L2}</code> ou nome por aba). A resposta vai inteira no <strong>📥 Importar</strong>.</p>
       <textarea id="exportPromptText" rows="20" readonly style="font-size:10px; font-family:monospace;"></textarea>
       <div class="import-rules-actions">
         <button type="button" onclick="closePromptModal()">Fechar</button>
@@ -2037,14 +2093,16 @@ Para importar: botão "📥 Importar CSV" → regras entram e o preview atualiza
   <!-- Modal import de regras -->
   <div id="importRulesOverlay" class="import-rules-overlay" onclick="if(event.target===this)closeImportRulesDialog()">
     <div class="import-rules-box">
-      <h4>📥 Importar regras (CSV)</h4>
-      <p>Uma regra por linha:<br>
-        <code>localizar;substituir;regex</code><br>
-        Regex: <code>true</code> ou <code>false</code> (padrão: false)<br>
-        Exemplo:<br>
-        <code>FINISHES 4TH FLOOR-HW\.1(\d+);FINISHES HW 1ST FLOOR-1$1;true</code>
+      <h4>📥 Importar configuração</h4>
+      <p>Cole a resposta da IA inteira (linhas <code>#</code> são ignoradas) ou uma regra por linha:<br>
+        <code>localizar;substituir;regex</code> · <code>@bloco;tipo;valor;sep</code> · <code>@separador;-</code><br>
+        Campo com espaço nas pontas ou <code>;</code> vai entre aspas: <code>@bloco;l2;;" - "</code>
       </p>
-      <textarea id="importRulesText" rows="9" placeholder="cole as regras aqui..."></textarea>
+      <textarea id="importRulesText" rows="9" placeholder="cole aqui..."></textarea>
+      <label style="font-size:11px; display:flex; gap:6px; align-items:center; margin-top:6px;">
+        <input type="checkbox" id="importReplaceAll" checked>
+        Substituir a configuração atual (desmarcado: soma às regras e blocos existentes)
+      </label>
       <div class="import-rules-actions">
         <button type="button" onclick="closeImportRulesDialog()">Cancelar</button>
         <button type="button" class="btn-import" onclick="importRulesFromText()">Importar</button>
