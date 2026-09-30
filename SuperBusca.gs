@@ -1,5 +1,7 @@
 /**
  * SUPER BUSCA - FERRAMENTAS PLB SHEETS
+ * Versão: 2.1 - busca com "palavra exata" e -excluir; nome inteiro na lista; busca
+ *               conservada após inserir; "Atualizar Lista" ignora o cache
  * Versão: 2.0 - sort, cache, persistência de estado, config dinâmica
  */
 
@@ -16,13 +18,31 @@ const SUPER_BUSCA_CONFIG = {
 };
 
 // Cache por aba+coluna para evitar re-leitura da planilha a cada reload
+// V2.1: em pedaços — o CacheService aceita 100 KB por chave e a lista de materiais
+// (5000+ itens) passa disso; o put único falhava calado e o cache nunca valia.
 const SBCache = {
   _c: CacheService.getScriptCache(),
+  CHUNK: 45000,   // caracteres; folga para acento, que ocupa mais de 1 byte
   get: (key) => {
-    try { const v = SBCache._c.get(key); return v ? JSON.parse(v) : null; } catch(e) { return null; }
+    try {
+      const n = Number(SBCache._c.get(key + '_n'));
+      if (!n) return null;
+      const keys  = Array.from({ length: n }, (_, i) => `${key}_${i}`);
+      const parts = SBCache._c.getAll(keys);
+      // pedaço expirado/ausente = cache inválido, relê a planilha
+      if (keys.some(k => parts[k] === undefined)) return null;
+      return JSON.parse(keys.map(k => parts[k]).join(''));
+    } catch(e) { return null; }
   },
   put: (key, value) => {
-    try { SBCache._c.put(key, JSON.stringify(value), SUPER_BUSCA_CONFIG.CACHE_TTL); } catch(e) {}
+    try {
+      const json = JSON.stringify(value);
+      const all  = {};
+      let n = 0;
+      for (let i = 0; i < json.length; i += SBCache.CHUNK) all[`${key}_${n++}`] = json.substring(i, i + SBCache.CHUNK);
+      all[key + '_n'] = String(n);
+      SBCache._c.putAll(all, SUPER_BUSCA_CONFIG.CACHE_TTL);
+    } catch(e) {}
   }
 };
 
@@ -123,15 +143,16 @@ function getColumnHeaders(sheetName) {
  * @public
  * @param {string} [sheetName]
  * @param {number} [colIndex]
+ * @param {boolean} [force] - true ignora o cache (botão "Atualizar Lista")
  * @returns {string[]}
  */
-function getDadosParaBusca(sheetName, colIndex) {
+function getDadosParaBusca(sheetName, colIndex, force) {
   try {
     const targetSheetName = sheetName || SUPER_BUSCA_CONFIG.SOURCE_SHEET;
     const targetCol       = SharedUtils_toPositiveInteger(colIndex, SUPER_BUSCA_CONFIG.DEFAULT_COL_INDEX);
 
     const cacheKey = `sb_${targetSheetName}_${targetCol}`;
-    const cached   = SBCache.get(cacheKey);
+    const cached   = force ? null : SBCache.get(cacheKey);
     if (cached) return cached;
 
     const ss    = SpreadsheetApp.getActiveSpreadsheet();

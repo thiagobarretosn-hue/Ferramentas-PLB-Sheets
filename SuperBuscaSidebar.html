@@ -130,6 +130,14 @@
       border-color: var(--primary);
       background: white;
     }
+    .search-hint {
+      margin-top: 5px; padding: 0 4px;
+      font-size: 10px; color: var(--text-light);
+    }
+    .search-hint code {
+      background: #eef0f2; border-radius: 3px; padding: 0 3px;
+      font-family: inherit; color: var(--text);
+    }
     .clear-search {
       position: absolute; right: 10px; top: 50%;
       transform: translateY(-50%);
@@ -153,9 +161,10 @@
     }
     .result-item {
       padding: 8px 16px; cursor: pointer;
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: flex-start; gap: 10px;
       color: var(--text);
       outline: none;
+      border-bottom: 1px solid #eef0f2;
     }
     .result-item:hover { background: #f1f3f4; }
     .result-item.selected { background: var(--hover); color: var(--primary); font-weight: 500; }
@@ -165,6 +174,7 @@
       border: 2px solid #5f6368; border-radius: 2px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0; background: white;
+      margin-top: 1px;
     }
     .result-item.selected .custom-check {
       background: var(--primary); border-color: var(--primary);
@@ -173,7 +183,8 @@
       color: white; font-size: 11px; font-weight: bold; display: none;
     }
     .result-item.selected .check-mark { display: block; }
-    .item-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Nome inteiro: quebra em várias linhas em vez de cortar com "..." */
+    .item-text { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
     .empty-msg {
       padding: 24px 16px; text-align: center;
       color: var(--text-light); font-size: 12px;
@@ -227,7 +238,7 @@
       <label>Coluna:</label>
       <select id="colSelect" onchange="onColChange()"></select>
     </div>
-    <button class="btn-reload" onclick="reloadData()">↺ Atualizar Lista</button>
+    <button class="btn-reload" onclick="reloadData(true)">↺ Atualizar Lista</button>
   </div>
 
   <!-- PAINEL DE SELECIONADOS -->
@@ -243,9 +254,10 @@
   <div class="search-header">
     <div class="search-wrapper">
       <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="Filtrar..." autocomplete="off" autofocus>
+      <input type="text" id="searchInput" placeholder="Buscar..." autocomplete="off" autofocus>
       <button class="clear-search" id="clearSearch" onclick="clearSearchInput()" title="Limpar">✕</button>
     </div>
+    <div class="search-hint"><code>"pvc"</code> palavra exata (não traz CPVC) · <code>-cpvc</code> excluir</div>
   </div>
 
   <!-- INFO DE RESULTADOS -->
@@ -266,9 +278,12 @@
 
   <script>
     let rawData    = [];        // todos os dados da coluna
+    let rawLower   = [];        // rawData em minúsculas (calculado 1x, não a cada tecla)
     let filtered   = [];        // resultado do filtro atual
     let selectedSet = new Set(); // itens selecionados
     let focusedIdx  = -1;       // índice focado por teclado
+    let searchTimer = null;
+    const MAX_RENDER = 300;     // teto de linhas no DOM; o contador mostra o total encontrado
 
     // =========================================================
     // INICIALIZAÇÃO
@@ -304,7 +319,7 @@
       loadColumnsForSheet(targetCol, true);
     }
 
-    function loadColumnsForSheet(targetColIndex, isFirstLoad) {
+    function loadColumnsForSheet(targetColIndex, isFirstLoad, persistAfter) {
       const sheetName = document.getElementById('sheetSelect').value;
       const colSel = document.getElementById('colSelect');
       colSel.innerHTML = '<option>...</option>';
@@ -322,6 +337,7 @@
             colSel.appendChild(opt);
           });
           if (isFirstLoad) reloadData();
+          if (persistAfter) persistState();
         })
         .withFailureHandler(err => {
           colSel.disabled = false;
@@ -334,12 +350,14 @@
     // EVENTOS DE CONFIG
     // =========================================================
     function onSheetChange() {
-      loadColumnsForSheet(null, true);
-      persistState();
+      // persiste só depois que as colunas da aba nova carregam (antes o select
+      // ainda estava em "..." e a troca de aba não era salva)
+      loadColumnsForSheet(null, true, true);
     }
 
     function onColChange() {
       persistState();
+      reloadData();   // antes a lista continuava sendo a da coluna anterior
     }
 
     function persistState() {
@@ -355,7 +373,7 @@
       document.getElementById('configIcon').textContent = panel.classList.contains('open') ? '▲' : '▼';
     }
 
-    function reloadData() {
+    function reloadData(force) {
       const list = document.getElementById('resultsList');
       list.innerHTML = '<div class="empty-msg">Carregando dados...</div>';
       document.getElementById('resultsInfo').style.display = 'none';
@@ -369,11 +387,12 @@
         .withFailureHandler(err => {
           list.innerHTML = `<div class="empty-msg">Erro: ${err.message}</div>`;
         })
-        .getDadosParaBusca(sheetVal, colVal);
+        .getDadosParaBusca(sheetVal, colVal, !!force);
     }
 
     function onDataLoaded(data) {
       rawData = data || [];
+      rawLower = rawData.map(s => s.toLowerCase());
       filtered = [];
       renderEmptyState();
       // Reabre com a busca atual se houver
@@ -387,21 +406,70 @@
     function onSearchInput() {
       const val = document.getElementById('searchInput').value;
       document.getElementById('clearSearch').style.display = val ? 'block' : 'none';
-      runFilter();
       focusedIdx = -1;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(runFilter, 120);
+    }
+
+    /**
+     * Quebra a busca em termos:
+     *   pvc        contém            (casa PVC e CPVC)
+     *   "pvc"      palavra exata     (casa PVC, não CPVC) — aceita frase: "2 in"
+     *   -cpvc      exclui quem contém;  -"dwv" exclui pela palavra exata
+     * Aspa ainda não fechada já vale como exata, para filtrar enquanto digita.
+     */
+    function parseQuery(query) {
+      const terms = [];
+      const re = /(-?)"([^"]*)"?|(-?)(\S+)/g;
+      let m;
+      while ((m = re.exec(query)) !== null) {
+        const exact = m[2] !== undefined;
+        const text  = (exact ? m[2] : m[4]).trim().replace(/\s+/g, ' ');
+        const neg   = (exact ? m[1] : m[3]) === '-';
+        if (text && text !== '-') terms.push({ text, exact, neg });
+      }
+      return terms;
+    }
+
+    const _isAlnum = c => /[a-z0-9]/.test(c);
+    const _isDigit = c => c >= '0' && c <= '9';
+
+    /**
+     * Palavra exata: o termo não pode estar colado em letra/número.
+     * Medida também conta: "2" não casa o 2 de 1/2, 1-1/2 nem 2-1/2.
+     */
+    function hasWholeTerm(lower, term) {
+      const startsDigit = _isDigit(term[0]);
+      const endsDigit   = _isDigit(term[term.length - 1]);
+      let i = lower.indexOf(term);
+      while (i !== -1) {
+        const end  = i + term.length;
+        const prev = i > 0 ? lower[i - 1] : '';
+        const next = end < lower.length ? lower[end] : '';
+        const gluedBefore = prev && (_isAlnum(prev) ||
+          (startsDigit && '/-.'.includes(prev) && i >= 2 && _isDigit(lower[i - 2])));
+        const gluedAfter = next && (_isAlnum(next) ||
+          (endsDigit && '/-.'.includes(next) && _isDigit(lower[end + 1] || '')));
+        if (!gluedBefore && !gluedAfter) return true;
+        i = lower.indexOf(term, i + 1);
+      }
+      return false;
     }
 
     function runFilter() {
-      const query = document.getElementById('searchInput').value.toLowerCase().trim();
-      if (!query) {
+      const terms = parseQuery(document.getElementById('searchInput').value.toLowerCase());
+      // Só exclusões ("-cpvc" sozinho) não filtram nada: precisa de um termo positivo
+      if (!terms.some(t => !t.neg)) {
         filtered = [];
         renderEmptyState();
         return;
       }
-      const tokens = query.split(/\s+/).filter(t => t.length > 0);
-      filtered = rawData.filter(item => {
-        const lower = item.toLowerCase();
-        return tokens.every(t => lower.includes(t));
+      filtered = rawData.filter((item, idx) => {
+        const lower = rawLower[idx];
+        return terms.every(t => {
+          const hit = t.exact ? hasWholeTerm(lower, t.text) : lower.includes(t.text);
+          return t.neg ? !hit : hit;
+        });
       });
       renderList();
     }
@@ -444,10 +512,13 @@
         return;
       }
 
-      info.textContent = `${filtered.length} de ${rawData.length} itens`;
+      const shown = Math.min(filtered.length, MAX_RENDER);
+      info.textContent = filtered.length > MAX_RENDER
+        ? `${filtered.length} de ${rawData.length} itens — mostrando ${shown}, refine a busca`
+        : `${filtered.length} de ${rawData.length} itens`;
       info.style.display = 'block';
 
-      filtered.forEach((text, idx) => {
+      filtered.slice(0, MAX_RENDER).forEach((text, idx) => {
         const div = document.createElement('div');
         div.className = 'result-item' + (selectedSet.has(text) ? ' selected' : '');
         div.dataset.idx = idx;
@@ -615,8 +686,10 @@
         .withSuccessHandler(result => {
           if (result && result.success) {
             showToast(`✓ ${result.data.inserted} item(s) inserido(s)`, 'success');
+            // Só a seleção é limpa — a busca e a lista ficam, para inserir mais itens
             clearAllSelected();
-            clearSearchInput();
+            const input = document.getElementById('searchInput');
+            input.focus();
           } else {
             showToast('Erro: ' + (result && result.error ? result.error : 'Falha desconhecida'), 'error');
             updateFooter();
