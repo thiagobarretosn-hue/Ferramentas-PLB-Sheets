@@ -87,6 +87,9 @@ Ferramentas-PLB-Sheets/
 **Ferramentas removidas (07/2026):** Template (planilha central), Fixadores, ConditionalFormat,
 Logger — código preservado em `C:\DEV\_OBSOLETO\Sheets\Ferramentas-PLB-Sheets-higiene-2026-07-08\`.
 
+**Submittal (removido 30/09/2026):** vive SÓ em `C:\DEV\Sheets\Submittal-GAS` (repositório próprio).
+Não recriar `Submittal.gs`/`SubmittalSidebar.html` aqui — a cópia que existia ficou para trás da original.
+
 ---
 
 ## SEÇÃO 2: ERROS CRÍTICOS E SOLUÇÕES

@@ -1,5 +1,6 @@
 /**
  * @fileoverview Menu Principal - Ferramentas PLB Sheets
+ * @version 3.3.0 - Montar Submittal saiu daqui: vive só no repositório Submittal-GAS
  * @version 3.2.0 - Removido onEdit vazio (rodava a cada edição sem fazer nada)
  */
 
@@ -15,6 +16,5 @@ function onOpen() {
     .addItem('🔍 Super Busca', 'abrirSuperBuscaSidebar')
     .addSeparator()
     .addItem('📊 Summary All', 'openSummaryAllSidebar')
-    .addItem('📦 Montar Submittal', 'openSubmittalSidebar')
     .addToUi();
 }
